@@ -1,5 +1,5 @@
 /** Both dice use this size at the bottom edge of the stage. */
-export const DIE_LAUNCH_SIZE_PX = 50
+export const DIE_LAUNCH_SIZE_PX = 45
 
 /** Size at the back wall, relative to `DIE_LAUNCH_SIZE_PX`. */
 export const DIE_DEPTH_SCALE = 0.50
@@ -98,4 +98,4 @@ export const PUCK_ON_5_SCALE = 0.39
 
 export const PUCK_ON_4_X = 150
 export const PUCK_ON_4_Y = 1660
-export const PUCK_ON_4_SCALE = 0.4
+export const PUCK_ON_4_SCALE = 0.41
