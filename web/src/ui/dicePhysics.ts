@@ -1,4 +1,5 @@
 import { REFERENCE_HEIGHT, REFERENCE_WIDTH } from '../config/constants'
+import { applyRoll } from './puckState'
 import {
   DIE_BINANCE_BUY_REF,
   DIE_BINANCE_SELL_REF,
@@ -67,12 +68,16 @@ export interface VolumeTotals {
   coinbaseSell: number
 }
 
+export type ThrowResult = { total: number; label: string | null } | { noRoll: true }
+
 export interface ThrowState {
   phase: 'holding' | 'flying' | 'result'
   phaseStartedMs: number
   sharedX: number
   dice: [Die, Die]
-  result: string | null
+  /** Pass-line point. Null is come-out, with the OFF puck in the Don't Come bar. */
+  point: number | null
+  result: ThrowResult | null
   flightMs: number
 }
 
@@ -137,6 +142,7 @@ export const createThrowState = (
   phaseStartedMs: nowMs,
   sharedX,
   dice: createHoldingDice(sharedX, random),
+  point: null,
   result: null,
   flightMs: 0,
 })
@@ -233,13 +239,15 @@ export const advanceThrow = (
     }
     const noRoll = dice.some((die) => !die.alive)
     const total = (dice[0].topFace ?? 0) + (dice[1].topFace ?? 0)
+    const roll = noRoll ? null : applyRoll(state.point, total)
     return {
       ...state,
       phase: 'result',
       phaseStartedMs: nowMs,
       flightMs,
       dice,
-      result: noRoll ? 'No Roll!' : String(total),
+      point: roll ? roll.point : state.point,
+      result: roll ? { total, label: roll.label } : { noRoll: true },
     }
   }
 
@@ -250,6 +258,7 @@ export const advanceThrow = (
     phaseStartedMs: nowMs,
     sharedX,
     dice: createHoldingDice(sharedX),
+    point: state.point,
     result: null,
     flightMs: 0,
   }

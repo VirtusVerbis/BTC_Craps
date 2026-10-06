@@ -13,6 +13,7 @@ import {
   DIE_WALL_RESTITUTION,
   DIE_WALL_SPIN_RAD,
 } from './diceConstants'
+import { applyRoll, puckPlacement } from './puckState'
 import {
   advanceThrow,
   createHoldingDice,
@@ -327,7 +328,8 @@ describe('throw cycle', () => {
     expect(early.dice[0].alive).toBe(true)
     const done = advanceThrow(early, 0.016, 1000 + DIE_NO_ROLL_PAUSE_MS, volume)
     expect(done.phase).toBe('result')
-    expect(done.result).toBe('No Roll!')
+    expect(done.result).toEqual({ noRoll: true })
+    expect(done.point).toBeNull()
     expect(done.dice[0].alive).toBe(false)
   })
 
@@ -342,7 +344,7 @@ describe('throw cycle', () => {
       { binanceBuy: 1, coinbaseBuy: 1, binanceSell: 0, coinbaseSell: 0 },
     )
     expect(next.phase).toBe('result')
-    expect(next.result).toBe('No Roll!')
+    expect(next.result).toEqual({ noRoll: true })
   })
 
   it('shows the face total, then resets after the result hold', () => {
@@ -355,7 +357,8 @@ describe('throw cycle', () => {
       1000,
       { binanceBuy: 1, coinbaseBuy: 1, binanceSell: 0, coinbaseSell: 0 },
     )
-    expect(result.result).toBe('7')
+    expect(result.result).toEqual({ total: 7, label: 'Pass Line' })
+    expect(result.point).toBeNull()
     const still = advanceThrow(result, 0.016, 1000 + DIE_RESULT_HOLD_MS - 1, {
       binanceBuy: 1,
       coinbaseBuy: 1,
@@ -371,7 +374,82 @@ describe('throw cycle', () => {
     })
     expect(reset.phase).toBe('holding')
     expect(reset.result).toBeNull()
+    expect(reset.point).toBeNull()
     expect(reset.dice[0].z).toBe(0)
     expect(reset.dice[1].z).toBe(0)
+  })
+})
+
+const volume = { binanceBuy: 1, coinbaseBuy: 1, binanceSell: 0, coinbaseSell: 0 }
+
+const settleRoll = (leftFace: number, rightFace: number, point: number | null = null) => {
+  const state = createThrowState(0, 540)
+  const left = flyingDie({ resting: true, topFace: leftFace, alive: true })
+  const right = flyingDie({ resting: true, topFace: rightFace, alive: true, x: 620 })
+  return advanceThrow({ ...state, phase: 'flying', point, dice: [left, right] }, 0.016, 1000, volume)
+}
+
+describe('pass line puck', () => {
+  it('names a come-out 7 or 11 as a pass line win and stays off', () => {
+    expect(applyRoll(null, 7)).toEqual({ point: null, label: 'Pass Line' })
+    expect(applyRoll(null, 11)).toEqual({ point: null, label: 'Pass Line' })
+    expect(settleRoll(5, 6).result).toEqual({ total: 11, label: 'Pass Line' })
+    expect(settleRoll(5, 6).point).toBeNull()
+  })
+
+  it('names a come-out 2, 3, or 12 as a pass line loss and stays off', () => {
+    expect(applyRoll(null, 2)).toEqual({ point: null, label: 'Pass Line loses' })
+    expect(applyRoll(null, 3)).toEqual({ point: null, label: 'Pass Line loses' })
+    expect(applyRoll(null, 12)).toEqual({ point: null, label: 'Pass Line loses' })
+    expect(settleRoll(6, 6).point).toBeNull()
+  })
+
+  it('sets the point on 4, 5, 6, 8, 9, or 10 and shows the total only', () => {
+    for (const total of [4, 5, 6, 8, 9, 10]) {
+      expect(applyRoll(null, total)).toEqual({ point: total, label: null })
+    }
+    const set = settleRoll(6, 4)
+    expect(set.point).toBe(10)
+    expect(set.result).toEqual({ total: 10, label: null })
+    expect(puckPlacement(set.point).src).toBe('/On_Puck.png')
+  })
+
+  it('clears the point when that number hits again', () => {
+    const made = settleRoll(4, 6, 10)
+    expect(made.point).toBeNull()
+    expect(made.result).toEqual({ total: 10, label: 'Point' })
+    expect(puckPlacement(made.point).src).toBe('/Off_Puck.png')
+  })
+
+  it('clears the point on a seven out', () => {
+    const out = settleRoll(3, 4, 10)
+    expect(out.point).toBeNull()
+    expect(out.result).toEqual({ total: 7, label: 'Seven Out!' })
+  })
+
+  it('leaves the point in place for any other total', () => {
+    const kept = settleRoll(5, 1, 10)
+    expect(kept.point).toBe(10)
+    expect(kept.result).toEqual({ total: 6, label: null })
+  })
+
+  it('keeps the point on a no roll', () => {
+    const state = createThrowState(0, 540)
+    const left = flyingDie({ alive: false, resting: false })
+    const right = flyingDie({ resting: true, topFace: 5, alive: true })
+    const next = advanceThrow({ ...state, phase: 'flying', point: 9, dice: [left, right] }, 0.016, 1000, volume)
+    expect(next.result).toEqual({ noRoll: true })
+    expect(next.point).toBe(9)
+  })
+
+  it('keeps the point into the next hold', () => {
+    const set = settleRoll(3, 3)
+    expect(set.point).toBe(6)
+    const reset = advanceThrow(set, 0.016, 1000 + DIE_RESULT_HOLD_MS, volume)
+    expect(reset.phase).toBe('holding')
+    expect(reset.result).toBeNull()
+    expect(reset.point).toBe(6)
+    expect(puckPlacement(null)).toMatchObject({ src: '/Off_Puck.png', x: 360, y: 830, scale: 0.18 })
+    expect(puckPlacement(6)).toMatchObject({ src: '/On_Puck.png', x: 230, y: 1180, scale: 0.26 })
   })
 })

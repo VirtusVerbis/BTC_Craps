@@ -14,7 +14,7 @@ export const DIE_LAUNCH_DELAY_MS = 3000
 export const DIE_RESULT_HOLD_MS = 2000
 
 /** How long a die that cleared the back wall stays visible if it is still on screen. */
-export const DIE_NO_ROLL_PAUSE_MS = 400
+export const DIE_NO_ROLL_PAUSE_MS = 800
 
 /** Trailing trade window sampled at launch. Independent of the overlay's 5s reset. */
 export const DIE_VOLUME_WINDOW_MS = 3000
@@ -66,3 +66,36 @@ export const DIE_BINANCE_BUY_REF = 6
 export const DIE_COINBASE_BUY_REF = 1.5
 export const DIE_BINANCE_SELL_REF = 6
 export const DIE_COINBASE_SELL_REF = 1.5
+
+/** Puck art width. Scale constants multiply this. */
+export const PUCK_IMAGE_WIDTH_PX = 291
+
+/** OFF puck center, in the dealer-end Don't Come bar. */
+export const PUCK_OFF_X = 200
+export const PUCK_OFF_Y = 925
+export const PUCK_OFF_SCALE = 0.3
+
+/** ON puck center on each point box. Farther up the felt is slightly smaller. */
+export const PUCK_ON_10_X = 230
+export const PUCK_ON_10_Y = 1025
+export const PUCK_ON_10_SCALE = 0.3
+
+export const PUCK_ON_9_X = 200
+export const PUCK_ON_9_Y = 1200
+export const PUCK_ON_9_SCALE = 0.31
+
+export const PUCK_ON_8_X = 190
+export const PUCK_ON_8_Y = 1290
+export const PUCK_ON_8_SCALE = 0.34
+
+export const PUCK_ON_6_X = 180
+export const PUCK_ON_6_Y = 1180
+export const PUCK_ON_6_SCALE = 0.37
+
+export const PUCK_ON_5_X = 170
+export const PUCK_ON_5_Y = 1540
+export const PUCK_ON_5_SCALE = 0.39
+
+export const PUCK_ON_4_X = 150
+export const PUCK_ON_4_Y = 1660
+export const PUCK_ON_4_SCALE = 0.4

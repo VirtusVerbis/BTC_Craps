@@ -7,6 +7,7 @@ import {
   quatToCssMatrix,
   stageMetrics,
   type Die,
+  type ThrowResult,
   type ThrowState,
 } from './dicePhysics'
 import { useDiceVolumeWindow } from './useDiceVolumeWindow'
@@ -22,7 +23,8 @@ export interface DieView {
 
 export interface DicePresentation {
   dice: [DieView, DieView]
-  result: string | null
+  result: ThrowResult | null
+  point: number | null
 }
 
 const toView = (die: Die, id: 'left' | 'right'): DieView => {
@@ -40,6 +42,7 @@ const toView = (die: Die, id: 'left' | 'right'): DieView => {
 const present = (state: ThrowState): DicePresentation => ({
   dice: [toView(state.dice[0], 'left'), toView(state.dice[1], 'right')],
   result: state.phase === 'result' ? state.result : null,
+  point: state.point,
 })
 
 export const useDiceThrow = (market: MarketSnapshot, enabled: boolean): DicePresentation | null => {

@@ -1,4 +1,5 @@
-import { DIE_FACE_ALPHA } from './diceConstants'
+import { DIE_FACE_ALPHA, PUCK_IMAGE_WIDTH_PX } from './diceConstants'
+import { puckPlacement } from './puckState'
 import type { DicePresentation } from './useDiceThrow'
 
 const PIP_LAYOUT: Record<number, Array<[number, number]>> = {
@@ -52,31 +53,53 @@ const Face = ({ name, value }: { name: string; value: number }) => (
   </div>
 )
 
-export const DiceLayer = ({ presentation }: { presentation: DicePresentation }) => (
-  <>
-    <div className="dice-layer" aria-hidden={presentation.result == null}>
-      {presentation.dice.map((die) =>
-        die.visible ? (
-          <div
-            key={die.id}
-            className="die"
-            style={{
-              width: die.size,
-              height: die.size,
-              left: die.x - die.size / 2,
-              top: die.y - die.size / 2,
-              ['--die-half' as string]: `${die.size / 2}px`,
-            }}
-          >
-            <div className="die-spin" style={{ transform: die.transform }}>
-              {FACES.map((face) => (
-                <Face key={face.name} name={face.name} value={face.value} />
-              ))}
+export const DiceLayer = ({ presentation }: { presentation: DicePresentation }) => {
+  const puck = puckPlacement(presentation.point)
+  const result = presentation.result
+  return (
+    <>
+      <div className="dice-layer" aria-hidden={result == null}>
+        <img
+          className="puck"
+          src={puck.src}
+          alt=""
+          draggable={false}
+          style={{ left: puck.x, top: puck.y, width: PUCK_IMAGE_WIDTH_PX * puck.scale }}
+        />
+        {presentation.dice.map((die) =>
+          die.visible ? (
+            <div
+              key={die.id}
+              className="die"
+              style={{
+                width: die.size,
+                height: die.size,
+                left: die.x - die.size / 2,
+                top: die.y - die.size / 2,
+                ['--die-half' as string]: `${die.size / 2}px`,
+              }}
+            >
+              <div className="die-spin" style={{ transform: die.transform }}>
+                {FACES.map((face) => (
+                  <Face key={face.name} name={face.name} value={face.value} />
+                ))}
+              </div>
             </div>
-          </div>
-        ) : null,
-      )}
-    </div>
-    {presentation.result ? <div className="dice-result">{presentation.result}</div> : null}
-  </>
-)
+          ) : null,
+        )}
+      </div>
+      {result ? (
+        <div className="dice-result">
+          {'noRoll' in result ? (
+            <div className="dice-result-total">No Roll!</div>
+          ) : (
+            <>
+              <div className="dice-result-total">{result.total}</div>
+              {result.label ? <div className="dice-result-label">{result.label}</div> : null}
+            </>
+          )}
+        </div>
+      ) : null}
+    </>
+  )
+}
