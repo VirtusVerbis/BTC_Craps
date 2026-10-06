@@ -15,6 +15,8 @@ import {
   BG2_NEO_TOP_OFFSET_FRACTION,
 } from './androidMirrorConstants'
 import { BtcCandleChart } from './BtcCandleChart'
+import { DiceLayer } from './DiceLayer'
+import type { DicePresentation } from './useDiceThrow'
 import type { Bg2ActiveMeme } from './useBg2MemeState'
 import type { Fg3CatState } from './useFg3CatState'
 import { mobileAssetManifest } from './mobileAssetManifest'
@@ -60,6 +62,7 @@ interface CrapsSceneProps {
   fg3Top: number
   fg3Width: number
   fg3Height: number
+  dice: DicePresentation | null
 }
 
 export const CrapsScene = ({
@@ -76,6 +79,7 @@ export const CrapsScene = ({
   fg3Top,
   fg3Width,
   fg3Height,
+  dice,
 }: CrapsSceneProps) => {
   const m = mobileAssetManifest
   const bg2MemeSrc = (() => {
@@ -152,6 +156,7 @@ export const CrapsScene = ({
           draggable={false}
         />
       ) : null}
+      {dice ? <DiceLayer presentation={dice} /> : null}
     </div>
   )
 }

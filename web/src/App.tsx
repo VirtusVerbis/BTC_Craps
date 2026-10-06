@@ -10,6 +10,7 @@ import { Stage } from './ui/Stage'
 import { BG2_MAX_CANDLES } from './ui/androidMirrorConstants'
 import { useBg2ChartVisible } from './ui/useBg2ChartVisibility'
 import { useBg2MemeState } from './ui/useBg2MemeState'
+import { useDiceThrow } from './ui/useDiceThrow'
 import { useFg3CatState } from './ui/useFg3CatState'
 import { useVideoOverlayState } from './ui/useVideoOverlayState'
 import { VideoOverlay } from './ui/VideoOverlay'
@@ -91,6 +92,7 @@ function App() {
   const isVideoActive = videoOverlay.isVideoActive
   const bg2Visible = useBg2ChartVisible(hasActiveBg2Meme || isVideoActive)
   const fg3 = useFg3CatState()
+  const dice = useDiceThrow(feed.market, splashDone)
 
   const marketService = useMemo(
     () =>
@@ -143,6 +145,7 @@ function App() {
               fg3Top={fg3.top}
               fg3Width={fg3.width}
               fg3Height={fg3.height}
+              dice={dice}
             />
             <Overlay market={feed.market} block={blockState} onTimeClick={() => {}} status={feed.status} />
             {videoOverlay.active ? (
