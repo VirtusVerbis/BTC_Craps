@@ -81,7 +81,7 @@ export const PUCK_ON_10_Y = 1025
 export const PUCK_ON_10_SCALE = 0.3
 
 export const PUCK_ON_9_X = 200
-export const PUCK_ON_9_Y = 1200
+export const PUCK_ON_9_Y = 1150
 export const PUCK_ON_9_SCALE = 0.31
 
 export const PUCK_ON_8_X = 190
