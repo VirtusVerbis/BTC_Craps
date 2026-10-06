@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
+  DIE_BINANCE_SELL_REF,
+  DIE_COINBASE_SELL_REF,
   DIE_DEPTH_SCALE,
+  DIE_FORWARD_SPIN_SCALE,
   DIE_LAUNCH_DELAY_MS,
   DIE_LAUNCH_SIZE_PX,
+  DIE_MAX_SPIN_RAD_PER_S,
+  DIE_MIN_REACH_FRACTION,
   DIE_RESULT_HOLD_MS,
 } from './diceConstants'
 import {
@@ -12,6 +17,7 @@ import {
   dieScreenCenter,
   dieSize,
   launchSpeeds,
+  logUnit,
   readTopFace,
   stageMetrics,
   stepDice,
@@ -98,6 +104,14 @@ describe('bounces', () => {
     expect(backed.vz).toBeGreaterThan(0)
   })
 
+  it('keeps forward speed when a fast die meets the felt on a short hop', () => {
+    const die = flyingDie({ h: 0.2, vh: -40, vz: 500, vx: 0 })
+    const [next] = stepDice([die, flyingDie({ alive: false })], 1 / 60, metrics)
+    expect(next.resting).toBe(false)
+    expect(next.vz).toBeGreaterThan(0)
+    expect(next.vz).toBeLessThan(500)
+  })
+
   it('bounces off the back wall when the die is below the top of the wall', () => {
     const radius = dieSize(metrics.wallZ, metrics) / 2
     const die = flyingDie({ z: metrics.wallZ - radius - 1, vz: 700, h: 20, vh: 0 })
@@ -143,9 +157,54 @@ describe('distance scalar', () => {
     expect(flight.maxZ).toBeGreaterThan(metrics.wallZ * 0.85)
   })
 
-  it('sends an ordinary buy sample past halfway', () => {
-    const flight = travel(1, 0.3)
-    expect(flight.maxZ).toBeGreaterThan(metrics.wallZ * 0.5)
+  it('sends a weak buy sample near the minimum reach', () => {
+    const flight = travel(0.05, 0.02)
+    expect(flight.maxZ).toBeGreaterThan(80)
+    expect(flight.maxZ).toBeGreaterThan(metrics.wallZ * DIE_MIN_REACH_FRACTION * 0.5)
+    expect(flight.maxZ).toBeLessThan(metrics.wallZ * 0.55)
+  })
+
+  it('sends one strong book much farther than a weak pair', () => {
+    const weak = travel(0.05, 0.02)
+    const oneSided = travel(6, 0.01)
+    expect(oneSided.maxZ).toBeGreaterThan(weak.maxZ + metrics.wallZ * 0.25)
+  })
+
+  it('sends a mid buy sample between a weak pair and one strong book', () => {
+    const weak = travel(0.05, 0.02)
+    const mid = travel(1, 0.3)
+    const oneSided = travel(6, 0.01)
+    expect(mid.maxZ).toBeGreaterThan(weak.maxZ)
+    expect(mid.maxZ).toBeLessThan(oneSided.maxZ)
+  })
+})
+
+describe('resting face', () => {
+  const sequence = (values: number[]) => {
+    let index = 0
+    return () => values[index++] ?? 0
+  }
+
+  it('gives each die its own top face and matches the quaternion', () => {
+    const [left, right] = createHoldingDice(540, sequence([0, 0, 0.5, 0]))
+    expect(left.topFace).not.toBe(1)
+    expect(right.topFace).not.toBe(left.topFace)
+    expect(readTopFace(left.q)).toBe(left.topFace)
+    expect(readTopFace(right.q)).toBe(right.topFace)
+  })
+
+  it('can show every face on top', () => {
+    const faces = new Set<number>()
+    for (let face = 0; face < 6; face += 1) {
+      for (let twist = 0; twist < 4; twist += 1) {
+        const [die] = createHoldingDice(540, sequence([(face + 0.1) / 6, (twist + 0.1) / 4, 0, 0]))
+        expect(die.topFace).toBeGreaterThanOrEqual(1)
+        expect(die.topFace).toBeLessThanOrEqual(6)
+        expect(readTopFace(die.q)).toBe(die.topFace)
+        faces.add(die.topFace ?? 0)
+      }
+    }
+    expect(faces.size).toBe(6)
   })
 })
 
@@ -182,8 +241,10 @@ describe('throw cycle', () => {
     expect(launched.dice[0].vh).toBeCloseTo(launched.dice[1].vh)
     expect(launched.dice[0].vh).toBeGreaterThan(0)
     expect(launched.dice[0].vz).toBeGreaterThan(0)
-    expect(launched.dice[0].w.x).toBeGreaterThan(0)
-    expect(launched.dice[1].w.x).toBeLessThan(0)
+    const leftSpin = DIE_MAX_SPIN_RAD_PER_S * logUnit(1, DIE_BINANCE_SELL_REF) * DIE_FORWARD_SPIN_SCALE
+    const rightSpin = DIE_MAX_SPIN_RAD_PER_S * logUnit(0.2, DIE_COINBASE_SELL_REF) * DIE_FORWARD_SPIN_SCALE
+    expect(launched.dice[0].w.x).toBeCloseTo(leftSpin)
+    expect(launched.dice[1].w.x).toBeCloseTo(-rightSpin)
     expect(launched.dice[1].x - launched.dice[0].x).toBeCloseTo(DIE_LAUNCH_SIZE_PX)
   })
 

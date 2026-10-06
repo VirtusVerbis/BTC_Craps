@@ -138,6 +138,7 @@ body {
   z-index: 11;
   pointer-events: none;
   perspective: 900px;
+  perspective-origin: 50% 0%;
 }
 
 .die {

@@ -7,12 +7,14 @@ import {
   DIE_DEPTH_SCALE,
   DIE_FELT_RESTITUTION,
   DIE_FELT_SPEED_KEEP,
+  DIE_FORWARD_SPIN_SCALE,
   DIE_FULL_REACH_SEC,
   DIE_GRAVITY_PX_PER_S2,
   DIE_LAUNCH_DELAY_MS,
   DIE_LAUNCH_SIZE_PX,
   DIE_MAX_FLIGHT_MS,
   DIE_MAX_SPIN_RAD_PER_S,
+  DIE_MIN_REACH_FRACTION,
   DIE_REST_SPEED_PX_PER_S,
   DIE_REST_VERTICAL_PX_PER_S,
   DIE_RESULT_HOLD_MS,
@@ -114,16 +116,20 @@ export const randomSharedX = (random: () => number = Math.random): number => {
   return min + random() * (max - min)
 }
 
-export const createHoldingDice = (sharedX: number): [Die, Die] => {
+export const createHoldingDice = (sharedX: number, random: () => number = Math.random): [Die, Die] => {
   const half = DIE_LAUNCH_SIZE_PX / 2
-  return [makeDie(sharedX - half), makeDie(sharedX + half)]
+  return [makeDie(sharedX - half, random), makeDie(sharedX + half, random)]
 }
 
-export const createThrowState = (nowMs: number, sharedX: number = randomSharedX()): ThrowState => ({
+export const createThrowState = (
+  nowMs: number,
+  sharedX: number = randomSharedX(),
+  random: () => number = Math.random,
+): ThrowState => ({
   phase: 'holding',
   phaseStartedMs: nowMs,
   sharedX,
-  dice: createHoldingDice(sharedX),
+  dice: createHoldingDice(sharedX, random),
   result: null,
   flightMs: 0,
 })
@@ -231,15 +237,12 @@ export const advanceThrow = (
   }
 }
 
-/** Shared launch speeds. Full strength covers the felt and can clear the wall; both dice use the same pair. */
+/** Shared launch speeds. One buy-volume distance for both dice; felt hits decide how many bounces that takes. */
 export const launchSpeeds = (volume: VolumeTotals, metrics: StageMetrics = stageMetrics()): { forward: number; up: number } => {
-  const forwardUnit = logUnit(volume.binanceBuy, DIE_BINANCE_BUY_REF)
-  const upUnit = logUnit(volume.coinbaseBuy, DIE_COINBASE_BUY_REF)
-  const bounceKeep = DIE_FELT_SPEED_KEEP * DIE_FELT_SPEED_KEEP
-  const forwardFull = metrics.wallZ / DIE_FULL_REACH_SEC / bounceKeep
-  const arriveT = metrics.wallZ / Math.max(forwardFull, 1)
-  const upFull = (metrics.wallHeight + 0.5 * DIE_GRAVITY_PX_PER_S2 * arriveT * arriveT) / Math.max(arriveT, 0.05)
-  return { forward: forwardFull * forwardUnit, up: upFull * upUnit }
+  const full = fullStrengthSpeeds(metrics)
+  const targetZ = metrics.wallZ * reachFraction(volume)
+  const scale = launchScale(targetZ, full, metrics)
+  return { forward: full.forward * scale, up: full.up * scale }
 }
 
 const launchDice = (dice: readonly [Die, Die], volume: VolumeTotals, metrics: StageMetrics): [Die, Die] => {
@@ -259,7 +262,11 @@ const applyLaunch = (die: Die, forward: number, up: number, spin: number, sign: 
   die.vx = 0
   die.vz = forward
   die.vh = up
-  die.w = { x: sign * spin, y: sign * spin * 0.45, z: sign * spin * 0.7 }
+  die.w = {
+    x: sign * spin * DIE_FORWARD_SPIN_SCALE,
+    y: sign * spin * 0.45,
+    z: sign * spin * 0.7,
+  }
 }
 
 const substep = (dice: [Die, Die], dt: number, metrics: StageMetrics): [Die, Die] => {
@@ -319,7 +326,7 @@ const constrain = (die: Die, metrics: StageMetrics, dt: number): Die => {
     if (next.vh <= 0 && hop < 1.5 && slide < DIE_REST_SPEED_PX_PER_S && Math.abs(next.vh) < DIE_REST_VERTICAL_PX_PER_S) {
       return forceRest(next)
     }
-    if (next.vh < 0 && hop >= 1.5) {
+    if (next.vh < 0) {
       const r = dieSize(next.z, metrics) / 2
       next.vx += next.w.z * r * DIE_SPIN_KICK
       next.vz += next.w.x * r * DIE_SPIN_KICK
@@ -403,7 +410,9 @@ const dampSpin = (die: Die) => {
   die.w = { x: die.w.x * DIE_SPIN_DAMP, y: die.w.y * DIE_SPIN_DAMP, z: die.w.z * DIE_SPIN_DAMP }
 }
 
-const makeDie = (x: number): Die => ({
+const makeDie = (x: number, random: () => number = Math.random): Die => restingDie(x, randomRestQuat(random))
+
+const restingDie = (x: number, q: Quat): Die => ({
   alive: true,
   resting: true,
   x,
@@ -412,9 +421,96 @@ const makeDie = (x: number): Die => ({
   vx: 0,
   vz: 0,
   vh: 0,
-  q: { ...IDENTITY },
+  q,
   w: { x: 0, y: 0, z: 0 },
-  topFace: 1,
+  topFace: readTopFace(q),
+})
+
+const buyDistanceUnit = (volume: VolumeTotals): number => {
+  const binance = logUnit(volume.binanceBuy, DIE_BINANCE_BUY_REF)
+  const coinbase = logUnit(volume.coinbaseBuy, DIE_COINBASE_BUY_REF)
+  return 1 - (1 - binance) * (1 - coinbase)
+}
+
+const reachFraction = (volume: VolumeTotals): number => {
+  const k = buyDistanceUnit(volume)
+  return DIE_MIN_REACH_FRACTION + (1 - DIE_MIN_REACH_FRACTION) * k
+}
+
+/** Ceiling of the launch search. The 0.62² term is not a required bounce count. */
+const fullStrengthSpeeds = (metrics: StageMetrics): { forward: number; up: number } => {
+  const bounceKeep = DIE_FELT_SPEED_KEEP * DIE_FELT_SPEED_KEEP
+  const forward = metrics.wallZ / DIE_FULL_REACH_SEC / bounceKeep
+  const arriveT = metrics.wallZ / Math.max(forward, 1)
+  const up = (metrics.wallHeight + 0.5 * DIE_GRAVITY_PX_PER_S2 * arriveT * arriveT) / Math.max(arriveT, 0.05)
+  return { forward, up }
+}
+
+const simulatedMaxZ = (forward: number, up: number, metrics: StageMetrics): number => {
+  const probe = restingDie(metrics.width / 2, IDENTITY)
+  probe.resting = false
+  probe.topFace = null
+  probe.vz = forward
+  probe.vh = up
+  const idle = restingDie(0, IDENTITY)
+  idle.alive = false
+  let dice: [Die, Die] = [probe, idle]
+  let maxZ = 0
+  const dt = 1 / 60
+  const steps = Math.ceil(DIE_MAX_FLIGHT_MS / 1000 / dt)
+  for (let i = 0; i < steps; i += 1) {
+    dice = stepDice(dice, dt, metrics)
+    maxZ = Math.max(maxZ, dice[0].z)
+    if (!dice[0].alive || dice[0].resting) break
+  }
+  return maxZ
+}
+
+const launchScale = (
+  targetZ: number,
+  full: { forward: number; up: number },
+  metrics: StageMetrics,
+): number => {
+  const reaches = (scale: number) => simulatedMaxZ(full.forward * scale, full.up * scale, metrics) >= targetZ - 0.5
+  if (!reaches(1)) return 1
+  let lo = 0
+  let hi = 1
+  for (let i = 0; i < 10; i += 1) {
+    const mid = (lo + hi) / 2
+    if (reaches(mid)) hi = mid
+    else lo = mid
+  }
+  return hi
+}
+
+const HALF_SQRT2 = Math.SQRT1_2
+
+/** Resting orientations whose top faces are 3, 4, 2, 5, 6, then 1. */
+const FACE_UP_QUATS: Quat[] = [
+  { x: 0, y: 0, z: HALF_SQRT2, w: HALF_SQRT2 },
+  { x: 0, y: 0, z: -HALF_SQRT2, w: HALF_SQRT2 },
+  { x: -HALF_SQRT2, y: 0, z: 0, w: HALF_SQRT2 },
+  { x: HALF_SQRT2, y: 0, z: 0, w: HALF_SQRT2 },
+  { x: 0, y: 0, z: 1, w: 0 },
+  { x: 0, y: 0, z: 0, w: 1 },
+]
+
+const randomRestQuat = (random: () => number): Quat => {
+  const face = Math.min(5, Math.floor(random() * 6))
+  const twist = Math.min(3, Math.floor(random() * 4))
+  return normalizeQuat(quatMul(yawQuat(twist), FACE_UP_QUATS[face]))
+}
+
+const yawQuat = (quarterTurns: number): Quat => {
+  const half = ((quarterTurns % 4) * Math.PI) / 4
+  return { x: 0, y: Math.sin(half), z: 0, w: Math.cos(half) }
+}
+
+const quatMul = (a: Quat, b: Quat): Quat => ({
+  w: a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z,
+  x: a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
+  y: a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
+  z: a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w,
 })
 
 const cloneDie = (die: Die): Die => ({

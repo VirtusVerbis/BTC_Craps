@@ -1,8 +1,8 @@
 /** Both dice use this size at the bottom edge of the stage. */
-export const DIE_LAUNCH_SIZE_PX = 80
+export const DIE_LAUNCH_SIZE_PX = 50
 
 /** Size at the back wall, relative to `DIE_LAUNCH_SIZE_PX`. */
-export const DIE_DEPTH_SCALE = 0.8
+export const DIE_DEPTH_SCALE = 0.50
 
 /** Red face opacity. Pips stay opaque. */
 export const DIE_FACE_ALPHA = 0.55
@@ -44,6 +44,15 @@ export const DIE_MAX_FLIGHT_MS = 20_000
  */
 export const DIE_FULL_REACH_SEC = 0.45
 export const DIE_MAX_SPIN_RAD_PER_S = 12
+
+/** Multiplier on world-X tumble for both dice. 1 matches the sell-volume spin rate. */
+export const DIE_FORWARD_SPIN_SCALE = 2
+
+/**
+ * Nearest aim for a throw that has already launched, as a fraction of felt depth.
+ * Buy volume fills the rest of the way to the back wall.
+ */
+export const DIE_MIN_REACH_FRACTION = 0.95
 
 /** Log-scale references for one volume window. Tune per exchange. */
 export const DIE_BINANCE_BUY_REF = 6
