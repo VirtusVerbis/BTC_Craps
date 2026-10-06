@@ -1,0 +1,20 @@
+{
+  "folders": [
+    {
+      "name": "BTC Craps",
+      "path": "."
+    },
+    {
+      "name": "Punch Up (reference)",
+      "path": "D:/WEB_BTC_PunchUp"
+    }
+  ],
+  "settings": {
+    "files.readonlyInclude": {
+      "D:/WEB_BTC_PunchUp/**": true
+    },
+    "git.ignoredRepositories": [
+      "D:/WEB_BTC_PunchUp"
+    ]
+  }
+}

@@ -1,0 +1,13 @@
+---
+description: Punch Up is a read-only reference codebase
+alwaysApply: true
+---
+
+# Punch Up reference
+
+`Punch Up (reference)` (`D:/WEB_BTC_PunchUp`) is a separate project used only as a reference for BTC Craps.
+
+- Read it to copy patterns into BTC Craps.
+- Never create, edit, delete, or format files in that folder.
+- Never commit, stage, or modify git state in that repository.
+- New craps code belongs in the BTC Craps root.

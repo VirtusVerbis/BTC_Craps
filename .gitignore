@@ -1,0 +1,51 @@
+# Dependencies
+**/node_modules/
+
+# Build outputs
+**/dist/
+**/dist-ssr/
+**/build/
+**/.vite/
+
+# Environment / secrets (never commit real secrets)
+**/.env
+**/.env.*
+!**/.env.example
+
+# GitHub PAT / token dumps
+.github_token
+github_token.txt
+gh_token.txt
+GITHUB_TOKEN.txt
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Test / coverage
+coverage/
+.nyc_output/
+
+# TypeScript
+*.tsbuildinfo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors / tooling
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Misc
+*.local
+
+# Punch Up reference checkout. The live repo is D:/WEB_BTC_PunchUp, outside
+# this tree. This ignores a copy placed inside BTC Craps, including its .git.
+WEB_BTC_PunchUp/
