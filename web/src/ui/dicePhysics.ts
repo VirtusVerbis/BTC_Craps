@@ -15,6 +15,7 @@ import {
   DIE_MAX_FLIGHT_MS,
   DIE_MAX_SPIN_RAD_PER_S,
   DIE_MIN_REACH_FRACTION,
+  DIE_NO_ROLL_PAUSE_MS,
   DIE_REST_SPEED_PX_PER_S,
   DIE_REST_VERTICAL_PX_PER_S,
   DIE_RESULT_HOLD_MS,
@@ -23,6 +24,8 @@ import {
   DIE_SPIN_KICK,
   DIE_WALL_BOTTOM_FRACTION,
   DIE_WALL_RESTITUTION,
+  DIE_WALL_SCATTER_RAD,
+  DIE_WALL_SPIN_RAD,
   DIE_WALL_TOP_FRACTION,
 } from './diceConstants'
 
@@ -42,6 +45,10 @@ export interface Quat {
 export interface Die {
   alive: boolean
   resting: boolean
+  /** Cleared the back wall and is holding still so the exit can be seen. */
+  leaving: boolean
+  /** Frame time when `leaving` started. Null until advanceThrow stamps it. */
+  leftAtMs: number | null
   x: number
   z: number
   h: number
@@ -171,13 +178,18 @@ export const quatToCssMatrix = (q: Quat): string => {
   return `matrix3d(${f(m00)},${f(m10)},${f(m20)},0,${f(m01)},${f(m11)},${f(m21)},0,${f(m02)},${f(m12)},${f(m22)},0,0,0,0,1)`
 }
 
-export const stepDice = (dice: readonly [Die, Die], dt: number, metrics: StageMetrics = stageMetrics()): [Die, Die] => {
+export const stepDice = (
+  dice: readonly [Die, Die],
+  dt: number,
+  metrics: StageMetrics = stageMetrics(),
+  random: () => number = Math.random,
+): [Die, Die] => {
   const step = Math.min(Math.max(dt, 0), 0.05)
   const sub = step > 0 ? 4 : 1
   const h = step / sub
   let next: [Die, Die] = [cloneDie(dice[0]), cloneDie(dice[1])]
   for (let i = 0; i < sub; i += 1) {
-    next = substep(next, h, metrics)
+    next = substep(next, h, metrics, random)
   }
   return next
 }
@@ -206,8 +218,14 @@ export const advanceThrow = (
     const flightMs = state.flightMs + dtSec * 1000
     let dice = stepDice(state.dice, dtSec, metrics)
     if (flightMs >= DIE_MAX_FLIGHT_MS) {
-      dice = dice.map((die) => (die.alive && !die.resting ? forceRest(die) : die)) as [Die, Die]
+      dice = dice.map((die) => (die.alive && !die.resting && !die.leaving ? forceRest(die) : die)) as [Die, Die]
     }
+    dice = dice.map((die) => {
+      if (!die.leaving || !die.alive) return die
+      if (die.leftAtMs == null) return { ...die, leftAtMs: nowMs }
+      if (nowMs - die.leftAtMs >= DIE_NO_ROLL_PAUSE_MS) return { ...die, alive: false }
+      return die
+    }) as [Die, Die]
     const alive = dice.filter((die) => die.alive)
     const settled = alive.every((die) => die.resting)
     if (!settled) {
@@ -269,16 +287,16 @@ const applyLaunch = (die: Die, forward: number, up: number, spin: number, sign: 
   }
 }
 
-const substep = (dice: [Die, Die], dt: number, metrics: StageMetrics): [Die, Die] => {
+const substep = (dice: [Die, Die], dt: number, metrics: StageMetrics, random: () => number): [Die, Die] => {
   const next: [Die, Die] = [integrate(dice[0], dt), integrate(dice[1], dt)]
   resolvePair(next[0], next[1], metrics)
-  next[0] = constrain(next[0], metrics, dt)
-  next[1] = constrain(next[1], metrics, dt)
+  next[0] = constrain(next[0], metrics, dt, random)
+  next[1] = constrain(next[1], metrics, dt, random)
   return next
 }
 
 const integrate = (die: Die, dt: number): Die => {
-  if (!die.alive || die.resting) return die
+  if (!die.alive || die.resting || die.leaving) return die
   const next = cloneDie(die)
   next.vh -= DIE_GRAVITY_PX_PER_S2 * dt
   next.x += next.vx * dt
@@ -288,35 +306,46 @@ const integrate = (die: Die, dt: number): Die => {
   return next
 }
 
-const constrain = (die: Die, metrics: StageMetrics, dt: number): Die => {
-  if (!die.alive || die.resting) return die
+const constrain = (die: Die, metrics: StageMetrics, dt: number, random: () => number): Die => {
+  if (!die.alive || die.resting || die.leaving) return die
   const next = cloneDie(die)
   const radius = dieSize(next.z, metrics) / 2
 
   if (next.x < radius) {
     next.x = radius
-    if (next.vx < 0) reflectAxis(next, 'x', 1)
+    if (next.vx < 0) bounceRail(next, 'x', 1, random)
   } else if (next.x > metrics.width - radius) {
     next.x = metrics.width - radius
-    if (next.vx > 0) reflectAxis(next, 'x', -1)
+    if (next.vx > 0) bounceRail(next, 'x', -1, random)
   }
 
   if (next.z < 0) {
     next.z = 0
-    if (next.vz < 0) reflectAxis(next, 'z', 1)
+    if (next.vz < 0) bounceRail(next, 'z', 1, random)
   }
 
   if (next.z >= metrics.wallZ && next.h > metrics.wallHeight) {
-    next.alive = false
+    const screen = dieScreenCenter(next, metrics)
+    if (screen.y + screen.size / 2 < 0) {
+      next.alive = false
+      next.resting = false
+      next.topFace = null
+      return next
+    }
+    next.leaving = true
+    next.alive = true
     next.resting = false
-    next.topFace = null
+    next.vx = 0
+    next.vz = 0
+    next.vh = 0
+    next.w = { x: 0, y: 0, z: 0 }
     return next
   }
 
   const front = next.z + radius
   if (front >= metrics.wallZ && next.vz > 0 && next.h <= metrics.wallHeight) {
     next.z = Math.max(0, metrics.wallZ - radius)
-    reflectAxis(next, 'z', -1)
+    bounceRail(next, 'z', -1, random)
   }
 
   if (next.h <= 0) {
@@ -348,7 +377,7 @@ const constrain = (die: Die, metrics: StageMetrics, dt: number): Die => {
 }
 
 const resolvePair = (a: Die, b: Die, metrics: StageMetrics) => {
-  if (!a.alive || !b.alive || a.resting || b.resting) return
+  if (!a.alive || !b.alive || a.resting || b.resting || a.leaving || b.leaving) return
   const ra = dieSize(a.z, metrics) / 2
   const rb = dieSize(b.z, metrics) / 2
   const minDist = ra + rb
@@ -392,6 +421,18 @@ const reflectAxis = (die: Die, axis: 'x' | 'z', outwardSign: number) => {
   dampSpin(die)
 }
 
+const bounceRail = (die: Die, axis: 'x' | 'z', outwardSign: number, random: () => number) => {
+  reflectAxis(die, axis, outwardSign)
+  const speed = Math.hypot(die.vx, die.vz)
+  if (speed > 0) {
+    const yaw = Math.atan2(die.vz, die.vx) + (random() * 2 - 1) * DIE_WALL_SCATTER_RAD
+    die.vx = Math.cos(yaw) * speed
+    die.vz = Math.sin(yaw) * speed
+  }
+  const kick = () => (random() * 2 - 1) * DIE_WALL_SPIN_RAD
+  die.w = { x: die.w.x + kick(), y: die.w.y + kick(), z: die.w.z + kick() }
+}
+
 const forceRest = (die: Die): Die => {
   const next = cloneDie(die)
   next.h = 0
@@ -402,6 +443,8 @@ const forceRest = (die: Die): Die => {
   next.q = snapQuaternion(next.q)
   next.resting = true
   next.alive = true
+  next.leaving = false
+  next.leftAtMs = null
   next.topFace = readTopFace(next.q)
   return next
 }
@@ -415,6 +458,8 @@ const makeDie = (x: number, random: () => number = Math.random): Die => restingD
 const restingDie = (x: number, q: Quat): Die => ({
   alive: true,
   resting: true,
+  leaving: false,
+  leftAtMs: null,
   x,
   z: 0,
   h: 0,
@@ -459,7 +504,7 @@ const simulatedMaxZ = (forward: number, up: number, metrics: StageMetrics): numb
   const dt = 1 / 60
   const steps = Math.ceil(DIE_MAX_FLIGHT_MS / 1000 / dt)
   for (let i = 0; i < steps; i += 1) {
-    dice = stepDice(dice, dt, metrics)
+    dice = stepDice(dice, dt, metrics, () => 0.5)
     maxZ = Math.max(maxZ, dice[0].z)
     if (!dice[0].alive || dice[0].resting) break
   }

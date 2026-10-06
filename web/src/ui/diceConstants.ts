@@ -13,6 +13,9 @@ export const DIE_LAUNCH_DELAY_MS = 3000
 /** How long the total or "No Roll!" stays up. */
 export const DIE_RESULT_HOLD_MS = 2000
 
+/** How long a die that cleared the back wall stays visible if it is still on screen. */
+export const DIE_NO_ROLL_PAUSE_MS = 400
+
 /** Trailing trade window sampled at launch. Independent of the overlay's 5s reset. */
 export const DIE_VOLUME_WINDOW_MS = 3000
 
@@ -26,6 +29,10 @@ export const DIE_WALL_BOTTOM_FRACTION = 0.403
 export const DIE_GRAVITY_PX_PER_S2 = 2400
 export const DIE_FELT_RESTITUTION = 0.42
 export const DIE_WALL_RESTITUTION = 0.55
+/** Random yaw of a rail bounce, in radians. About 26 degrees. */
+export const DIE_WALL_SCATTER_RAD = 0.45
+/** Random spin added on each axis when a die hits a rail, in rad/s. */
+export const DIE_WALL_SPIN_RAD = 10
 /** Horizontal speed kept on a felt bounce. */
 export const DIE_FELT_SPEED_KEEP = 0.62
 /** Exponential damping while a die is sliding on the felt. */

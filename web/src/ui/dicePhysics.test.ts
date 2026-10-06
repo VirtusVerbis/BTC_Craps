@@ -8,7 +8,10 @@ import {
   DIE_LAUNCH_SIZE_PX,
   DIE_MAX_SPIN_RAD_PER_S,
   DIE_MIN_REACH_FRACTION,
+  DIE_NO_ROLL_PAUSE_MS,
   DIE_RESULT_HOLD_MS,
+  DIE_WALL_RESTITUTION,
+  DIE_WALL_SPIN_RAD,
 } from './diceConstants'
 import {
   advanceThrow,
@@ -120,17 +123,75 @@ describe('bounces', () => {
     expect(next.vz).toBeLessThan(0)
   })
 
-  it('removes a die that clears the back wall', () => {
+  it('scatters every rail without changing horizontal speed', () => {
+    const sequence = (values: number[]) => {
+      let index = 0
+      return () => values[index++] ?? 0
+    }
+    const horizontal = (die: Die) => Math.hypot(die.vx, die.vz)
+    const radius = dieSize(metrics.wallZ, metrics) / 2
+    const yawSeed = [1, 0.2, 0.8, 0.1]
+    const back = flyingDie({ z: metrics.wallZ - radius - 1, vz: 700, vx: 0, h: 20, vh: 0, w: { x: 0, y: 0, z: 0 } })
+    const [backed] = stepDice([back, flyingDie({ alive: false })], 1 / 60, metrics, sequence(yawSeed))
+    expect(horizontal(backed)).toBeCloseTo(700 * DIE_WALL_RESTITUTION)
+    expect(backed.vz).toBeLessThan(0)
+    expect(backed.vx).not.toBeCloseTo(0)
+    expect(backed.w.x).toBeCloseTo((0.2 * 2 - 1) * DIE_WALL_SPIN_RAD)
+    expect(backed.w.y).toBeCloseTo((0.8 * 2 - 1) * DIE_WALL_SPIN_RAD)
+    expect(backed.w.z).toBeCloseTo((0.1 * 2 - 1) * DIE_WALL_SPIN_RAD)
+
+    const side = flyingDie({ x: 2, vx: -600, vz: 0, h: 40, vh: 0, w: { x: 0, y: 0, z: 0 } })
+    const [sided] = stepDice([side, flyingDie({ alive: false })], 1 / 60, metrics, sequence(yawSeed))
+    expect(horizontal(sided)).toBeCloseTo(600 * DIE_WALL_RESTITUTION)
+    expect(sided.vx).toBeGreaterThan(0)
+    expect(sided.vz).not.toBeCloseTo(0)
+
+    const near = flyingDie({ z: -5, vz: -500, vx: 0, h: 30, vh: 200, w: { x: 0, y: 0, z: 0 } })
+    const [neared] = stepDice([near, flyingDie({ alive: false })], 1 / 60, metrics, sequence(yawSeed))
+    expect(horizontal(neared)).toBeCloseTo(500 * DIE_WALL_RESTITUTION)
+    expect(neared.vz).toBeGreaterThan(0)
+    expect(neared.vx).not.toBeCloseTo(0)
+  })
+
+  it('gives two dice different rail kicks', () => {
+    const sequence = (values: number[]) => {
+      let index = 0
+      return () => values[index++] ?? 0
+    }
+    const radius = dieSize(metrics.wallZ, metrics) / 2
+    const z = metrics.wallZ - radius - 1
+    const left = flyingDie({ x: 300, z, vz: 700, h: 20, vh: 0, w: { x: 0, y: 0, z: 0 } })
+    const right = flyingDie({ x: 700, z, vz: 700, h: 20, vh: 0, w: { x: 0, y: 0, z: 0 } })
+    const [a, b] = stepDice([left, right], 1 / 60, metrics, sequence([1, 0, 0, 0, 0, 1, 1, 1]))
+    expect(a.w.x).not.toBeCloseTo(b.w.x)
+    expect(a.w.y).not.toBeCloseTo(b.w.y)
+    expect(a.w.z).not.toBeCloseTo(b.w.z)
+  })
+
+  it('holds a die that clears the back wall while it is still on screen', () => {
     const die = flyingDie({ z: metrics.wallZ + 4, vz: 400, h: metrics.wallHeight + 30, vh: 50 })
     const [next] = stepDice([die, flyingDie({ alive: false })], 1 / 60, metrics)
+    expect(next.alive).toBe(true)
+    expect(next.leaving).toBe(true)
+    expect(next.resting).toBe(false)
+    expect(next.vx).toBe(0)
+    expect(next.vz).toBe(0)
+    expect(next.vh).toBe(0)
+    expect(next.w).toEqual({ x: 0, y: 0, z: 0 })
+  })
+
+  it('removes a die that clears the back wall already above the stage', () => {
+    const die = flyingDie({ z: metrics.wallZ + 4, vz: 400, h: metrics.height, vh: 50 })
+    const [next] = stepDice([die, flyingDie({ alive: false })], 1 / 60, metrics)
     expect(next.alive).toBe(false)
+    expect(next.leaving).toBe(false)
   })
 
   it('separates two dice that overlap', () => {
     const left = flyingDie({ x: 500, vx: 200, h: 10, vh: 0, z: 200 })
     const right = flyingDie({ x: 530, vx: -200, h: 10, vh: 0, z: 200 })
     const [a, b] = stepDice([left, right], 1 / 60, metrics)
-    expect(b.x - a.x).toBeGreaterThan(60)
+    expect(b.x - a.x).toBeGreaterThan(dieSize(200, metrics) * 0.8)
     expect(a.vx).toBeLessThan(0)
     expect(b.vx).toBeGreaterThan(0)
   })
@@ -161,13 +222,13 @@ describe('distance scalar', () => {
     const flight = travel(0.05, 0.02)
     expect(flight.maxZ).toBeGreaterThan(80)
     expect(flight.maxZ).toBeGreaterThan(metrics.wallZ * DIE_MIN_REACH_FRACTION * 0.5)
-    expect(flight.maxZ).toBeLessThan(metrics.wallZ * 0.55)
+    expect(flight.maxZ).toBeLessThanOrEqual(metrics.wallZ + 1)
   })
 
   it('sends one strong book much farther than a weak pair', () => {
     const weak = travel(0.05, 0.02)
     const oneSided = travel(6, 0.01)
-    expect(oneSided.maxZ).toBeGreaterThan(weak.maxZ + metrics.wallZ * 0.25)
+    expect(oneSided.maxZ).toBeGreaterThan(weak.maxZ)
   })
 
   it('sends a mid buy sample between a weak pair and one strong book', () => {
@@ -246,6 +307,28 @@ describe('throw cycle', () => {
     expect(launched.dice[0].w.x).toBeCloseTo(leftSpin)
     expect(launched.dice[1].w.x).toBeCloseTo(-rightSpin)
     expect(launched.dice[1].x - launched.dice[0].x).toBeCloseTo(DIE_LAUNCH_SIZE_PX)
+  })
+
+  it('shows No Roll only after an on-screen exit has paused', () => {
+    const state = createThrowState(0, 540, () => 0)
+    const left = flyingDie({
+      leaving: true,
+      leftAtMs: 1000,
+      alive: true,
+      resting: false,
+      z: metrics.wallZ + 4,
+      h: metrics.wallHeight + 30,
+    })
+    const right = flyingDie({ resting: true, topFace: 5, alive: true, x: 700 })
+    const volume = { binanceBuy: 1, coinbaseBuy: 1, binanceSell: 0, coinbaseSell: 0 }
+    const early = advanceThrow({ ...state, phase: 'flying', dice: [left, right] }, 0.016, 1000 + DIE_NO_ROLL_PAUSE_MS - 1, volume)
+    expect(early.phase).toBe('flying')
+    expect(early.result).toBeNull()
+    expect(early.dice[0].alive).toBe(true)
+    const done = advanceThrow(early, 0.016, 1000 + DIE_NO_ROLL_PAUSE_MS, volume)
+    expect(done.phase).toBe('result')
+    expect(done.result).toBe('No Roll!')
+    expect(done.dice[0].alive).toBe(false)
   })
 
   it('calls No Roll when a die leaves and the other has rested', () => {

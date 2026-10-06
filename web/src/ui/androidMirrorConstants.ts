@@ -22,6 +22,8 @@ export const BG2_CHART_TOP_OFFSET_FRACTION = 0.13
 export const BG2_CHART_HEIGHT_FRACTION = 0.495
 /** Android `BG2_MAX_CANDLES`: max 1m candles kept / requested for BG1 chart. */
 export const BG2_MAX_CANDLES = 200
+/** Candle chart black tint. 0 is clear, 1 is solid black. */
+export const CHART_BG_ALPHA = 0.45
 
 export const BG2_MEME_PRICE_WINDOW_MS = 60_000  //this controls the look back into history window (you can decrease for testing say 1000ms))
 

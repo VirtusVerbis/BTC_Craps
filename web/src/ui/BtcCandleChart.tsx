@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 import type { Candle } from '../data/candles'
+import { CHART_BG_ALPHA } from './androidMirrorConstants'
 
-const CHART_BG = '#000000'
 const CANDLE_GREEN = '#00c853'
 const CANDLE_RED = '#d50000'
 const LABEL = 'rgba(255,255,255,0.8)'
@@ -54,7 +54,8 @@ export const BtcCandleChart = ({ candles, showAxisLabels = true }: BtcCandleChar
     canvas.height = Math.floor(h * dpr)
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
 
-    ctx.fillStyle = CHART_BG
+    ctx.clearRect(0, 0, w, h)
+    ctx.fillStyle = `rgba(0, 0, 0, ${CHART_BG_ALPHA})`
     ctx.fillRect(0, 0, w, h)
 
     if (candles.length === 0) return
