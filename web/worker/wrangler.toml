@@ -2,10 +2,9 @@ name = "btc-craps-oi"
 main = "src/index.ts"
 compatibility_date = "2024-11-01"
 
-# Once a minute. Cloudflare runs this only after deploy.
-# Local cron does not tick. From web/:
-#   npm run oi:dev
-#   curl "http://localhost:8787/cdn-cgi/local/scheduled?cron=*+*+*+*+*"
+# Once a minute after deploy. Locally, `npm run oi:dev` (from web/) starts
+# Wrangler and requests /cdn-cgi/local/scheduled on the same schedule.
+# The free key is read from worker/.dev.vars.
 [triggers]
 crons = ["* * * * *"]
 
