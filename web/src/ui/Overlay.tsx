@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import type { BlockState } from '../data/blockHeight'
 import type { FeedStatus } from '../data/marketData'
+import { useOpenInterest } from '../data/openInterest'
 import type { MarketSnapshot } from '../game/types'
 import { mobileAssetManifest } from './mobileAssetManifest'
 import { resolveMobileAssetUrl } from './mobileAssetUrls'
 import { formatElapsed, formatExchangePriceLabel } from './format'
+import { OI_LABEL_FONT_REM, OI_LABEL_X, OI_LABEL_Y } from './overlayConstants'
 
 interface OverlayProps {
   market: MarketSnapshot
@@ -101,7 +103,12 @@ const VolumeBar = ({
   )
 }
 
+const formatOpenInterest = (value: number): string => Math.round(value).toLocaleString('en-US')
+
+const formatAccountPct = (value: number): string => `${Math.round(value)}%`
+
 export const Overlay = ({ market, block, onTimeClick, status }: OverlayProps) => {
+  const openInterest = useOpenInterest()
   const binanceMaxV = exchangeMaxVolume(market.binance.buyVolume, market.binance.sellVolume)
   const coinbaseMaxV = exchangeMaxVolume(market.coinbase.buyVolume, market.coinbase.sellVolume)
   const prevBinance = useRef<number | undefined>(undefined)
@@ -331,6 +338,18 @@ export const Overlay = ({ market, block, onTimeClick, status }: OverlayProps) =>
             animate={cbPulse}
           />
         </div>
+      </div>
+      <div
+        className="overlay-oi"
+        style={{
+          left: OI_LABEL_X,
+          top: OI_LABEL_Y,
+          fontSize: `${OI_LABEL_FONT_REM}rem`,
+        }}
+      >
+        <p>O/I : {openInterest ? formatOpenInterest(openInterest.openInterest) : '—'}</p>
+        <p>Long {openInterest ? formatAccountPct(openInterest.longPct) : '—'} (Pass)</p>
+        <p>Short {openInterest ? formatAccountPct(openInterest.shortPct) : '—'} (Don't)</p>
       </div>
     </div>
   )
