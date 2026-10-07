@@ -79,29 +79,29 @@ export const PUCK_IMAGE_WIDTH_PX = 291
 /** OFF puck center, in the dealer-end Don't Come bar. */
 export const PUCK_OFF_X = 200
 export const PUCK_OFF_Y = 925
-export const PUCK_OFF_SCALE = 0.3
+export const PUCK_OFF_SCALE = 0.33//0.3
 
 /** ON puck center on each point box. Farther up the felt is slightly smaller. */
 export const PUCK_ON_10_X = 230
 export const PUCK_ON_10_Y = 1025
-export const PUCK_ON_10_SCALE = 0.3
+export const PUCK_ON_10_SCALE = 0.33//0.3
 
 export const PUCK_ON_9_X = 200
 export const PUCK_ON_9_Y = 1150
-export const PUCK_ON_9_SCALE = 0.31
+export const PUCK_ON_9_SCALE = 0.34//0.31
 
 export const PUCK_ON_8_X = 190
 export const PUCK_ON_8_Y = 1290
-export const PUCK_ON_8_SCALE = 0.34
+export const PUCK_ON_8_SCALE = 0.37//0.34
 
 export const PUCK_ON_6_X = 180
 export const PUCK_ON_6_Y = 1180
-export const PUCK_ON_6_SCALE = 0.37
+export const PUCK_ON_6_SCALE = 0.40//0.37
 
 export const PUCK_ON_5_X = 170
 export const PUCK_ON_5_Y = 1540
-export const PUCK_ON_5_SCALE = 0.39
+export const PUCK_ON_5_SCALE = 0.42//0.39
 
 export const PUCK_ON_4_X = 150
 export const PUCK_ON_4_Y = 1660
-export const PUCK_ON_4_SCALE = 0.41
+export const PUCK_ON_4_SCALE = 0.45 //0.41
