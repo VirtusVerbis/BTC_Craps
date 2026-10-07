@@ -1,5 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
 import type { MarketSnapshot } from '../game/types'
+import { useOpenInterest } from '../data/openInterest'
+import { btcPrice, buildBets } from './chipBets'
+import {
+  beginRestack,
+  driftLooseChips,
+  emptyChipWorld,
+  presentChips,
+  resolveDiceChips,
+  tickRestack,
+  worldFromBets,
+  type ChipDisc,
+  type ChipWorld,
+} from './chipPhysics'
 import {
   advanceThrow,
   createThrowState,
@@ -7,6 +20,7 @@ import {
   quatToCssMatrix,
   stageMetrics,
   type Die,
+  type DicePoseHook,
   type ThrowResult,
   type ThrowState,
 } from './dicePhysics'
@@ -27,6 +41,7 @@ export interface DicePresentation {
   dice: [DieView, DieView]
   result: ThrowResult | null
   point: number | null
+  chips: ChipDisc[]
 }
 
 const toView = (die: Die, id: 'left' | 'right'): DieView => {
@@ -44,30 +59,66 @@ const toView = (die: Die, id: 'left' | 'right'): DieView => {
   }
 }
 
-const present = (state: ThrowState): DicePresentation => ({
+const present = (state: ThrowState, chips: readonly ChipDisc[]): DicePresentation => ({
   dice: [toView(state.dice[0], 'left'), toView(state.dice[1], 'right')],
   result: state.phase === 'result' ? state.result : null,
   point: state.point,
+  chips: chips.slice(),
 })
 
 export const useDiceThrow = (market: MarketSnapshot, enabled: boolean): DicePresentation | null => {
+  const oi = useOpenInterest()
   const volume = useDiceVolumeWindow(market)
   const volumeRef = useRef(volume)
   volumeRef.current = volume
+  const marketRef = useRef(market)
+  marketRef.current = market
+  const oiRef = useRef(oi)
+  oiRef.current = oi
   const stateRef = useRef<ThrowState>(createThrowState(performance.now()))
-  const [presentation, setPresentation] = useState<DicePresentation>(() => present(stateRef.current))
+  const worldRef = useRef<ChipWorld | null>(null)
+  const [presentation, setPresentation] = useState<DicePresentation>(() => present(stateRef.current, []))
 
   useEffect(() => {
     if (!enabled) return undefined
     stateRef.current = createThrowState(performance.now())
-    setPresentation(present(stateRef.current))
+    worldRef.current = null
+    setPresentation(present(stateRef.current, []))
     let frame = 0
     let last = performance.now()
+
+    const betsNow = () => {
+      const snap = oiRef.current
+      const price = btcPrice(marketRef.current)
+      if (!snap || !(price > 0)) return null
+      return buildBets(snap.openInterest * price, snap.longPct, snap.shortPct)
+    }
+
+    const poseHook: DicePoseHook = (dice, dt, metrics) => {
+      const world = worldRef.current
+      if (!world) return dice
+      return resolveDiceChips(world, dice, dt, metrics)
+    }
+
     const loop = (now: number) => {
       const dt = Math.min(0.05, (now - last) / 1000)
       last = now
-      stateRef.current = advanceThrow(stateRef.current, dt, now, volumeRef.current)
-      setPresentation(present(stateRef.current))
+      const metrics = stageMetrics()
+      if (!worldRef.current) {
+        const bets = betsNow()
+        if (bets && bets.length > 0) worldRef.current = worldFromBets(bets, Math.floor(now))
+      }
+      const phaseBefore = stateRef.current.phase
+      stateRef.current = advanceThrow(stateRef.current, dt, now, volumeRef.current, metrics, poseHook)
+      if (phaseBefore !== 'holding' && stateRef.current.phase === 'holding') {
+        const bets = betsNow()
+        if (bets) worldRef.current = beginRestack(worldRef.current ?? emptyChipWorld(), bets, now, Math.floor(now))
+      } else if (stateRef.current.phase === 'result' && worldRef.current) {
+        worldRef.current = driftLooseChips(worldRef.current, dt, metrics)
+      }
+      if (worldRef.current?.restack) worldRef.current = tickRestack(worldRef.current, now)
+      const chips = worldRef.current ? presentChips(worldRef.current, now, metrics) : []
+      setPresentation(present(stateRef.current, chips))
       frame = window.requestAnimationFrame(loop)
     }
     frame = window.requestAnimationFrame(loop)

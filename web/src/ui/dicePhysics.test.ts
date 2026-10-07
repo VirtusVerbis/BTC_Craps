@@ -405,6 +405,48 @@ describe('throw cycle', () => {
     expect(reset.dice[0].z).toBe(0)
     expect(reset.dice[1].z).toBe(0)
   })
+
+  it('counts a roll that already reached the back-wall line', () => {
+    const state = createThrowState(0, 540)
+    const line = metrics.wallZ * DIE_MIN_REACH_FRACTION
+    const left = flyingDie({ resting: true, topFace: 6, alive: true, z: 200 })
+    const right = flyingDie({ resting: true, topFace: 1, alive: true, x: 620, z: 200 })
+    const result = advanceThrow(
+      { ...state, phase: 'flying', reachTracked: true, reachZ: [line + 8, line + 8], dice: [left, right] },
+      0.016,
+      1000,
+      volume,
+    )
+    expect(result.result).toEqual({ total: 7, label: 'Pass Line' })
+  })
+
+  it('calls No Roll when either die stays short of the back-wall line', () => {
+    const state = createThrowState(0, 540)
+    const line = metrics.wallZ * DIE_MIN_REACH_FRACTION
+    const left = flyingDie({ resting: true, topFace: 6, alive: true, z: 200 })
+    const right = flyingDie({ resting: true, topFace: 1, alive: true, x: 620, z: 200 })
+    const result = advanceThrow(
+      { ...state, phase: 'flying', reachTracked: true, reachZ: [line - 40, line + 8], dice: [left, right] },
+      0.016,
+      1000,
+      volume,
+    )
+    expect(result.result).toEqual({ noRoll: true })
+  })
+
+  it('still calls No Roll when a die leaves over the rack after reaching the line', () => {
+    const state = createThrowState(0, 540)
+    const line = metrics.wallZ * DIE_MIN_REACH_FRACTION
+    const left = flyingDie({ alive: false, resting: false, z: metrics.wallZ + 20 })
+    const right = flyingDie({ resting: true, topFace: 5, alive: true, x: 700, z: line })
+    const result = advanceThrow(
+      { ...state, phase: 'flying', reachTracked: true, reachZ: [line + 30, line], dice: [left, right] },
+      0.016,
+      1000,
+      volume,
+    )
+    expect(result.result).toEqual({ noRoll: true })
+  })
 })
 
 const volume = { binanceBuy: 1, coinbaseBuy: 1, binanceSell: 0, coinbaseSell: 0 }

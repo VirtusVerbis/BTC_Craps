@@ -11,6 +11,8 @@
 **/.env
 **/.env.*
 !**/.env.example
+**/.dev.vars
+**/.wrangler/
 
 # GitHub PAT / token dumps
 .github_token

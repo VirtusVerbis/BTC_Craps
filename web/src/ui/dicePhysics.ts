@@ -79,6 +79,13 @@ export interface ThrowState {
   point: number | null
   result: ThrowResult | null
   flightMs: number
+  /**
+   * Farthest felt depth each die reached during a tracked flight.
+   * A throw that never launched leaves this at zero and skips the short-reach rule.
+   */
+  reachZ: [number, number]
+  /** True after a launch, so a resting test die is not judged as a short throw. */
+  reachTracked: boolean
 }
 
 export interface StageMetrics {
@@ -145,6 +152,8 @@ export const createThrowState = (
   point: null,
   result: null,
   flightMs: 0,
+  reachZ: [0, 0],
+  reachTracked: false,
 })
 
 export const readTopFace = (q: Quat): number => {
@@ -184,11 +193,15 @@ export const quatToCssMatrix = (q: Quat): string => {
   return `matrix3d(${f(m00)},${f(m10)},${f(m20)},0,${f(m01)},${f(m11)},${f(m21)},0,${f(m02)},${f(m12)},${f(m22)},0,0,0,0,1)`
 }
 
+/** Runs after each dice substep, before the next integration. May push the dice back. */
+export type DicePoseHook = (dice: [Die, Die], dt: number, metrics: StageMetrics) => [Die, Die]
+
 export const stepDice = (
   dice: readonly [Die, Die],
   dt: number,
   metrics: StageMetrics = stageMetrics(),
   random: () => number = Math.random,
+  hook?: DicePoseHook,
 ): [Die, Die] => {
   const step = Math.min(Math.max(dt, 0), 0.05)
   const sub = step > 0 ? 4 : 1
@@ -196,6 +209,7 @@ export const stepDice = (
   let next: [Die, Die] = [cloneDie(dice[0]), cloneDie(dice[1])]
   for (let i = 0; i < sub; i += 1) {
     next = substep(next, h, metrics, random)
+    if (hook) next = hook(next, h, metrics)
   }
   return next
 }
@@ -206,6 +220,7 @@ export const advanceThrow = (
   nowMs: number,
   volume: VolumeTotals,
   metrics: StageMetrics = stageMetrics(),
+  poseHook?: DicePoseHook,
 ): ThrowState => {
   if (state.phase === 'holding') {
     if (nowMs - state.phaseStartedMs < DIE_LAUNCH_DELAY_MS) return state
@@ -216,13 +231,29 @@ export const advanceThrow = (
       phaseStartedMs: nowMs,
       flightMs: 0,
       result: null,
+      reachZ: [0, 0],
+      reachTracked: true,
       dice: launchDice(state.dice, volume, metrics),
     }
   }
 
   if (state.phase === 'flying') {
     const flightMs = state.flightMs + dtSec * 1000
-    let dice = stepDice(state.dice, dtSec, metrics)
+    const tracking = state.reachTracked === true
+    let peak0 = state.reachZ?.[0] ?? 0
+    let peak1 = state.reachZ?.[1] ?? 0
+    const wrapped: DicePoseHook | undefined =
+      tracking || poseHook
+        ? (pair, dt, poseMetrics) => {
+            if (tracking) {
+              peak0 = Math.max(peak0, pair[0].z)
+              peak1 = Math.max(peak1, pair[1].z)
+            }
+            return poseHook ? poseHook(pair, dt, poseMetrics) : pair
+          }
+        : undefined
+    let dice = stepDice(state.dice, dtSec, metrics, Math.random, wrapped)
+    const reachZ: [number, number] = [peak0, peak1]
     if (flightMs >= DIE_MAX_FLIGHT_MS) {
       dice = dice.map((die) => (die.alive && !die.resting && !die.leaving ? forceRest(die) : die)) as [Die, Die]
     }
@@ -235,9 +266,11 @@ export const advanceThrow = (
     const alive = dice.filter((die) => die.alive)
     const settled = alive.every((die) => die.resting)
     if (!settled) {
-      return { ...state, dice, flightMs }
+      return { ...state, dice, flightMs, reachZ }
     }
-    const noRoll = dice.some((die) => !die.alive)
+    const line = metrics.wallZ * DIE_MIN_REACH_FRACTION
+    const short = tracking && dice.some((die, index) => die.alive && reachZ[index] < line)
+    const noRoll = dice.some((die) => !die.alive) || short
     const total = (dice[0].topFace ?? 0) + (dice[1].topFace ?? 0)
     const roll = noRoll ? null : applyRoll(state.point, total)
     return {
@@ -245,6 +278,7 @@ export const advanceThrow = (
       phase: 'result',
       phaseStartedMs: nowMs,
       flightMs,
+      reachZ,
       dice,
       point: roll ? roll.point : state.point,
       result: roll ? { total, label: roll.label } : { noRoll: true },
@@ -261,6 +295,8 @@ export const advanceThrow = (
     point: state.point,
     result: null,
     flightMs: 0,
+    reachZ: [0, 0],
+    reachTracked: false,
   }
 }
 

@@ -1,50 +1,25 @@
 import type { CSSProperties } from 'react'
-import {
-  CHIP_FELT_TILT_DEG,
-  CHIP_HEIGHT_PX,
-  CHIP_SIZE_SCALAR,
-  CHIP_THICKNESS_PX,
-  CHIP_WIDTH_PX,
-  chipRotationDeg,
-  type ChipColor,
-} from './chipConstants'
+import { CHIP_FELT_TILT_DEG } from './chipConstants'
+import { chipDrawSize, type ChipDisc } from './chipPhysics'
 
-interface ChipStackProps {
-  /** Stage-pixel center of the bottom chip. */
-  x: number
-  y: number
-  /** Bottom to top. */
-  chips: ChipColor[]
+interface ChipLayerProps {
+  discs: readonly ChipDisc[]
 }
 
-export const ChipStack = ({ x, y, chips }: ChipStackProps) => {
-  const scalar = CHIP_SIZE_SCALAR
-  const width = CHIP_WIDTH_PX * scalar
-  const height = CHIP_HEIGHT_PX * scalar
-  const thickness = Math.max(1, Math.round(CHIP_THICKNESS_PX * scalar))
-
+export const ChipLayer = ({ discs }: ChipLayerProps) => {
+  const { width, height } = chipDrawSize()
   return (
-    <div className="chip-stack" style={{ left: x, top: y }} aria-hidden>
-      {chips.map((color, index) => {
-        const spin = chipRotationDeg(index)
-        return Array.from({ length: thickness }, (_, layer) => {
-          const isTop = layer === thickness - 1
-          const style = {
-            width,
-            height,
-            left: -width / 2,
-            top: -height / 2,
-            zIndex: index * thickness + layer,
-            transform: `translateY(${-(index * thickness + layer)}px) rotateX(${CHIP_FELT_TILT_DEG}deg) rotateZ(${spin}deg)`,
-          } as CSSProperties
-          return (
-            <div
-              key={`${color}-${index}-${layer}`}
-              className={`chip chip-${color}${isTop ? ' chip-top' : ' chip-wall'}`}
-              style={style}
-            />
-          )
-        })
+    <div className="chip-stack" aria-hidden>
+      {discs.map((disc) => {
+        const style = {
+          width,
+          height,
+          left: disc.x,
+          top: disc.y,
+          zIndex: disc.zIndex,
+          transform: `translate(-50%, -50%) translateY(${disc.lift}px) rotateX(${CHIP_FELT_TILT_DEG}deg) rotateZ(${disc.spin}deg)`,
+        } as CSSProperties
+        return <div key={disc.key} className={`chip chip-${disc.color}${disc.face ? ' chip-top' : ' chip-wall'}`} style={style} />
       })}
     </div>
   )

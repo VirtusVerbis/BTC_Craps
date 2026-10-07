@@ -1,0 +1,162 @@
+import { REFERENCE_HEIGHT, REFERENCE_WIDTH } from '../config/constants'
+import type { MarketSnapshot } from '../game/types'
+import {
+  CHIP_ANCHORS,
+  CHIP_ANCHOR_JITTER_PX,
+  CHIP_MAX_BET_CHIPS,
+  CHIP_MAX_COLUMNS,
+  CHIP_MAX_STACK,
+  type ChipCharacter,
+  type ChipColor,
+  type ChipSide,
+} from './chipConstants'
+
+/** Face value of each color before open interest grows past the 40-chip cap. */
+export const CHIP_FACE_VALUE: Record<ChipColor, number> = {
+  white: 500_000,
+  red: 2_500_000,
+  green: 12_500_000,
+  blue: 25_000_000,
+  black: 50_000_000,
+}
+
+const DENOM_ORDER: readonly ChipColor[] = ['black', 'blue', 'green', 'red', 'white']
+
+/** Pass-line weights. Don't Pass uses these reversed. They sum to 200. */
+export const PASS_WEIGHT: Record<ChipCharacter, number> = {
+  wolf: 20,
+  oldMan: 40,
+  oldLady: 60,
+  cat: 80,
+}
+
+export const CHIP_WEIGHT_SUM = 200
+
+const CHARACTERS: readonly ChipCharacter[] = ['wolf', 'oldLady', 'cat', 'oldMan']
+
+export interface ChipBet {
+  id: string
+  character: ChipCharacter
+  side: ChipSide
+  dollars: number
+  /** Bottom to top. At most two columns, each at most 20 high. */
+  columns: ChipColor[][]
+}
+
+export const btcPrice = (market: MarketSnapshot): number => {
+  if (market.binance.price > 0) return market.binance.price
+  if (market.coinbase.price > 0) return market.coinbase.price
+  return 0
+}
+
+/** Don't Pass reverses the Pass weights: 20 becomes 80, 40 becomes 60. */
+const dontWeight = (character: ChipCharacter): number => 100 - PASS_WEIGHT[character]
+
+export const betDollars = (
+  notional: number,
+  longPct: number,
+  shortPct: number,
+  character: ChipCharacter,
+  side: ChipSide,
+): number => {
+  if (!(notional > 0)) return 0
+  const pool = side === 'pass' ? longPct : shortPct
+  const weight = side === 'pass' ? PASS_WEIGHT[character] : dontWeight(character)
+  if (!(pool > 0) || !(weight > 0)) return 0
+  return (notional * pool * weight) / (100 * CHIP_WEIGHT_SUM)
+}
+
+/** Scale every denomination by the same factor so the largest bet is 40 chips. */
+export const denominationScale = (largestDollars: number): number => {
+  const cap = CHIP_FACE_VALUE.black * CHIP_MAX_BET_CHIPS
+  if (!(largestDollars > cap)) return 1
+  return largestDollars / cap
+}
+
+export const scaledFaceValues = (scale: number): Array<{ color: ChipColor; value: number }> =>
+  DENOM_ORDER.map((color) => ({ color, value: CHIP_FACE_VALUE[color] * scale }))
+
+/** Largest-first. A remainder of at least half a white chip becomes one more white. */
+export const chipsForDollars = (dollars: number, scale: number): ChipColor[] => {
+  if (!(dollars > 0)) return []
+  const values = scaledFaceValues(scale)
+  const out: ChipColor[] = []
+  let left = dollars
+  for (const denom of values) {
+    if (!(denom.value > 0)) continue
+    let count = Math.floor((left + denom.value * 1e-9) / denom.value)
+    count = Math.min(count, CHIP_MAX_BET_CHIPS - out.length)
+    for (let i = 0; i < count; i += 1) out.push(denom.color)
+    left -= count * denom.value
+    if (out.length >= CHIP_MAX_BET_CHIPS) return out
+  }
+  const white = values[values.length - 1]
+  if (white && out.length < CHIP_MAX_BET_CHIPS && left >= white.value * 0.5) out.push(white.color)
+  return out
+}
+
+export const splitColumns = (chips: readonly ChipColor[]): ChipColor[][] => {
+  const columns: ChipColor[][] = []
+  for (let i = 0; i < chips.length && columns.length < CHIP_MAX_COLUMNS; i += CHIP_MAX_STACK) {
+    columns.push(chips.slice(i, i + CHIP_MAX_STACK))
+  }
+  return columns
+}
+
+export const buildBets = (notional: number, longPct: number, shortPct: number): ChipBet[] => {
+  const drafts = CHARACTERS.flatMap((character) =>
+    (['pass', 'dont'] as const).map((side) => ({
+      id: `${character}-${side}`,
+      character,
+      side,
+      dollars: betDollars(notional, longPct, shortPct, character, side),
+    })),
+  )
+  const largest = drafts.reduce((max, bet) => Math.max(max, bet.dollars), 0)
+  const scale = denominationScale(largest)
+  return drafts.flatMap((bet) => {
+    const columns = splitColumns(chipsForDollars(bet.dollars, scale))
+    if (columns.length === 0) return []
+    return [{ ...bet, columns }]
+  })
+}
+
+const unit = (seed: number): number => {
+  const x = Math.sin(seed * 12.9898) * 43758.5453
+  return x - Math.floor(x)
+}
+
+export interface PlacedColumn {
+  id: string
+  betId: string
+  x: number
+  /** Felt depth. Screen y is `REFERENCE_HEIGHT - z`. */
+  z: number
+  colors: ChipColor[]
+}
+
+/** Second column steps sideways. Stacks near the right rail step left. */
+export const placeBets = (bets: readonly ChipBet[], seed: number, columnGap: number): PlacedColumn[] => {
+  const placed: PlacedColumn[] = []
+  for (const bet of bets) {
+    const anchor = CHIP_ANCHORS.find((item) => item.character === bet.character && item.side === bet.side)
+    if (!anchor) continue
+    const jx = (unit(seed + anchor.x * 0.17 + anchor.y) - 0.5) * 2 * CHIP_ANCHOR_JITTER_PX
+    const jy = (unit(seed + anchor.y * 0.13 + anchor.x) - 0.5) * 2 * CHIP_ANCHOR_JITTER_PX
+    const x0 = anchor.x + jx
+    const y0 = anchor.y + jy
+    const sign = x0 > REFERENCE_WIDTH * 0.72 ? -1 : 1
+    bet.columns.forEach((colors, index) => {
+      const x = Math.min(REFERENCE_WIDTH - 40, Math.max(40, x0 + sign * index * columnGap))
+      const y = Math.min(REFERENCE_HEIGHT - 40, Math.max(40, y0))
+      placed.push({
+        id: `${bet.id}-${index}`,
+        betId: bet.id,
+        x,
+        z: REFERENCE_HEIGHT - y,
+        colors,
+      })
+    })
+  }
+  return placed
+}

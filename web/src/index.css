@@ -140,6 +140,7 @@ body {
 
 .chip-stack {
   position: absolute;
+  inset: 0;
   z-index: 12;
   pointer-events: none;
 }
