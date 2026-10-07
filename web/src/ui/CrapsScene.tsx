@@ -15,6 +15,8 @@ import {
   BG2_NEO_TOP_OFFSET_FRACTION,
 } from './androidMirrorConstants'
 import { BtcCandleChart } from './BtcCandleChart'
+import { ChipStack } from './ChipStack'
+import { WOLF_PASS_PREVIEW_STACK, WOLF_PASS_X, WOLF_PASS_Y } from './chipConstants'
 import { DiceLayer } from './DiceLayer'
 import type { DicePresentation } from './useDiceThrow'
 import type { Bg2ActiveMeme } from './useBg2MemeState'
@@ -156,6 +158,7 @@ export const CrapsScene = ({
           draggable={false}
         />
       ) : null}
+      <ChipStack x={WOLF_PASS_X} y={WOLF_PASS_Y} chips={WOLF_PASS_PREVIEW_STACK} />
       {dice ? <DiceLayer presentation={dice} /> : null}
     </div>
   )

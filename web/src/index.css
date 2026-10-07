@@ -138,6 +138,63 @@ body {
   pointer-events: none;
 }
 
+.chip-stack {
+  position: absolute;
+  z-index: 12;
+  pointer-events: none;
+}
+
+.chip {
+  position: absolute;
+  border-radius: 50%;
+}
+
+.chip-wall {
+  background: repeating-conic-gradient(var(--chip-spot) 0deg 16deg, var(--chip-edge) 16deg 72deg);
+}
+
+.chip-top {
+  background:
+    radial-gradient(ellipse 78% 58% at 50% 30%, var(--chip-highlight) 0%, var(--chip-face) 70%),
+    repeating-conic-gradient(var(--chip-spot) 0deg 16deg, var(--chip-edge) 16deg 72deg);
+}
+
+/* Sampled from the rack under the characters in craps-scene-layout_onepiece.png. */
+.chip-white {
+  --chip-highlight: #f4d3a0;
+  --chip-face: #e2c48a;
+  --chip-edge: #a8844c;
+  --chip-spot: #f7e6c4;
+}
+
+.chip-red {
+  --chip-highlight: #f1a082;
+  --chip-face: #9a2e18;
+  --chip-edge: #5c1408;
+  --chip-spot: #e5937d;
+}
+
+.chip-green {
+  --chip-highlight: #b0c487;
+  --chip-face: #3a6824;
+  --chip-edge: #1e3a10;
+  --chip-spot: #8fb56a;
+}
+
+.chip-blue {
+  --chip-highlight: #c5ced4;
+  --chip-face: #2c5368;
+  --chip-edge: #0e2433;
+  --chip-spot: #8aa0ae;
+}
+
+.chip-black {
+  --chip-highlight: #6a5644;
+  --chip-face: #24160c;
+  --chip-edge: #0c0804;
+  --chip-spot: #4a3a2c;
+}
+
 .puck {
   position: absolute;
   z-index: 10;
