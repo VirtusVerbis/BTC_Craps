@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { formatLiqCountdown, liqSwapAtMs } from '../ui/format'
 
 export interface OpenInterestSnapshot {
   sampledAt: number
@@ -7,6 +8,12 @@ export interface OpenInterestSnapshot {
   ratio: number
   longPct: number
   shortPct: number
+  /** Unix seconds when the displayed liquidation hour began. Null until the worker has a closed bar. */
+  liqBarStart: number | null
+  longLiqBtc: number | null
+  shortLiqBtc: number | null
+  longLiqUsd: number | null
+  shortLiqUsd: number | null
 }
 
 /** How often the page re-reads the worker snapshot. */
@@ -22,6 +29,38 @@ const DEV_SAMPLE: OpenInterestSnapshot = {
   ratio: 1.3267,
   longPct: 57.02,
   shortPct: 42.98,
+  liqBarStart: null,
+  longLiqBtc: null,
+  shortLiqBtc: null,
+  longLiqUsd: null,
+  shortLiqUsd: null,
+}
+
+const optionalLiq = (value: unknown): number | null => {
+  if (value == null || value === '') return null
+  const n = Number(value)
+  return Number.isFinite(n) && n >= 0 ? n : null
+}
+
+const liquidationFields = (
+  row: Record<string, unknown>,
+): Pick<OpenInterestSnapshot, 'liqBarStart' | 'longLiqBtc' | 'shortLiqBtc' | 'longLiqUsd' | 'shortLiqUsd'> => {
+  const empty = {
+    liqBarStart: null,
+    longLiqBtc: null,
+    shortLiqBtc: null,
+    longLiqUsd: null,
+    shortLiqUsd: null,
+  }
+  const liqBarStart = optionalLiq(row.liqBarStart)
+  const longLiqBtc = optionalLiq(row.longLiqBtc)
+  const shortLiqBtc = optionalLiq(row.shortLiqBtc)
+  const longLiqUsd = optionalLiq(row.longLiqUsd)
+  const shortLiqUsd = optionalLiq(row.shortLiqUsd)
+  if (liqBarStart == null || liqBarStart <= 0 || longLiqBtc == null || shortLiqBtc == null || longLiqUsd == null || shortLiqUsd == null) {
+    return empty
+  }
+  return { liqBarStart, longLiqBtc, shortLiqBtc, longLiqUsd, shortLiqUsd }
 }
 
 export const parseOpenInterest = (value: unknown): OpenInterestSnapshot | null => {
@@ -39,6 +78,7 @@ export const parseOpenInterest = (value: unknown): OpenInterestSnapshot | null =
     ratio,
     longPct,
     shortPct,
+    ...liquidationFields(row),
   }
 }
 
@@ -76,4 +116,22 @@ export const useOpenInterest = (): OpenInterestSnapshot | null => {
   }, [])
 
   return snapshot
+}
+
+/** Counts down to the next hour swap. The bar time comes from the worker; the tick is local. */
+export const useLiqCountdown = (liqBarStart: number | null): string => {
+  const [label, setLabel] = useState('—')
+
+  useEffect(() => {
+    if (liqBarStart == null) {
+      setLabel('—')
+      return
+    }
+    const tick = () => setLabel(formatLiqCountdown(liqSwapAtMs(liqBarStart) - Date.now()))
+    tick()
+    const id = window.setInterval(tick, 1000)
+    return () => window.clearInterval(id)
+  }, [liqBarStart])
+
+  return label
 }

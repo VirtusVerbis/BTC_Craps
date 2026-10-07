@@ -1,5 +1,6 @@
 /**
- * Samples Coinalyze open interest and the long/short account ratio.
+ * Samples Coinalyze open interest, the long/short account ratio, and the
+ * last closed hour of long/short liquidations.
  * The API key stays on the worker. The page only reads the KV snapshot.
  */
 
@@ -17,7 +18,22 @@ interface Snapshot {
   ratio: number
   longPct: number
   shortPct: number
+  liqBarStart?: number
+  longLiqBtc?: number
+  shortLiqBtc?: number
+  longLiqUsd?: number
+  shortLiqUsd?: number
 }
+
+interface LiqFields {
+  liqBarStart: number
+  longLiqBtc: number
+  shortLiqBtc: number
+  longLiqUsd: number
+  shortLiqUsd: number
+}
+
+const HOUR_SEC = 60 * 60
 
 const SYMBOL = 'BTCUSDT_PERP.A'
 const JSON_HEADERS = {
@@ -74,16 +90,120 @@ const readLatestRatio = (payload: unknown): { ratio: number; longPct: number; sh
   return best
 }
 
+const walkHistory = (payload: unknown, consider: (row: Record<string, unknown> | null) => void): void => {
+  for (const item of asList(payload)) {
+    const row = asRecord(item)
+    if (!row) continue
+    const history = row.history
+    if (Array.isArray(history)) {
+      for (const bar of history) consider(asRecord(bar))
+    } else {
+      consider(row)
+    }
+  }
+}
+
+/** Latest hour bar that has fully closed. `t` is the bar start, in seconds. */
+const readClosedLiquidation = (payload: unknown, nowSec: number): { t: number; l: number; s: number } | null => {
+  let bestT = -Infinity
+  let best: { t: number; l: number; s: number } | null = null
+  walkHistory(payload, (row) => {
+    if (!row) return
+    const t = num(row.t)
+    const l = num(row.l)
+    const s = num(row.s)
+    if (t == null || l == null || s == null || l < 0 || s < 0) return
+    if (t + HOUR_SEC > nowSec) return
+    if (t >= bestT) {
+      bestT = t
+      best = { t, l, s }
+    }
+  })
+  return best
+}
+
+const readLiquidationAt = (payload: unknown, barStart: number): { l: number; s: number } | null => {
+  let found: { l: number; s: number } | null = null
+  walkHistory(payload, (row) => {
+    if (!row) return
+    const t = num(row.t)
+    const l = num(row.l)
+    const s = num(row.s)
+    if (t !== barStart || l == null || s == null || l < 0 || s < 0) return
+    found = { l, s }
+  })
+  return found
+}
+
+const liqFrom = (snapshot: Snapshot | null): LiqFields | null => {
+  if (!snapshot) return null
+  const { liqBarStart, longLiqBtc, shortLiqBtc, longLiqUsd, shortLiqUsd } = snapshot
+  if (
+    liqBarStart == null ||
+    longLiqBtc == null ||
+    shortLiqBtc == null ||
+    longLiqUsd == null ||
+    shortLiqUsd == null ||
+    liqBarStart <= 0 ||
+    longLiqBtc < 0 ||
+    shortLiqBtc < 0 ||
+    longLiqUsd < 0 ||
+    shortLiqUsd < 0
+  ) {
+    return null
+  }
+  return { liqBarStart, longLiqBtc, shortLiqBtc, longLiqUsd, shortLiqUsd }
+}
+
+/** The closed hour stays on screen until the next hour ends. */
+const liqStillCurrent = (liq: LiqFields | null, nowSec: number): liq is LiqFields =>
+  liq != null && nowSec < liq.liqBarStart + 2 * HOUR_SEC
+
+const fetchLiquidation = async (key: string, nowSec: number): Promise<LiqFields | null> => {
+  const from = nowSec - 3 * HOUR_SEC
+  const url = (usd: boolean) =>
+    `https://api.coinalyze.net/v1/liquidation-history?symbols=${SYMBOL}` +
+    `&interval=1hour&from=${from}&to=${nowSec}&convert_to_usd=${usd ? 'true' : 'false'}` +
+    `&api_key=${encodeURIComponent(key)}`
+  const [btcRes, usdRes] = await Promise.all([
+    fetch(url(false), { signal: AbortSignal.timeout(8000) }),
+    fetch(url(true), { signal: AbortSignal.timeout(8000) }),
+  ])
+  if (!btcRes.ok || !usdRes.ok) return null
+  const btc = readClosedLiquidation(await btcRes.json(), nowSec)
+  if (!btc) return null
+  const usd = readLiquidationAt(await usdRes.json(), btc.t)
+  if (!usd) return null
+  return {
+    liqBarStart: btc.t,
+    longLiqBtc: btc.l,
+    shortLiqBtc: btc.s,
+    longLiqUsd: usd.l,
+    shortLiqUsd: usd.s,
+  }
+}
+
+const readStored = (raw: string | null): Snapshot | null => {
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    return asRecord(parsed) as Snapshot | null
+  } catch {
+    return null
+  }
+}
+
 const sample = async (env: Env): Promise<void> => {
   const key = env.COINALYZE_API_KEY
   if (!key) return
   const nowSec = Math.floor(Date.now() / 1000)
-  const from = nowSec - 60 * 60
+  const from = nowSec - HOUR_SEC
   const oiUrl = `https://api.coinalyze.net/v1/open-interest?symbols=${SYMBOL}&api_key=${encodeURIComponent(key)}`
   const ratioUrl =
     `https://api.coinalyze.net/v1/long-short-ratio-history?symbols=${SYMBOL}` +
     `&interval=5min&from=${from}&to=${nowSec}&api_key=${encodeURIComponent(key)}`
   try {
+    const previous = readStored(await env.OI_SNAPSHOT.get('latest'))
     const [oiRes, ratioRes] = await Promise.all([
       fetch(oiUrl, { signal: AbortSignal.timeout(8000) }),
       fetch(ratioUrl, { signal: AbortSignal.timeout(8000) }),
@@ -92,12 +212,17 @@ const sample = async (env: Env): Promise<void> => {
     const openInterest = readOpenInterest(await oiRes.json())
     const ratio = readLatestRatio(await ratioRes.json())
     if (openInterest == null || ratio == null) return
+    let liq = liqFrom(previous)
+    if (!liqStillCurrent(liq, nowSec)) {
+      liq = (await fetchLiquidation(key, nowSec)) ?? liq
+    }
     const snapshot: Snapshot = {
       sampledAt: Date.now(),
       openInterest,
       ratio: ratio.ratio,
       longPct: ratio.longPct,
       shortPct: ratio.shortPct,
+      ...(liq ?? {}),
     }
     await env.OI_SNAPSHOT.put('latest', JSON.stringify(snapshot))
   } catch {

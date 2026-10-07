@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import type { BlockState } from '../data/blockHeight'
 import type { FeedStatus } from '../data/marketData'
-import { useOpenInterest } from '../data/openInterest'
+import { useLiqCountdown, useOpenInterest } from '../data/openInterest'
 import type { MarketSnapshot } from '../game/types'
 import { mobileAssetManifest } from './mobileAssetManifest'
 import { resolveMobileAssetUrl } from './mobileAssetUrls'
-import { formatElapsed, formatExchangePriceLabel } from './format'
-import { OI_LABEL_FONT_REM, OI_LABEL_X, OI_LABEL_Y } from './overlayConstants'
+import { formatElapsed, formatExchangePriceLabel, formatLiqBtc, formatLiqUsd } from './format'
+import { LIQ_LABEL_X, LIQ_LABEL_Y, OI_LABEL_FONT_REM, OI_LABEL_X, OI_LABEL_Y } from './overlayConstants'
 
 interface OverlayProps {
   market: MarketSnapshot
@@ -109,6 +109,11 @@ const formatAccountPct = (value: number): string => `${Math.round(value)}%`
 
 export const Overlay = ({ market, block, onTimeClick, status }: OverlayProps) => {
   const openInterest = useOpenInterest()
+  const liqCountdown = useLiqCountdown(openInterest?.liqBarStart ?? null)
+  const longLiqBtc = openInterest?.longLiqBtc
+  const shortLiqBtc = openInterest?.shortLiqBtc
+  const longLiqUsd = openInterest?.longLiqUsd
+  const shortLiqUsd = openInterest?.shortLiqUsd
   const binanceMaxV = exchangeMaxVolume(market.binance.buyVolume, market.binance.sellVolume)
   const coinbaseMaxV = exchangeMaxVolume(market.coinbase.buyVolume, market.coinbase.sellVolume)
   const prevBinance = useRef<number | undefined>(undefined)
@@ -350,6 +355,26 @@ export const Overlay = ({ market, block, onTimeClick, status }: OverlayProps) =>
         <p>O/I : {openInterest ? formatOpenInterest(openInterest.openInterest) : '—'}</p>
         <p>Long {openInterest ? formatAccountPct(openInterest.longPct) : '—'} (Pass)</p>
         <p>Short {openInterest ? formatAccountPct(openInterest.shortPct) : '—'} (Don't)</p>
+      </div>
+      <div
+        className="overlay-oi overlay-liq"
+        style={{
+          left: LIQ_LABEL_X,
+          top: LIQ_LABEL_Y,
+          fontSize: `${OI_LABEL_FONT_REM}rem`,
+        }}
+      >
+        <p>next {liqCountdown}</p>
+        <p className="overlay-liq-row">
+          <span>Long liq</span>
+          <span>{longLiqBtc == null ? '—' : `${formatLiqBtc(longLiqBtc)} BTC`}</span>
+          <span>{longLiqUsd == null ? '—' : formatLiqUsd(longLiqUsd)}</span>
+        </p>
+        <p className="overlay-liq-row">
+          <span>Short liq</span>
+          <span>{shortLiqBtc == null ? '—' : `${formatLiqBtc(shortLiqBtc)} BTC`}</span>
+          <span>{shortLiqUsd == null ? '—' : formatLiqUsd(shortLiqUsd)}</span>
+        </p>
       </div>
     </div>
   )

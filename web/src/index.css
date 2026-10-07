@@ -437,6 +437,22 @@ body {
   white-space: nowrap;
 }
 
+.overlay-liq {
+  transform: none;
+  text-align: left;
+  text-shadow:
+    0 1px 0 #000,
+    0 2px 4px #000,
+    0 0 8px rgba(0, 0, 0, 1),
+    0 0 18px rgba(0, 0, 0, 0.95);
+}
+
+.overlay-liq-row {
+  display: flex;
+  column-gap: 0.35em;
+  justify-content: flex-start;
+}
+
 .feed-glyph {
   font-size: 1.21875em;
   line-height: 1;
