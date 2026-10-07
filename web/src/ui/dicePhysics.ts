@@ -264,12 +264,13 @@ export const advanceThrow = (
   }
 }
 
-/** Shared launch speeds. One buy-volume distance for both dice; felt hits decide how many bounces that takes. */
+/** Binance buy sets forward speed. Coinbase buy sets upward speed. A short throw raises forward speed only. */
 export const launchSpeeds = (volume: VolumeTotals, metrics: StageMetrics = stageMetrics()): { forward: number; up: number } => {
   const full = fullStrengthSpeeds(metrics)
-  const targetZ = metrics.wallZ * reachFraction(volume)
-  const scale = launchScale(targetZ, full, metrics)
-  return { forward: full.forward * scale, up: full.up * scale }
+  const up = full.up * logUnit(volume.coinbaseBuy, DIE_COINBASE_BUY_REF)
+  const rawForward = full.forward * logUnit(volume.binanceBuy, DIE_BINANCE_BUY_REF)
+  const targetZ = metrics.wallZ * DIE_MIN_REACH_FRACTION
+  return { forward: forwardForReach(rawForward, up, targetZ, full.forward, metrics), up }
 }
 
 const launchDice = (dice: readonly [Die, Die], volume: VolumeTotals, metrics: StageMetrics): [Die, Die] => {
@@ -361,10 +362,11 @@ const constrain = (die: Die, metrics: StageMetrics, dt: number, random: () => nu
     next.h = 0
     const hop = (next.vh * next.vh) / (2 * DIE_GRAVITY_PX_PER_S2)
     const slide = Math.hypot(next.vx, next.vz)
-    if (next.vh <= 0 && hop < 1.5 && slide < DIE_REST_SPEED_PX_PER_S && Math.abs(next.vh) < DIE_REST_VERTICAL_PX_PER_S) {
+    const gentle = hop < 1.5
+    if (next.vh <= 0 && gentle && slide < DIE_REST_SPEED_PX_PER_S && Math.abs(next.vh) < DIE_REST_VERTICAL_PX_PER_S) {
       return forceRest(next)
     }
-    if (next.vh < 0) {
+    if (next.vh < 0 && !gentle) {
       const r = dieSize(next.z, metrics) / 2
       next.vx += next.w.z * r * DIE_SPIN_KICK
       next.vz += next.w.x * r * DIE_SPIN_KICK
@@ -377,7 +379,10 @@ const constrain = (die: Die, metrics: StageMetrics, dt: number, random: () => nu
       const keep = Math.exp(-DIE_SLIDE_DAMP_PER_S * dt)
       next.vx *= keep
       next.vz *= keep
-      dampSpin(next)
+      const size = dieSize(next.z, metrics)
+      next.w.y *= DIE_SPIN_DAMP
+      next.w.z *= DIE_SPIN_DAMP
+      next.w.x = (Math.PI / 2) * next.vz / size
       if (Math.hypot(next.vx, next.vz) < DIE_REST_SPEED_PX_PER_S) return forceRest(next)
     }
   }
@@ -480,17 +485,6 @@ const restingDie = (x: number, q: Quat): Die => ({
   topFace: readTopFace(q),
 })
 
-const buyDistanceUnit = (volume: VolumeTotals): number => {
-  const binance = logUnit(volume.binanceBuy, DIE_BINANCE_BUY_REF)
-  const coinbase = logUnit(volume.coinbaseBuy, DIE_COINBASE_BUY_REF)
-  return 1 - (1 - binance) * (1 - coinbase)
-}
-
-const reachFraction = (volume: VolumeTotals): number => {
-  const k = buyDistanceUnit(volume)
-  return DIE_MIN_REACH_FRACTION + (1 - DIE_MIN_REACH_FRACTION) * k
-}
-
 /** Ceiling of the launch search. The 0.62² term is not a required bounce count. */
 const fullStrengthSpeeds = (metrics: StageMetrics): { forward: number; up: number } => {
   const bounceKeep = DIE_FELT_SPEED_KEEP * DIE_FELT_SPEED_KEEP
@@ -520,15 +514,19 @@ const simulatedMaxZ = (forward: number, up: number, metrics: StageMetrics): numb
   return maxZ
 }
 
-const launchScale = (
+/** Raises forward speed until the probe reaches `targetZ`. Upward speed stays put. */
+const forwardForReach = (
+  rawForward: number,
+  up: number,
   targetZ: number,
-  full: { forward: number; up: number },
+  fullForward: number,
   metrics: StageMetrics,
 ): number => {
-  const reaches = (scale: number) => simulatedMaxZ(full.forward * scale, full.up * scale, metrics) >= targetZ - 0.5
-  if (!reaches(1)) return 1
-  let lo = 0
-  let hi = 1
+  const reaches = (forward: number) => simulatedMaxZ(forward, up, metrics) >= targetZ - 0.5
+  if (reaches(rawForward)) return rawForward
+  if (!reaches(fullForward)) return fullForward
+  let lo = rawForward
+  let hi = fullForward
   for (let i = 0; i < 10; i += 1) {
     const mid = (lo + hi) / 2
     if (reaches(mid)) hi = mid

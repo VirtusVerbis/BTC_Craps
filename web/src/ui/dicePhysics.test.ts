@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  DIE_BINANCE_BUY_REF,
   DIE_BINANCE_SELL_REF,
+  DIE_COINBASE_BUY_REF,
   DIE_COINBASE_SELL_REF,
   DIE_DEPTH_SCALE,
   DIE_FORWARD_SPIN_SCALE,
@@ -10,6 +12,12 @@ import {
   DIE_MIN_REACH_FRACTION,
   DIE_NO_ROLL_PAUSE_MS,
   DIE_RESULT_HOLD_MS,
+  PUCK_OFF_SCALE,
+  PUCK_OFF_X,
+  PUCK_OFF_Y,
+  PUCK_ON_6_SCALE,
+  PUCK_ON_6_X,
+  PUCK_ON_6_Y,
   DIE_WALL_RESTITUTION,
   DIE_WALL_SPIN_RAD,
 } from './diceConstants'
@@ -108,12 +116,16 @@ describe('bounces', () => {
     expect(backed.vz).toBeGreaterThan(0)
   })
 
-  it('keeps forward speed when a fast die meets the felt on a short hop', () => {
-    const die = flyingDie({ h: 0.2, vh: -40, vz: 500, vx: 0 })
+  it('rolls a fast die that meets the felt on a short hop', () => {
+    const die = flyingDie({ h: 0.2, vh: -40, vz: 500, vx: 0, w: { x: 0, y: 3, z: 4 } })
     const [next] = stepDice([die, flyingDie({ alive: false })], 1 / 60, metrics)
     expect(next.resting).toBe(false)
-    expect(next.vz).toBeGreaterThan(0)
+    expect(next.vh).toBe(0)
+    expect(next.vz).toBeGreaterThan(500 * 0.9)
     expect(next.vz).toBeLessThan(500)
+    expect(next.w.x).toBeCloseTo((Math.PI / 2) * next.vz / dieSize(next.z, metrics))
+    expect(Math.abs(next.w.y)).toBeLessThan(3)
+    expect(Math.abs(next.w.z)).toBeLessThan(4)
   })
 
   it('bounces off the back wall when the die is below the top of the wall', () => {
@@ -213,31 +225,46 @@ const travel = (binanceBuy: number, coinbaseBuy: number) => {
   return { maxZ, cleared, hitWall, forward: launchSpeeds(volume, metrics).forward, up: launchSpeeds(volume, metrics).up }
 }
 
-describe('distance scalar', () => {
-  it('sends a full buy sample to the back wall', () => {
-    const flight = travel(6, 1.5)
+const speeds = (binanceBuy: number, coinbaseBuy: number) =>
+  launchSpeeds({ binanceBuy, coinbaseBuy, binanceSell: 0, coinbaseSell: 0 }, metrics)
+
+describe('launch axes', () => {
+  it('sends a full buy sample to the back wall on the full-strength pair', () => {
+    const flight = travel(DIE_BINANCE_BUY_REF, DIE_COINBASE_BUY_REF)
+    const launched = speeds(DIE_BINANCE_BUY_REF, DIE_COINBASE_BUY_REF)
     expect(flight.maxZ).toBeGreaterThan(metrics.wallZ * 0.85)
+    expect(launched.up).toBeGreaterThan(0)
+    expect(launched.forward).toBeGreaterThan(launched.up)
   })
 
-  it('sends a weak buy sample near the minimum reach', () => {
+  it('leaves upward speed at zero when Coinbase buy is zero', () => {
+    const launched = speeds(DIE_BINANCE_BUY_REF, 0)
+    expect(launched.up).toBe(0)
+    expect(launched.forward).toBeGreaterThan(0)
+  })
+
+  it('keeps upward speed on Coinbase buy when Binance buy changes', () => {
+    const weak = speeds(0.05, DIE_COINBASE_BUY_REF)
+    const strong = speeds(DIE_BINANCE_BUY_REF, DIE_COINBASE_BUY_REF)
+    expect(weak.up).toBeCloseTo(strong.up)
+    expect(strong.up).toBeGreaterThan(0)
+  })
+
+  it('raises a weak Binance buy so the throw still reaches the felt floor', () => {
+    const launched = speeds(0.05, 0)
+    const raw = speeds(DIE_BINANCE_BUY_REF, 0).forward * logUnit(0.05, DIE_BINANCE_BUY_REF)
+    expect(launched.up).toBe(0)
+    expect(launched.forward).toBeGreaterThan(raw)
     const flight = travel(0.05, 0.02)
-    expect(flight.maxZ).toBeGreaterThan(80)
-    expect(flight.maxZ).toBeGreaterThan(metrics.wallZ * DIE_MIN_REACH_FRACTION * 0.5)
+    expect(flight.maxZ).toBeGreaterThan(metrics.wallZ * DIE_MIN_REACH_FRACTION * 0.9)
     expect(flight.maxZ).toBeLessThanOrEqual(metrics.wallZ + 1)
   })
 
-  it('sends one strong book much farther than a weak pair', () => {
-    const weak = travel(0.05, 0.02)
-    const oneSided = travel(6, 0.01)
-    expect(oneSided.maxZ).toBeGreaterThan(weak.maxZ)
-  })
-
-  it('sends a mid buy sample between a weak pair and one strong book', () => {
-    const weak = travel(0.05, 0.02)
-    const mid = travel(1, 0.3)
-    const oneSided = travel(6, 0.01)
-    expect(mid.maxZ).toBeGreaterThan(weak.maxZ)
-    expect(mid.maxZ).toBeLessThan(oneSided.maxZ)
+  it('does not let Coinbase buy change forward speed when Binance buy is already full', () => {
+    const quiet = speeds(DIE_BINANCE_BUY_REF, 0)
+    const loud = speeds(DIE_BINANCE_BUY_REF, DIE_COINBASE_BUY_REF)
+    expect(loud.up).toBeGreaterThan(quiet.up)
+    expect(loud.forward).toBeCloseTo(quiet.forward)
   })
 })
 
@@ -449,7 +476,7 @@ describe('pass line puck', () => {
     expect(reset.phase).toBe('holding')
     expect(reset.result).toBeNull()
     expect(reset.point).toBe(6)
-    expect(puckPlacement(null)).toMatchObject({ src: '/Off_Puck.png', x: 360, y: 830, scale: 0.18 })
-    expect(puckPlacement(6)).toMatchObject({ src: '/On_Puck.png', x: 230, y: 1180, scale: 0.26 })
+    expect(puckPlacement(null)).toMatchObject({ src: '/Off_Puck.png', x: PUCK_OFF_X, y: PUCK_OFF_Y, scale: PUCK_OFF_SCALE })
+    expect(puckPlacement(6)).toMatchObject({ src: '/On_Puck.png', x: PUCK_ON_6_X, y: PUCK_ON_6_Y, scale: PUCK_ON_6_SCALE })
   })
 })

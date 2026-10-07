@@ -136,8 +136,6 @@ body {
   inset: 0;
   z-index: 11;
   pointer-events: none;
-  perspective: 900px;
-  perspective-origin: 50% 0%;
 }
 
 .puck {
@@ -152,6 +150,8 @@ body {
   position: absolute;
   z-index: 11;
   transform-style: preserve-3d;
+  perspective: 1600px;
+  perspective-origin: center;
 }
 
 .die-spin {

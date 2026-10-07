@@ -18,6 +18,8 @@ export interface DieView {
   x: number
   y: number
   size: number
+  /** 0 at the launch rail, 1 at the back wall. */
+  depth: number
   transform: string
 }
 
@@ -28,13 +30,16 @@ export interface DicePresentation {
 }
 
 const toView = (die: Die, id: 'left' | 'right'): DieView => {
-  const screen = dieScreenCenter(die, stageMetrics())
+  const metrics = stageMetrics()
+  const screen = dieScreenCenter(die, metrics)
+  const depth = metrics.wallZ > 0 ? Math.min(1, Math.max(0, die.z / metrics.wallZ)) : 0
   return {
     id,
     visible: die.alive,
     x: screen.x,
     y: screen.y,
     size: screen.size,
+    depth,
     transform: quatToCssMatrix(die.q),
   }
 }

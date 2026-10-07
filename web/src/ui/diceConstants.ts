@@ -1,11 +1,17 @@
 /** Both dice use this size at the bottom edge of the stage. */
-export const DIE_LAUNCH_SIZE_PX = 45
+export const DIE_LAUNCH_SIZE_PX = 57//45
 
 /** Size at the back wall, relative to `DIE_LAUNCH_SIZE_PX`. */
-export const DIE_DEPTH_SCALE = 0.50
+export const DIE_DEPTH_SCALE = 0.6//0.50
 
 /** Red face opacity. Pips stay opaque. */
-export const DIE_FACE_ALPHA = 0.55
+export const DIE_FACE_ALPHA = 0.65//0.55
+
+/** Camera lean at the launch rail. Negative tips the near side up. */
+export const DIE_LAUNCH_TILT_DEG = -55
+
+/** Camera lean at the back wall. Positive tips the opposite way from the launch rail. */
+export const DIE_BACK_WALL_TILT_DEG = -10 
 
 /** Hold on the bottom edge before a throw. */
 export const DIE_LAUNCH_DELAY_MS = 3000
@@ -56,8 +62,8 @@ export const DIE_MAX_SPIN_RAD_PER_S = 12
 export const DIE_FORWARD_SPIN_SCALE = 2
 
 /**
- * Nearest aim for a throw that has already launched, as a fraction of felt depth.
- * Buy volume fills the rest of the way to the back wall.
+ * Minimum felt distance for a throw, as a fraction of the depth to the back wall.
+ * Forward speed is raised to meet it. Upward speed stays on Coinbase buy volume.
  */
 export const DIE_MIN_REACH_FRACTION =  0.983 //0.985
 

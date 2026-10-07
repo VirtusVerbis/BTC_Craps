@@ -1,4 +1,4 @@
-import { DIE_FACE_ALPHA, PUCK_IMAGE_WIDTH_PX } from './diceConstants'
+import { DIE_BACK_WALL_TILT_DEG, DIE_FACE_ALPHA, DIE_LAUNCH_TILT_DEG, PUCK_IMAGE_WIDTH_PX } from './diceConstants'
 import { puckPlacement } from './puckState'
 import type { DicePresentation } from './useDiceThrow'
 
@@ -35,6 +35,8 @@ const PIP_LAYOUT: Record<number, Array<[number, number]>> = {
     [72, 72],
   ],
 }
+
+const viewTiltDeg = (depth: number) => DIE_LAUNCH_TILT_DEG + depth * (DIE_BACK_WALL_TILT_DEG - DIE_LAUNCH_TILT_DEG)
 
 const FACES: Array<{ name: string; value: number }> = [
   { name: 'front', value: 2 },
@@ -79,7 +81,7 @@ export const DiceLayer = ({ presentation }: { presentation: DicePresentation }) 
                 ['--die-half' as string]: `${die.size / 2}px`,
               }}
             >
-              <div className="die-spin" style={{ transform: die.transform }}>
+              <div className="die-spin" style={{ transform: `rotateX(${viewTiltDeg(die.depth)}deg) ${die.transform}` }}>
                 {FACES.map((face) => (
                   <Face key={face.name} name={face.name} value={face.value} />
                 ))}
