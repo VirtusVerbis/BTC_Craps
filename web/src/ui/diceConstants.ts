@@ -11,7 +11,7 @@ export const DIE_FACE_ALPHA = 0.65//0.55
 export const DIE_LAUNCH_TILT_DEG = -55
 
 /** Camera lean at the back wall. Positive tips the opposite way from the launch rail. */
-export const DIE_BACK_WALL_TILT_DEG = -10 
+export const DIE_BACK_WALL_TILT_DEG = -20 
 
 /** Hold on the bottom edge before a throw. */
 export const DIE_LAUNCH_DELAY_MS = 3000
