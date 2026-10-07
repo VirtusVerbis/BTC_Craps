@@ -55,7 +55,7 @@ export const CHIP_TOPPLE_SPEED_PX_PER_S = 40
 /** Side-rail and back-wall bounce for loose chips. */
 export const CHIP_RAIL_RESTITUTION = 0.4
 
-export const CHIP_MAX_STACK = 20
+export const CHIP_MAX_STACK = 10//20
 export const CHIP_MAX_COLUMNS = 2
 export const CHIP_MAX_BET_CHIPS = CHIP_MAX_STACK * CHIP_MAX_COLUMNS
 
@@ -63,7 +63,7 @@ export const CHIP_MAX_BET_CHIPS = CHIP_MAX_STACK * CHIP_MAX_COLUMNS
  * Center of the bottom chip, in stage pixels (1080×1920).
  * Wolf, far Pass line, left of the upside-down lettering.
  */
-export const WOLF_PASS_X = 200//220
+export const WOLF_PASS_X = 170//200//220
 export const WOLF_PASS_Y = 835 //860
 
 export type ChipCharacter = 'wolf' | 'oldLady' | 'cat' | 'oldMan'
@@ -80,12 +80,13 @@ export interface ChipAnchor {
 export const CHIP_ANCHORS: readonly ChipAnchor[] = [
   { character: 'wolf', side: 'pass', x: WOLF_PASS_X, y: WOLF_PASS_Y },
   { character: 'oldLady', side: 'pass', x: 430, y: 835 },
-  { character: 'cat', side: 'pass', x: 650, y: 828 },
-  { character: 'oldMan', side: 'pass', x: 880, y: 835 },
-  { character: 'wolf', side: 'dont', x: 210, y: 900 },
-  { character: 'oldLady', side: 'dont', x: 440, y: 900 },
-  { character: 'cat', side: 'dont', x: 655, y: 892 },
-  { character: 'oldMan', side: 'dont', x: 870, y: 900 },
+  { character: 'cat', side: 'pass', x: 740, y: 870 },
+  { character: 'oldMan', side: 'pass', x: 880, y: 1000 },
+  // donts
+  { character: 'wolf', side: 'dont', x: 195, y: 880 },
+  { character: 'oldLady', side: 'dont', x: 440, y: 880 },
+  { character: 'cat', side: 'dont', x: 765, y: 930 },
+  { character: 'oldMan', side: 'dont', x: 815, y: 1050 },
 ]
 
 export type ChipColor = 'white' | 'red' | 'green' | 'blue' | 'black'
