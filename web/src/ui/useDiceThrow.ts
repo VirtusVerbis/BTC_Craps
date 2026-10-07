@@ -3,7 +3,7 @@ import type { MarketSnapshot } from '../game/types'
 import { useOpenInterest } from '../data/openInterest'
 import { btcPrice, buildBets } from './chipBets'
 import {
-  beginRestack,
+  settleColumns,
   driftLooseChips,
   emptyChipWorld,
   presentChips,
@@ -112,7 +112,7 @@ export const useDiceThrow = (market: MarketSnapshot, enabled: boolean): DicePres
       stateRef.current = advanceThrow(stateRef.current, dt, now, volumeRef.current, metrics, poseHook)
       if (phaseBefore !== 'holding' && stateRef.current.phase === 'holding') {
         const bets = betsNow()
-        if (bets) worldRef.current = beginRestack(worldRef.current ?? emptyChipWorld(), bets, now, Math.floor(now))
+        if (bets) worldRef.current = settleColumns(worldRef.current ?? emptyChipWorld(), bets, now, Math.floor(now))
       } else if (stateRef.current.phase === 'result' && worldRef.current) {
         worldRef.current = driftLooseChips(worldRef.current, dt, metrics)
       }

@@ -30,6 +30,9 @@ export const chipRotationDeg = (index: number): number => {
 /** How far an anchor may wander, in stage pixels, when a throw resets. */
 export const CHIP_ANCHOR_JITTER_PX = 8
 
+/** Farthest a bumped column may lean, in stage pixels. The top chip reaches this. */
+export const CHIP_NUDGE_PX = 6
+
 /** Restack length after the dice return to the rail. The launch delay is 3s. */
 export const CHIP_RESTACK_MS = 500
 

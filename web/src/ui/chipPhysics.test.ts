@@ -8,10 +8,14 @@ import {
   emptyChipWorld,
   presentChips,
   resolveDiceChips,
+  settleColumns,
+  worldFromBets,
+  zeroOffsets,
   type ChipWorld,
   type StandingStack,
 } from './chipPhysics'
 import { CHIP_WEIGHT } from './chipConstants'
+import { buildBets } from './chipBets'
 
 const metrics = stageMetrics()
 
@@ -33,6 +37,7 @@ const stackOf = (count: number, x: number, z: number): StandingStack => ({
   x,
   z,
   colors: Array.from({ length: count }, () => 'red' as const),
+  offsets: zeroOffsets(count),
 })
 
 const worldWith = (stacks: StandingStack[]): ChipWorld => ({ stacks, loose: [], restack: null })
@@ -74,6 +79,38 @@ describe('chip topples', () => {
     resolveDiceChips(world, [die, flyingDie({ alive: false, x: 10, z: 10 })], 1 / 60, metrics)
     expect(world.loose).toHaveLength(0)
     expect(world.stacks[0]?.colors).toHaveLength(10)
+    const offsets = world.stacks[0]?.offsets ?? []
+    const lean = (offset: { x: number; z: number } | undefined) => Math.hypot(offset?.x ?? 0, offset?.z ?? 0)
+    expect(lean(offsets[offsets.length - 1])).toBeGreaterThan(lean(offsets[0]))
+    expect(lean(offsets[0])).toBe(0)
+  })
+
+  it('restacks only after a chip has fallen', () => {
+    const bets = buildBets(10_000_000_000, 50, 50)
+    const world = worldFromBets(bets, 1)
+    const leaned = world.stacks[0]
+    leaned.offsets[leaned.offsets.length - 1] = { x: 4, z: 1 }
+    const stayed = settleColumns(world, bets, 0, 99)
+    const kept = stayed.stacks.find((stack) => stack.id === leaned.id)
+    expect(stayed.restack).toBeNull()
+    expect(kept?.x).toBe(leaned.x)
+    expect(kept?.offsets[kept.offsets.length - 1]).toEqual({ x: 4, z: 1 })
+
+    world.loose.push({
+      id: 'fell',
+      color: 'white',
+      x: leaned.x,
+      z: leaned.z,
+      h: 0,
+      vx: 0,
+      vz: 0,
+      vh: 0,
+      spin: 0,
+    })
+    const rebuilt = settleColumns(world, bets, 0, 99)
+    expect(rebuilt.restack).not.toBeNull()
+    const crooked = rebuilt.restack?.nextStacks.some((stack) => stack.offsets.some((offset) => offset.x !== 0 || offset.z !== 0))
+    expect(crooked).toBe(false)
   })
 
   it('topples a neighbor only while the chip is still moving', () => {

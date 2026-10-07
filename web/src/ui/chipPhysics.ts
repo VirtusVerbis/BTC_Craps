@@ -5,6 +5,7 @@ import {
   CHIP_DIE_RESTITUTION,
   CHIP_FRICTION_PER_S,
   CHIP_HEIGHT_PX,
+  CHIP_NUDGE_PX,
   CHIP_RAIL_RESTITUTION,
   CHIP_RESTACK_MS,
   CHIP_SIZE_SCALAR,
@@ -20,11 +21,18 @@ export const chipDiameter = (): number => CHIP_WIDTH_PX * CHIP_SIZE_SCALAR
 export const chipRadius = (): number => chipDiameter() / 2
 export const chipThickness = (): number => Math.max(1, Math.round(CHIP_THICKNESS_PX * CHIP_SIZE_SCALAR))
 
+export interface ChipOffset {
+  x: number
+  z: number
+}
+
 export interface StandingStack {
   id: string
   x: number
   z: number
   colors: ChipColor[]
+  /** Felt shift of each plate. The bottom stays at zero until a bump leans the column. */
+  offsets: ChipOffset[]
 }
 
 export interface LooseChip {
@@ -81,12 +89,22 @@ const nextLooseId = (stackId: string, index: number): string => {
   return `${stackId}-loose-${index}-${looseSerial}`
 }
 
+export const zeroOffsets = (count: number): ChipOffset[] =>
+  Array.from({ length: count }, () => ({ x: 0, z: 0 }))
+
+const fitOffsets = (offsets: readonly ChipOffset[] | undefined, count: number): ChipOffset[] =>
+  Array.from({ length: count }, (_, index) => ({
+    x: offsets?.[index]?.x ?? 0,
+    z: offsets?.[index]?.z ?? 0,
+  }))
+
 export const worldFromBets = (bets: readonly ChipBet[], seed: number): ChipWorld => ({
   stacks: placeBets(bets, seed, chipDiameter() + 6).map((column) => ({
     id: column.id,
     x: column.x,
     z: column.z,
     colors: column.colors,
+    offsets: zeroOffsets(column.colors.length),
   })),
   loose: [],
   restack: null,
@@ -130,6 +148,7 @@ const shearStack = (
   const shearAt = stack.colors.length - flyingCount
   const flying = stack.colors.slice(shearAt)
   stack.colors = stack.colors.slice(0, shearAt)
+  stack.offsets = fitOffsets(stack.offsets, shearAt)
   const thickness = chipThickness()
   const radius = chipRadius()
   const mass = chipMass()
@@ -149,6 +168,26 @@ const shearStack = (
       spin: chipRotationDeg(index),
     }
   })
+}
+
+/** Lean the column along the hit. The bottom plate stays put. Higher plates shift farther. */
+const nudgeStack = (stack: StandingStack, dirX: number, dirZ: number) => {
+  const count = stack.colors.length
+  if (count <= 1) return
+  stack.offsets = fitOffsets(stack.offsets, count)
+  const step = CHIP_NUDGE_PX * 0.25
+  for (let index = 1; index < count; index += 1) {
+    const scale = index / (count - 1)
+    const nextX = stack.offsets[index].x + dirX * step * scale
+    const nextZ = stack.offsets[index].z + dirZ * step * scale
+    const mag = Math.hypot(nextX, nextZ)
+    const limit = CHIP_NUDGE_PX * scale
+    if (mag > limit && mag > 0) {
+      stack.offsets[index] = { x: (nextX / mag) * limit, z: (nextZ / mag) * limit }
+    } else {
+      stack.offsets[index] = { x: nextX, z: nextZ }
+    }
+  }
 }
 
 const hitStack = (
@@ -190,7 +229,9 @@ const resolveDieStacks = (world: ChipWorld, dice: [Die, Die], metrics: StageMetr
       const dirX = travel > 1 ? die.vx / travel : hit.nx
       const dirZ = travel > 1 ? die.vz / travel : hit.nz
       const keep = Math.max(0, Math.min(stack.colors.length, Math.floor(Math.max(0, die.h) / chipThickness())))
-      born.push(...shearStack(stack, keep, dirX, dirZ, travel * 0.45))
+      const lifted = shearStack(stack, keep, dirX, dirZ, travel * 0.45)
+      if (lifted.length === 0) nudgeStack(stack, dirX, dirZ)
+      else born.push(...lifted)
       bounceDie(die, hit.nx, hit.nz)
     }
   }
@@ -328,7 +369,12 @@ const resolveLooseStacks = (world: ChipWorld) => {
       const nz = dist > 1e-4 ? dz / dist : 0
       const keep = Math.max(0, Math.min(stack.colors.length, Math.floor(Math.max(0, chip.h) / chipThickness())))
       if (keep >= stack.colors.length) continue
-      born.push(...shearStack(stack, keep, chip.vx / speed, chip.vz / speed, speed * 0.7))
+      const dirX = speed > 1 ? chip.vx / speed : nx
+      const dirZ = speed > 1 ? chip.vz / speed : nz
+      const lifted = shearStack(stack, keep, dirX, dirZ, speed * 0.7)
+      if (lifted.length === 0) {
+        if (speed >= CHIP_TOPPLE_SPEED_PX_PER_S) nudgeStack(stack, dirX, dirZ)
+      } else born.push(...lifted)
       chip.x += nx * (minDist - dist)
       chip.z += nz * (minDist - dist)
     }
@@ -362,7 +408,11 @@ export const driftLooseChips = (
 ): ChipWorld => {
   if (world.restack || world.loose.length === 0) return world
   const next: ChipWorld = {
-    stacks: world.stacks.map((stack) => ({ ...stack, colors: stack.colors.slice() })),
+    stacks: world.stacks.map((stack) => ({
+      ...stack,
+      colors: stack.colors.slice(),
+      offsets: fitOffsets(stack.offsets, stack.colors.length),
+    })),
     loose: world.loose.map((chip) => ({ ...chip })),
     restack: null,
   }
@@ -385,8 +435,8 @@ const collectSources = (world: ChipWorld): ChipSource[] => {
   const stacked = world.stacks.flatMap((stack) =>
     stack.colors.map((color, index) => ({
       color,
-      x: stack.x,
-      z: stack.z,
+      x: stack.x + (stack.offsets[index]?.x ?? 0),
+      z: stack.z + (stack.offsets[index]?.z ?? 0),
       h: index * thickness,
       spin: chipRotationDeg(index),
     })),
@@ -412,6 +462,35 @@ const collectTargets = (stacks: readonly StandingStack[]): ChipSource[] => {
       spin: chipRotationDeg(index),
     })),
   )
+}
+
+/** Restack only after a chip has left a column. Otherwise keep the lean and swap colors in place. */
+export const settleColumns = (
+  world: ChipWorld,
+  bets: readonly ChipBet[],
+  nowMs: number,
+  seed: number,
+): ChipWorld => {
+  if (world.loose.length > 0) return beginRestack(world, bets, nowMs, seed)
+  const placed = placeBets(bets, seed, chipDiameter() + 6)
+  const byId = new Map(world.stacks.map((stack) => [stack.id, stack]))
+  return {
+    loose: [],
+    restack: null,
+    stacks: placed.map((column) => {
+      const existing = byId.get(column.id)
+      if (!existing) {
+        return { id: column.id, x: column.x, z: column.z, colors: column.colors.slice(), offsets: zeroOffsets(column.colors.length) }
+      }
+      return {
+        id: existing.id,
+        x: existing.x,
+        z: existing.z,
+        colors: column.colors.slice(),
+        offsets: fitOffsets(existing.offsets, column.colors.length),
+      }
+    }),
+  }
 }
 
 export const beginRestack = (world: ChipWorld, bets: readonly ChipBet[], nowMs: number, seed: number): ChipWorld => {
@@ -497,7 +576,16 @@ const plateDiscs = (
 const standingDiscs = (stack: StandingStack, metrics: StageMetrics): ChipDisc[] => {
   const layers = chipThickness()
   return stack.colors.flatMap((color, index) =>
-    plateDiscs(`${stack.id}-${index}`, color, stack.x, stack.z, chipRotationDeg(index), index * layers, index * layers, metrics),
+    plateDiscs(
+      `${stack.id}-${index}`,
+      color,
+      stack.x + (stack.offsets[index]?.x ?? 0),
+      stack.z + (stack.offsets[index]?.z ?? 0),
+      chipRotationDeg(index),
+      index * layers,
+      index * layers,
+      metrics,
+    ),
   )
 }
 
