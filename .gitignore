@@ -45,6 +45,7 @@ Thumbs.db
 
 # Misc
 *.local
+MY_CMDS.md
 
 # Punch Up reference checkout. The live repo is D:/WEB_BTC_PunchUp, outside
 # this tree. This ignores a copy placed inside BTC Craps, including its .git.

@@ -59,7 +59,7 @@ export const DIE_FORWARD_SPIN_SCALE = 2
  * Nearest aim for a throw that has already launched, as a fraction of felt depth.
  * Buy volume fills the rest of the way to the back wall.
  */
-export const DIE_MIN_REACH_FRACTION = 0.95
+export const DIE_MIN_REACH_FRACTION =  0.983 //0.985
 
 /** Log-scale references for one volume window. Tune per exchange. */
 export const DIE_BINANCE_BUY_REF = 6
