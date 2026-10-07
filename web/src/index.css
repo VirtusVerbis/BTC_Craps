@@ -131,17 +131,18 @@ body {
   pointer-events: none;
 }
 
+/* Above the table (1), under the meme (5) and candle chart (6). */
 .dice-layer {
   position: absolute;
   inset: 0;
-  z-index: 11;
+  z-index: 2;
   pointer-events: none;
 }
 
 .chip-stack {
   position: absolute;
   inset: 0;
-  z-index: 12;
+  z-index: 3;
   pointer-events: none;
 }
 
