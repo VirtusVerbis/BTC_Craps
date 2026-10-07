@@ -7,6 +7,7 @@ import {
   driftLooseChips,
   emptyChipWorld,
   presentChips,
+  puckObstacle,
   resolveDiceChips,
   tickRestack,
   worldFromBets,
@@ -97,7 +98,7 @@ export const useDiceThrow = (market: MarketSnapshot, enabled: boolean): DicePres
     const poseHook: DicePoseHook = (dice, dt, metrics) => {
       const world = worldRef.current
       if (!world) return dice
-      return resolveDiceChips(world, dice, dt, metrics)
+      return resolveDiceChips(world, dice, dt, metrics, puckObstacle(stateRef.current.point))
     }
 
     const loop = (now: number) => {
@@ -114,7 +115,7 @@ export const useDiceThrow = (market: MarketSnapshot, enabled: boolean): DicePres
         const bets = betsNow()
         if (bets) worldRef.current = settleColumns(worldRef.current ?? emptyChipWorld(), bets, now, Math.floor(now))
       } else if (stateRef.current.phase === 'result' && worldRef.current) {
-        worldRef.current = driftLooseChips(worldRef.current, dt, metrics)
+        worldRef.current = driftLooseChips(worldRef.current, dt, metrics, puckObstacle(stateRef.current.point))
       }
       if (worldRef.current?.restack) worldRef.current = tickRestack(worldRef.current, now)
       const chips = worldRef.current ? presentChips(worldRef.current, now, metrics) : []

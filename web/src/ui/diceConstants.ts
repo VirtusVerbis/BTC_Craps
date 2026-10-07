@@ -76,6 +76,9 @@ export const DIE_COINBASE_SELL_REF = 1.5
 /** Puck art width. Scale constants multiply this. */
 export const PUCK_IMAGE_WIDTH_PX = 291
 
+/** Height of the puck disc above the felt. A die above this flies over it. About two chip walls. */
+export const PUCK_COLLISION_HEIGHT_PX = 12
+
 /** OFF puck center, in the dealer-end Don't Come bar. */
 export const PUCK_OFF_X = 200
 export const PUCK_OFF_Y = 925

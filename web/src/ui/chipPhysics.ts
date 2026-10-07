@@ -1,4 +1,6 @@
-import { DIE_GRAVITY_PX_PER_S2 } from './diceConstants'
+import { REFERENCE_HEIGHT } from '../config/constants'
+import { DIE_GRAVITY_PX_PER_S2, PUCK_COLLISION_HEIGHT_PX, PUCK_IMAGE_WIDTH_PX } from './diceConstants'
+import { puckPlacement } from './puckState'
 import { dieSize, stageMetrics, type Die, type StageMetrics } from './dicePhysics'
 import { placeBets, type ChipBet } from './chipBets'
 import {
@@ -16,6 +18,22 @@ import {
   chipRotationDeg,
   type ChipColor,
 } from './chipConstants'
+
+export interface PuckObstacle {
+  x: number
+  z: number
+  radius: number
+}
+
+/** Felt circle for the current OFF or ON puck. The spot itself never changes on a hit. */
+export const puckObstacle = (point: number | null): PuckObstacle => {
+  const puck = puckPlacement(point)
+  return {
+    x: puck.x,
+    z: REFERENCE_HEIGHT - puck.y,
+    radius: (PUCK_IMAGE_WIDTH_PX * puck.scale) / 2,
+  }
+}
 
 export const chipDiameter = (): number => CHIP_WIDTH_PX * CHIP_SIZE_SCALAR
 export const chipRadius = (): number => chipDiameter() / 2
@@ -383,20 +401,86 @@ const resolveLooseStacks = (world: ChipWorld) => {
   world.stacks = world.stacks.filter((stack) => stack.colors.length > 0)
 }
 
+const bounceOffPuck = (
+  x: number,
+  z: number,
+  vx: number,
+  vz: number,
+  h: number,
+  bodyRadius: number,
+  puck: PuckObstacle,
+): { x: number; z: number; vx: number; vz: number } | null => {
+  if (h >= PUCK_COLLISION_HEIGHT_PX) return null
+  let dx = x - puck.x
+  let dz = z - puck.z
+  let dist = Math.hypot(dx, dz)
+  const minDist = bodyRadius + puck.radius
+  if (dist >= minDist) return null
+  let nx: number
+  let nz: number
+  if (dist < 1e-4) {
+    const speed = Math.hypot(vx, vz)
+    nx = speed > 1 ? vx / speed : 1
+    nz = speed > 1 ? vz / speed : 0
+    dist = 0
+  } else {
+    nx = dx / dist
+    nz = dz / dist
+  }
+  let nextVx = vx
+  let nextVz = vz
+  const approach = vx * nx + vz * nz
+  if (approach < 0) {
+    const impulse = -(1 + CHIP_DIE_RESTITUTION) * approach
+    nextVx += impulse * nx
+    nextVz += impulse * nz
+  }
+  const overlap = minDist - dist
+  return { x: x + nx * overlap, z: z + nz * overlap, vx: nextVx, vz: nextVz }
+}
+
+const resolvePuckDice = (dice: [Die, Die], puck: PuckObstacle | null | undefined, metrics: StageMetrics) => {
+  if (!puck) return
+  for (const die of dice) {
+    if (!die.alive || die.leaving || die.resting) continue
+    const hit = bounceOffPuck(die.x, die.z, die.vx, die.vz, die.h, dieSize(die.z, metrics) / 2, puck)
+    if (!hit) continue
+    die.x = hit.x
+    die.z = hit.z
+    die.vx = hit.vx
+    die.vz = hit.vz
+  }
+}
+
+const resolvePuckChips = (chips: LooseChip[], puck: PuckObstacle | null | undefined) => {
+  if (!puck) return
+  for (const chip of chips) {
+    const hit = bounceOffPuck(chip.x, chip.z, chip.vx, chip.vz, chip.h, chipRadius(), puck)
+    if (!hit) continue
+    chip.x = hit.x
+    chip.z = hit.z
+    chip.vx = hit.vx
+    chip.vz = hit.vz
+  }
+}
+
 /** One felt step. Mutates `world`. Returns dice after stack and chip bumps. */
 export const resolveDiceChips = (
   world: ChipWorld,
   dice: readonly [Die, Die],
   dt: number,
   metrics: StageMetrics = stageMetrics(),
+  puck?: PuckObstacle | null,
 ): [Die, Die] => {
   if (world.restack) return [dice[0], dice[1]]
   const next: [Die, Die] = [copyDie(dice[0]), copyDie(dice[1])]
   resolveDieStacks(world, next, metrics)
+  resolvePuckDice(next, puck, metrics)
   world.loose = world.loose.map((chip) => constrainLoose(integrateLoose(chip, dt), metrics, dt))
   resolveLoosePairs(world.loose)
   resolveLooseDice(world.loose, next, metrics)
   resolveLooseStacks(world)
+  resolvePuckChips(world.loose, puck)
   return next
 }
 
@@ -405,6 +489,7 @@ export const driftLooseChips = (
   world: ChipWorld,
   dt: number,
   metrics: StageMetrics = stageMetrics(),
+  puck?: PuckObstacle | null,
 ): ChipWorld => {
   if (world.restack || world.loose.length === 0) return world
   const next: ChipWorld = {
@@ -419,6 +504,7 @@ export const driftLooseChips = (
   next.loose = next.loose.map((chip) => constrainLoose(integrateLoose(chip, dt), metrics, dt))
   resolveLoosePairs(next.loose)
   resolveLooseStacks(next)
+  resolvePuckChips(next.loose, puck)
   return next
 }
 

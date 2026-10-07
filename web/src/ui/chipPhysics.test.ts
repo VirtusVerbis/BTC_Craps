@@ -7,6 +7,7 @@ import {
   driftLooseChips,
   emptyChipWorld,
   presentChips,
+  puckObstacle,
   resolveDiceChips,
   settleColumns,
   worldFromBets,
@@ -16,6 +17,8 @@ import {
 } from './chipPhysics'
 import { CHIP_WEIGHT } from './chipConstants'
 import { buildBets } from './chipBets'
+import { PUCK_COLLISION_HEIGHT_PX, PUCK_OFF_X, PUCK_OFF_Y } from './diceConstants'
+import { puckPlacement } from './puckState'
 
 const metrics = stageMetrics()
 
@@ -163,5 +166,58 @@ describe('chip topples', () => {
     expect(left && left.vx).toBeGreaterThan(0)
     expect(back && back.z).toBeLessThanOrEqual(metrics.wallZ - radius + 0.01)
     expect(back && back.vz).toBeLessThan(0)
+  })
+})
+
+describe('puck collision', () => {
+  const puck = puckObstacle(null)
+  const idle = () => flyingDie({ alive: false, x: 20, z: 20 })
+
+  it('bounces a die off the OFF puck and leaves the puck spot alone', () => {
+    const before = puckPlacement(null)
+    const world = emptyChipWorld()
+    const die = flyingDie({ x: puck.x, z: puck.z - puck.radius, h: 0, vx: 0, vz: 500, vh: 0 })
+    const [next] = resolveDiceChips(world, [die, idle()], 1 / 60, metrics, puck)
+    const dist = Math.hypot(next.x - puck.x, next.z - puck.z)
+    expect(dist).toBeGreaterThanOrEqual(puck.radius + 1)
+    expect(next.vz).toBeLessThan(0)
+    expect(puckPlacement(null)).toEqual(before)
+    expect(before).toMatchObject({ x: PUCK_OFF_X, y: PUCK_OFF_Y })
+  })
+
+  it('bounces a loose chip off the puck', () => {
+    const world = emptyChipWorld()
+    world.loose.push({
+      id: 'slider',
+      color: 'white',
+      x: puck.x,
+      z: puck.z - puck.radius,
+      h: 0,
+      vx: 0,
+      vz: 400,
+      vh: 0,
+      spin: 0,
+    })
+    const next = driftLooseChips(world, 1 / 60, metrics, puck)
+    const chip = next.loose[0]
+    const dist = Math.hypot(chip.x - puck.x, chip.z - puck.z)
+    expect(dist).toBeGreaterThanOrEqual(puck.radius + chipRadius() - 0.5)
+    expect(chip.vz).toBeLessThan(0)
+    expect(puckObstacle(null)).toEqual(puck)
+  })
+
+  it('lets a die above the puck keep its course', () => {
+    const world = emptyChipWorld()
+    const die = flyingDie({
+      x: puck.x,
+      z: puck.z - puck.radius,
+      h: PUCK_COLLISION_HEIGHT_PX + 4,
+      vx: 0,
+      vz: 500,
+      vh: 0,
+    })
+    const [next] = resolveDiceChips(world, [die, idle()], 1 / 60, metrics, puck)
+    expect(next.z).toBeCloseTo(die.z)
+    expect(next.vz).toBe(500)
   })
 })
