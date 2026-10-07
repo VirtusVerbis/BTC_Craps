@@ -324,6 +324,17 @@ body {
   flex-direction: column;
   justify-content: flex-start;
   z-index: 20;
+  --hud-text-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.95),
+    0 2px 6px rgba(0, 0, 0, 0.95),
+    0 0 10px rgba(0, 0, 0, 0.8);
+}
+
+.overlay-label,
+.overlay-price,
+.time-block-height,
+.overlay-oi {
+  text-shadow: var(--hud-text-shadow);
 }
 
 .video-overlay-root {
@@ -418,10 +429,6 @@ body {
   color: #f7931a;
   text-align: right;
   line-height: 1.25;
-  text-shadow:
-    0 1px 0 rgba(0, 0, 0, 0.95),
-    0 2px 6px rgba(0, 0, 0, 0.95),
-    0 0 10px rgba(0, 0, 0, 0.8);
   pointer-events: none;
 }
 
@@ -565,6 +572,17 @@ body {
 .time-elapsed {
   color: #f7931a;
   font-size: 1.5625rem;
+  text-shadow:
+    0 4px 0 #000,
+    4px 0 0 #000,
+    -4px 0 0 #000,
+    0 -4px 0 #000,
+    3px 3px 0 #000,
+    -3px 3px 0 #000,
+    3px -3px 0 #000,
+    -3px -3px 0 #000,
+    0 4px 12px #000,
+    0 0 22px rgba(0, 0, 0, 0.95);
 }
 
 .repo-links-panel {
