@@ -10,8 +10,9 @@ import { Stage } from './ui/Stage'
 import { BG2_MAX_CANDLES } from './ui/androidMirrorConstants'
 import { useBg2ChartVisible } from './ui/useBg2ChartVisibility'
 import { useBg2MemeState } from './ui/useBg2MemeState'
-import { BONUS_FLASH_MS } from './ui/bonusConstants'
+import { BONUS_FLASH_MS, BONUS_LABEL_EXTRA_MS } from './ui/bonusConstants'
 import { applyBonusRoll, bonusFlashTotals, emptyBonusHand } from './ui/bonusCraps'
+import { bonusTestHand, isBonusTestSeed, type BonusTestSeed } from './ui/bonusTest'
 import type { ThrowResult } from './ui/dicePhysics'
 import { pushRoll } from './ui/histogramModel'
 import { useDiceThrow } from './ui/useDiceThrow'
@@ -107,7 +108,7 @@ function App() {
   const onCountedRoll = useCallback((result: ThrowResult) => {
     if (!('total' in result)) {
       setBonusLines([])
-      return
+      return 0
     }
     setRolls((current) => pushRoll(current, result.total))
     const step = applyBonusRoll(bonusHandRef.current, result.total)
@@ -123,8 +124,32 @@ function App() {
       window.clearTimeout(bonusFlashTimer.current)
       setBonusFlashing([])
     }
+    return step.lines.length > 0 ? BONUS_LABEL_EXTRA_MS : 0
   }, [])
   useEffect(() => () => window.clearTimeout(bonusFlashTimer.current), [])
+  const armBonusTest = useCallback((seed: BonusTestSeed) => {
+    const hand = bonusTestHand(seed)
+    bonusHandRef.current = hand
+    setBonusHits(hand.hits)
+    setBonusLines([])
+    setBonusFlashing([])
+    window.clearTimeout(bonusFlashTimer.current)
+  }, [])
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    window.btcCrapsBonus = { arm: armBonusTest }
+    const params = new URLSearchParams(window.location.search)
+    const seed = params.get('bonus')
+    if (isBonusTestSeed(seed)) {
+      armBonusTest(seed)
+      params.delete('bonus')
+      const query = params.toString()
+      window.history.replaceState(null, '', `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`)
+    }
+    return () => {
+      delete window.btcCrapsBonus
+    }
+  }, [armBonusTest])
   const histogram = useHistogramVisibility(splashDone, histogramBoost)
   const dice = useDiceThrow(feed.market, splashDone, onCountedRoll)
 

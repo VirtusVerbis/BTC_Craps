@@ -406,6 +406,35 @@ describe('throw cycle', () => {
     expect(reset.dice[1].z).toBe(0)
   })
 
+  it('keeps a bonus result up until the extended hold, then returns to the rail', () => {
+    const state = createThrowState(0, 540)
+    const left = flyingDie({ resting: true, topFace: 4, alive: true })
+    const right = flyingDie({ resting: true, topFace: 4, alive: true, x: 620 })
+    const result = advanceThrow(
+      { ...state, phase: 'flying', dice: [left, right] },
+      0.016,
+      1000,
+      { binanceBuy: 1, coinbaseBuy: 1, binanceSell: 0, coinbaseSell: 0 },
+    )
+    const extended = { ...result, resultHoldMs: DIE_RESULT_HOLD_MS + 2000 }
+    const duringExtra = advanceThrow(extended, 0.016, 1000 + DIE_RESULT_HOLD_MS + 1999, {
+      binanceBuy: 1,
+      coinbaseBuy: 1,
+      binanceSell: 0,
+      coinbaseSell: 0,
+    })
+    expect(duringExtra.phase).toBe('result')
+    expect(duringExtra.result).toEqual(result.result)
+    const reset = advanceThrow(extended, 0.016, 1000 + DIE_RESULT_HOLD_MS + 2000, {
+      binanceBuy: 1,
+      coinbaseBuy: 1,
+      binanceSell: 0,
+      coinbaseSell: 0,
+    })
+    expect(reset.phase).toBe('holding')
+    expect(reset.result).toBeNull()
+  })
+
   it('counts a roll that already reached the back-wall line', () => {
     const state = createThrowState(0, 540)
     const line = metrics.wallZ * DIE_MIN_REACH_FRACTION

@@ -14,6 +14,7 @@ import {
   type ChipDisc,
   type ChipWorld,
 } from './chipPhysics'
+import { DIE_RESULT_HOLD_MS } from './diceConstants'
 import {
   advanceThrow,
   createThrowState,
@@ -70,7 +71,7 @@ const present = (state: ThrowState, chips: readonly ChipDisc[]): DicePresentatio
 export const useDiceThrow = (
   market: MarketSnapshot,
   enabled: boolean,
-  onCountedRoll?: (result: ThrowResult) => void,
+  onCountedRoll?: (result: ThrowResult) => number | void,
 ): DicePresentation | null => {
   const oi = useOpenInterest()
   const volume = useDiceVolumeWindow(market)
@@ -119,7 +120,9 @@ export const useDiceThrow = (
       stateRef.current = advanceThrow(stateRef.current, dt, now, volumeRef.current, metrics, poseHook)
       if (phaseBefore !== 'result' && stateRef.current.phase === 'result') {
         const result = stateRef.current.result
-        if (result) onCountedRollRef.current?.(result)
+        const raw = result ? onCountedRollRef.current?.(result) : 0
+        const extra = typeof raw === 'number' ? raw : 0
+        if (extra > 0) stateRef.current = { ...stateRef.current, resultHoldMs: DIE_RESULT_HOLD_MS + extra }
       }
       if (phaseBefore !== 'holding' && stateRef.current.phase === 'holding') {
         const bets = betsNow()

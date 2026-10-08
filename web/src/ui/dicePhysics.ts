@@ -78,6 +78,8 @@ export interface ThrowState {
   /** Pass-line point. Null is come-out, with the OFF puck in the Don't Come bar. */
   point: number | null
   result: ThrowResult | null
+  /** Result-phase length. A bonus win sets this above `DIE_RESULT_HOLD_MS`. */
+  resultHoldMs?: number
   flightMs: number
   /**
    * Farthest felt depth each die reached during a tracked flight.
@@ -285,7 +287,8 @@ export const advanceThrow = (
     }
   }
 
-  if (nowMs - state.phaseStartedMs < DIE_RESULT_HOLD_MS) return state
+  const resultHoldMs = state.resultHoldMs ?? DIE_RESULT_HOLD_MS
+  if (nowMs - state.phaseStartedMs < resultHoldMs) return state
   const sharedX = randomSharedX()
   return {
     phase: 'holding',
