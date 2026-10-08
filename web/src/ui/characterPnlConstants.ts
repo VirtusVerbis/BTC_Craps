@@ -17,7 +17,7 @@ export const OLD_LADY_PL_X = 440
 export const OLD_LADY_PL_Y = 470
 export const CAT_PL_X = 650
 export const CAT_PL_Y = 470
-export const OLD_MAN_PL_X = 920
+export const OLD_MAN_PL_X = 890
 export const OLD_MAN_PL_Y = 470
 
 export const PL_LABEL_ANCHOR: Record<ChipCharacter, { x: number; y: number }> = {
