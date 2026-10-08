@@ -170,7 +170,26 @@ body {
 }
 
 .roll-histogram-bar {
+  position: relative;
   transition: height 280ms linear;
+}
+
+.roll-histogram-count {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+  color: #000;
+  font-size: var(--histogram-count-font);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.roll-histogram-count.is-above {
+  color: #fff;
+  transform: translate(-50%, -100%);
 }
 
 .roll-histogram-number {

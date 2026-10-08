@@ -22,6 +22,9 @@ export const HISTOGRAM_PLATE_ALPHA = 0.55
 /** Size of the 2–12 labels along the bottom of the plate. */
 export const HISTOGRAM_NUMBER_FONT_PX = 36
 
+/** Bar count, as a fraction of `HISTOGRAM_NUMBER_FONT_PX`. */
+export const HISTOGRAM_COUNT_FONT_RATIO = 0.75
+
 /** Share of each of the 11 slots taken by that total's column. */
 export const HISTOGRAM_COLUMN_WIDTH_FRACTION = 0.5
 

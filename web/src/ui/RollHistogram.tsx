@@ -1,7 +1,8 @@
-import type { CSSProperties } from 'react'
+import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { BONUS_CIRCLE_COLOR, BONUS_CIRCLE_DIAMETER_PX, BONUS_CIRCLE_FLASH_MS } from './bonusConstants'
 import {
   HISTOGRAM_COLUMN_WIDTH_FRACTION,
+  HISTOGRAM_COUNT_FONT_RATIO,
   HISTOGRAM_HEIGHT,
   HISTOGRAM_NUMBER_FONT_PX,
   HISTOGRAM_ORANGE,
@@ -30,6 +31,28 @@ export const RollHistogram = ({
   flashing,
 }: RollHistogramProps) => {
   const columns = histogramColumns(rolls)
+  const countFontPx = HISTOGRAM_NUMBER_FONT_PX * HISTOGRAM_COUNT_FONT_RATIO
+  const columnsRef = useRef<HTMLDivElement>(null)
+  const [aboveTotals, setAboveTotals] = useState<ReadonlySet<number>>(() => new Set())
+  useLayoutEffect(() => {
+    const root = columnsRef.current
+    if (!root) return
+    const bars = Array.from(root.querySelectorAll<HTMLElement>('.roll-histogram-bar'))
+    const measure = () => {
+      const above = new Set<number>()
+      for (const bar of bars) {
+        if (bar.offsetHeight < countFontPx) above.add(Number(bar.dataset.total))
+      }
+      setAboveTotals((current) => {
+        if (current.size === above.size && [...above].every((total) => current.has(total))) return current
+        return above
+      })
+    }
+    const observer = new ResizeObserver(measure)
+    for (const bar of bars) observer.observe(bar)
+    measure()
+    return () => observer.disconnect()
+  }, [rolls, countFontPx])
   const sheetStyle: CSSProperties = {
     transform: `translateY(${(1 - reveal) * 100}%)`,
     transition: animate ? `transform ${transitionMs}ms linear` : 'none',
@@ -56,19 +79,28 @@ export const RollHistogram = ({
           ['--bonus-flash-half' as string]: `${BONUS_CIRCLE_FLASH_MS}ms`,
         }}
       >
-        <div className="roll-histogram-columns">
+        <div
+          className="roll-histogram-columns"
+          ref={columnsRef}
+          style={{ ['--histogram-count-font' as string]: `${countFontPx}px` }}
+        >
           {columns.map((column) => (
             <div className="roll-histogram-slot" key={column.total}>
               <div className="roll-histogram-track">
                 {column.scale > 0 ? (
                   <div
                     className="roll-histogram-bar"
+                    data-total={column.total}
                     style={{
                       height: `${column.scale * 100}%`,
                       width: `${HISTOGRAM_COLUMN_WIDTH_FRACTION * 100}%`,
                       background: HISTOGRAM_ORANGE,
                     }}
-                  />
+                  >
+                    <span className={aboveTotals.has(column.total) ? 'roll-histogram-count is-above' : 'roll-histogram-count'}>
+                      {column.count}
+                    </span>
+                  </div>
                 ) : null}
               </div>
               <div
