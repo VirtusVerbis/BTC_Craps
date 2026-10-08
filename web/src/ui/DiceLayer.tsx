@@ -55,7 +55,13 @@ const Face = ({ name, value }: { name: string; value: number }) => (
   </div>
 )
 
-export const DiceLayer = ({ presentation }: { presentation: DicePresentation }) => {
+export const DiceLayer = ({
+  presentation,
+  bonusLines = [],
+}: {
+  presentation: DicePresentation
+  bonusLines?: readonly string[]
+}) => {
   const puck = puckPlacement(presentation.point)
   const result = presentation.result
   return (
@@ -98,6 +104,11 @@ export const DiceLayer = ({ presentation }: { presentation: DicePresentation }) 
             <>
               <div className="dice-result-total">{result.total}</div>
               {result.label ? <div className="dice-result-label">{result.label}</div> : null}
+              {bonusLines.map((line) => (
+                <div className="dice-result-bonus" key={line}>
+                  {line}
+                </div>
+              ))}
             </>
           )}
         </div>

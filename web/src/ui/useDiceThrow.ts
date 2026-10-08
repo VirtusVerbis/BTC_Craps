@@ -70,7 +70,7 @@ const present = (state: ThrowState, chips: readonly ChipDisc[]): DicePresentatio
 export const useDiceThrow = (
   market: MarketSnapshot,
   enabled: boolean,
-  onCountedRoll?: (total: number) => void,
+  onCountedRoll?: (result: ThrowResult) => void,
 ): DicePresentation | null => {
   const oi = useOpenInterest()
   const volume = useDiceVolumeWindow(market)
@@ -119,7 +119,7 @@ export const useDiceThrow = (
       stateRef.current = advanceThrow(stateRef.current, dt, now, volumeRef.current, metrics, poseHook)
       if (phaseBefore !== 'result' && stateRef.current.phase === 'result') {
         const result = stateRef.current.result
-        if (result && 'total' in result) onCountedRollRef.current?.(result.total)
+        if (result) onCountedRollRef.current?.(result)
       }
       if (phaseBefore !== 'holding' && stateRef.current.phase === 'holding') {
         const bets = betsNow()

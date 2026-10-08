@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { HISTOGRAM_RISE_MS } from './histogramConstants'
 import { histogramPhase, type HistogramMotion } from './histogramModel'
 
 export interface HistogramReveal {
@@ -16,18 +17,21 @@ const HISTOGRAM_SYNC_MS = 1000
  * Rise, hold, fall, and hidden gap measured from the moment `enabled` becomes true.
  * A hidden tab does not pause the clock. Coming back snaps to the elapsed position,
  * then finishes a rise or fall that is still in progress.
+ * `boostId` restarts the rise and the 5-minute hold from wherever the plate is now.
  */
-export const useHistogramVisibility = (enabled: boolean): HistogramReveal => {
+export const useHistogramVisibility = (enabled: boolean, boostId = 0): HistogramReveal => {
   const [reveal, setReveal] = useState<HistogramReveal>(REST)
   const originRef = useRef<number | null>(null)
   const motionRef = useRef<HistogramMotion | null>(null)
   const playGen = useRef(0)
+  const forceShowRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
     if (!enabled) {
       originRef.current = null
       motionRef.current = null
       playGen.current += 1
+      forceShowRef.current = null
       setReveal(REST)
       return
     }
@@ -91,6 +95,26 @@ export const useHistogramVisibility = (enabled: boolean): HistogramReveal => {
       }, Math.max(1, sample.msUntilNext))
     }
 
+    const forceShow = () => {
+      const origin = originRef.current
+      if (origin == null || cancelled) return
+      const sample = histogramPhase(Date.now() - origin)
+      if (sample.reveal >= 1) {
+        originRef.current = Date.now() - HISTOGRAM_RISE_MS
+        motionRef.current = 'up'
+        playGen.current += 1
+        commit({ reveal: 1, animate: false, transitionMs: 0 })
+      } else {
+        const remaining = Math.max(1, Math.round(HISTOGRAM_RISE_MS * (1 - sample.reveal)))
+        originRef.current = Date.now() - (HISTOGRAM_RISE_MS - remaining)
+        motionRef.current = 'rising'
+        animateTo(sample.reveal, 1, remaining)
+      }
+      window.clearTimeout(boundary)
+      schedule()
+    }
+
+    forceShowRef.current = forceShow
     apply('tick')
     schedule()
     const interval = window.setInterval(() => apply('tick'), HISTOGRAM_SYNC_MS)
@@ -103,12 +127,18 @@ export const useHistogramVisibility = (enabled: boolean): HistogramReveal => {
 
     return () => {
       cancelled = true
+      forceShowRef.current = null
       playGen.current += 1
       window.clearTimeout(boundary)
       window.clearInterval(interval)
       document.removeEventListener('visibilitychange', onVisibility)
     }
   }, [enabled])
+
+  useEffect(() => {
+    if (!enabled || boostId === 0) return
+    forceShowRef.current?.()
+  }, [boostId, enabled])
 
   return reveal
 }

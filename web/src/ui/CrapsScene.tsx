@@ -69,6 +69,9 @@ interface CrapsSceneProps {
   histogramReveal: number
   histogramAnimate: boolean
   histogramTransitionMs: number
+  bonusHits: readonly number[]
+  bonusFlashing: readonly number[]
+  bonusLines: readonly string[]
 }
 
 export const CrapsScene = ({
@@ -90,6 +93,9 @@ export const CrapsScene = ({
   histogramReveal,
   histogramAnimate,
   histogramTransitionMs,
+  bonusHits,
+  bonusFlashing,
+  bonusLines,
 }: CrapsSceneProps) => {
   const m = mobileAssetManifest
   const bg2MemeSrc = (() => {
@@ -154,6 +160,8 @@ export const CrapsScene = ({
         reveal={histogramReveal}
         animate={histogramAnimate}
         transitionMs={histogramTransitionMs}
+        hits={bonusHits}
+        flashing={bonusFlashing}
       />
       {showBg2Meme && bg2MemeSrc ? (
         <img src={bg2MemeSrc} alt="" className="scene-layer scene-bg2-meme" style={bg2Style} draggable={false} />
@@ -173,7 +181,7 @@ export const CrapsScene = ({
         />
       ) : null}
       <ChipLayer discs={dice?.chips ?? []} />
-      {dice ? <DiceLayer presentation={dice} /> : null}
+      {dice ? <DiceLayer presentation={dice} bonusLines={bonusLines} /> : null}
     </div>
   )
 }

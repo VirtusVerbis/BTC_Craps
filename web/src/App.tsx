@@ -10,6 +10,9 @@ import { Stage } from './ui/Stage'
 import { BG2_MAX_CANDLES } from './ui/androidMirrorConstants'
 import { useBg2ChartVisible } from './ui/useBg2ChartVisibility'
 import { useBg2MemeState } from './ui/useBg2MemeState'
+import { BONUS_FLASH_MS } from './ui/bonusConstants'
+import { applyBonusRoll, bonusFlashTotals, emptyBonusHand } from './ui/bonusCraps'
+import type { ThrowResult } from './ui/dicePhysics'
 import { pushRoll } from './ui/histogramModel'
 import { useDiceThrow } from './ui/useDiceThrow'
 import { useHistogramVisibility } from './ui/useHistogramVisibility'
@@ -95,10 +98,34 @@ function App() {
   const bg2Visible = useBg2ChartVisible(hasActiveBg2Meme || isVideoActive)
   const fg3 = useFg3CatState()
   const [rolls, setRolls] = useState<number[]>([])
-  const onCountedRoll = useCallback((total: number) => {
-    setRolls((current) => pushRoll(current, total))
+  const [bonusHits, setBonusHits] = useState<number[]>([])
+  const [bonusFlashing, setBonusFlashing] = useState<number[]>([])
+  const [bonusLines, setBonusLines] = useState<string[]>([])
+  const [histogramBoost, setHistogramBoost] = useState(0)
+  const bonusHandRef = useRef(emptyBonusHand())
+  const bonusFlashTimer = useRef<number | undefined>(undefined)
+  const onCountedRoll = useCallback((result: ThrowResult) => {
+    if (!('total' in result)) {
+      setBonusLines([])
+      return
+    }
+    setRolls((current) => pushRoll(current, result.total))
+    const step = applyBonusRoll(bonusHandRef.current, result.total)
+    bonusHandRef.current = step.hand
+    setBonusHits(step.hand.hits)
+    setBonusLines(step.lines)
+    if (step.flash) {
+      setBonusFlashing(bonusFlashTotals(step.flash))
+      setHistogramBoost((current) => current + 1)
+      window.clearTimeout(bonusFlashTimer.current)
+      bonusFlashTimer.current = window.setTimeout(() => setBonusFlashing([]), BONUS_FLASH_MS)
+    } else if (result.total === 7) {
+      window.clearTimeout(bonusFlashTimer.current)
+      setBonusFlashing([])
+    }
   }, [])
-  const histogram = useHistogramVisibility(splashDone)
+  useEffect(() => () => window.clearTimeout(bonusFlashTimer.current), [])
+  const histogram = useHistogramVisibility(splashDone, histogramBoost)
   const dice = useDiceThrow(feed.market, splashDone, onCountedRoll)
 
   const marketService = useMemo(
@@ -157,6 +184,9 @@ function App() {
               histogramReveal={histogram.reveal}
               histogramAnimate={histogram.animate}
               histogramTransitionMs={histogram.transitionMs}
+              bonusHits={bonusHits}
+              bonusFlashing={bonusFlashing}
+              bonusLines={bonusLines}
             />
             <Overlay market={feed.market} block={blockState} onTimeClick={() => {}} status={feed.status} />
             {videoOverlay.active ? (
