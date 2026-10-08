@@ -173,7 +173,7 @@ body {
   --chip-highlight: #f1a082;
   --chip-face: #9a2e18;
   --chip-edge: #5c1408;
-  --chip-spot: #e5937d;
+  --chip-spot: #f2c9be;
 }
 
 .chip-green {
@@ -191,10 +191,10 @@ body {
 }
 
 .chip-black {
-  --chip-highlight: #6a5644;
-  --chip-face: #24160c;
+  --chip-highlight: #9f8166;
+  --chip-face: #362112;
   --chip-edge: #0c0804;
-  --chip-spot: #4a3a2c;
+  --chip-spot: #947458;
 }
 
 .puck {

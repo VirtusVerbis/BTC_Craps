@@ -7,7 +7,7 @@ export const CHIP_WIDTH_PX = Math.round(DIE_LAUNCH_SIZE_PX * DIE_DEPTH_SCALE)
 export const CHIP_HEIGHT_PX = CHIP_WIDTH_PX
 
 /** Multiplier on diameter and chip thickness. */
-export const CHIP_SIZE_SCALAR = 1.2
+export const CHIP_SIZE_SCALAR = 1.6//1.2
 
 /**
  * Visible height of each chip's side wall, before the size scalar.
