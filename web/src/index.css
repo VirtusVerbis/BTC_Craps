@@ -131,18 +131,67 @@ body {
   pointer-events: none;
 }
 
-/* Above the table (1), under the meme (5) and candle chart (6). */
+/* Above the table (1), under the dice (3), chips (4), meme (5), and candle chart (6). */
+.roll-histogram {
+  position: absolute;
+  z-index: 2;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.roll-histogram-sheet {
+  width: 100%;
+  height: 100%;
+}
+
+.roll-histogram-columns {
+  display: flex;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 12px 0 14px;
+}
+
+.roll-histogram-slot {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.roll-histogram-track {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.roll-histogram-bar {
+  transition: height 280ms linear;
+}
+
+.roll-histogram-number {
+  flex: 0 0 auto;
+  margin-top: 8px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Above the histogram (2) and table (1), under the meme (5) and candle chart (6). */
 .dice-layer {
   position: absolute;
   inset: 0;
-  z-index: 2;
+  z-index: 3;
   pointer-events: none;
 }
 
 .chip-stack {
   position: absolute;
   inset: 0;
-  z-index: 3;
+  z-index: 4;
   pointer-events: none;
 }
 

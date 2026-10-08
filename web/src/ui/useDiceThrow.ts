@@ -67,7 +67,11 @@ const present = (state: ThrowState, chips: readonly ChipDisc[]): DicePresentatio
   chips: chips.slice(),
 })
 
-export const useDiceThrow = (market: MarketSnapshot, enabled: boolean): DicePresentation | null => {
+export const useDiceThrow = (
+  market: MarketSnapshot,
+  enabled: boolean,
+  onCountedRoll?: (total: number) => void,
+): DicePresentation | null => {
   const oi = useOpenInterest()
   const volume = useDiceVolumeWindow(market)
   const volumeRef = useRef(volume)
@@ -76,6 +80,8 @@ export const useDiceThrow = (market: MarketSnapshot, enabled: boolean): DicePres
   marketRef.current = market
   const oiRef = useRef(oi)
   oiRef.current = oi
+  const onCountedRollRef = useRef(onCountedRoll)
+  onCountedRollRef.current = onCountedRoll
   const stateRef = useRef<ThrowState>(createThrowState(performance.now()))
   const worldRef = useRef<ChipWorld | null>(null)
   const [presentation, setPresentation] = useState<DicePresentation>(() => present(stateRef.current, []))
@@ -111,6 +117,10 @@ export const useDiceThrow = (market: MarketSnapshot, enabled: boolean): DicePres
       }
       const phaseBefore = stateRef.current.phase
       stateRef.current = advanceThrow(stateRef.current, dt, now, volumeRef.current, metrics, poseHook)
+      if (phaseBefore !== 'result' && stateRef.current.phase === 'result') {
+        const result = stateRef.current.result
+        if (result && 'total' in result) onCountedRollRef.current?.(result.total)
+      }
       if (phaseBefore !== 'holding' && stateRef.current.phase === 'holding') {
         const bets = betsNow()
         if (bets) worldRef.current = settleColumns(worldRef.current ?? emptyChipWorld(), bets, now, Math.floor(now))

@@ -17,6 +17,7 @@ import {
 import { BtcCandleChart } from './BtcCandleChart'
 import { ChipLayer } from './ChipStack'
 import { DiceLayer } from './DiceLayer'
+import { RollHistogram } from './RollHistogram'
 import type { DicePresentation } from './useDiceThrow'
 import type { Bg2ActiveMeme } from './useBg2MemeState'
 import type { Fg3CatState } from './useFg3CatState'
@@ -64,6 +65,10 @@ interface CrapsSceneProps {
   fg3Width: number
   fg3Height: number
   dice: DicePresentation | null
+  rolls: readonly number[]
+  histogramReveal: number
+  histogramAnimate: boolean
+  histogramTransitionMs: number
 }
 
 export const CrapsScene = ({
@@ -81,6 +86,10 @@ export const CrapsScene = ({
   fg3Width,
   fg3Height,
   dice,
+  rolls,
+  histogramReveal,
+  histogramAnimate,
+  histogramTransitionMs,
 }: CrapsSceneProps) => {
   const m = mobileAssetManifest
   const bg2MemeSrc = (() => {
@@ -139,6 +148,12 @@ export const CrapsScene = ({
         alt=""
         className="scene-layer scene-craps"
         draggable={false}
+      />
+      <RollHistogram
+        rolls={rolls}
+        reveal={histogramReveal}
+        animate={histogramAnimate}
+        transitionMs={histogramTransitionMs}
       />
       {showBg2Meme && bg2MemeSrc ? (
         <img src={bg2MemeSrc} alt="" className="scene-layer scene-bg2-meme" style={bg2Style} draggable={false} />

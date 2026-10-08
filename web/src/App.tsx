@@ -10,7 +10,9 @@ import { Stage } from './ui/Stage'
 import { BG2_MAX_CANDLES } from './ui/androidMirrorConstants'
 import { useBg2ChartVisible } from './ui/useBg2ChartVisibility'
 import { useBg2MemeState } from './ui/useBg2MemeState'
+import { pushRoll } from './ui/histogramModel'
 import { useDiceThrow } from './ui/useDiceThrow'
+import { useHistogramVisibility } from './ui/useHistogramVisibility'
 import { useFg3CatState } from './ui/useFg3CatState'
 import { useVideoOverlayState } from './ui/useVideoOverlayState'
 import { VideoOverlay } from './ui/VideoOverlay'
@@ -92,7 +94,12 @@ function App() {
   const isVideoActive = videoOverlay.isVideoActive
   const bg2Visible = useBg2ChartVisible(hasActiveBg2Meme || isVideoActive)
   const fg3 = useFg3CatState()
-  const dice = useDiceThrow(feed.market, splashDone)
+  const [rolls, setRolls] = useState<number[]>([])
+  const onCountedRoll = useCallback((total: number) => {
+    setRolls((current) => pushRoll(current, total))
+  }, [])
+  const histogram = useHistogramVisibility(splashDone)
+  const dice = useDiceThrow(feed.market, splashDone, onCountedRoll)
 
   const marketService = useMemo(
     () =>
@@ -146,6 +153,10 @@ function App() {
               fg3Width={fg3.width}
               fg3Height={fg3.height}
               dice={dice}
+              rolls={rolls}
+              histogramReveal={histogram.reveal}
+              histogramAnimate={histogram.animate}
+              histogramTransitionMs={histogram.transitionMs}
             />
             <Overlay market={feed.market} block={blockState} onTimeClick={() => {}} status={feed.status} />
             {videoOverlay.active ? (
