@@ -22,7 +22,7 @@ export const ChipLayer = ({ discs }: ChipLayerProps) => {
         return (
           <div key={disc.key} className={`chip chip-${disc.color}${disc.face ? ' chip-top' : ' chip-wall'}`} style={style}>
             {disc.face ? (
-              <span className="chip-mark" style={{ transform: `translate(-50%, -50%) rotate(${-disc.spin}deg)` }} />
+              <span className="chip-mark" style={{ transform: 'translate(-50%, -50%)' }} />
             ) : null}
           </div>
         )
