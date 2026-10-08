@@ -19,7 +19,13 @@ export const ChipLayer = ({ discs }: ChipLayerProps) => {
           zIndex: disc.zIndex,
           transform: `translate(-50%, -50%) translateY(${disc.lift}px) rotateX(${CHIP_FELT_TILT_DEG}deg) rotateZ(${disc.spin}deg)`,
         } as CSSProperties
-        return <div key={disc.key} className={`chip chip-${disc.color}${disc.face ? ' chip-top' : ' chip-wall'}`} style={style} />
+        return (
+          <div key={disc.key} className={`chip chip-${disc.color}${disc.face ? ' chip-top' : ' chip-wall'}`} style={style}>
+            {disc.face ? (
+              <span className="chip-mark" style={{ transform: `translate(-50%, -50%) rotate(${-disc.spin}deg)` }} />
+            ) : null}
+          </div>
+        )
       })}
     </div>
   )

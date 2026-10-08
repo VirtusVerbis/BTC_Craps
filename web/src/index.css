@@ -157,8 +157,19 @@ body {
 
 .chip-top {
   background:
-    radial-gradient(ellipse 78% 58% at 50% 30%, var(--chip-highlight) 0%, var(--chip-face) 70%),
-    repeating-conic-gradient(var(--chip-spot) 0deg 16deg, var(--chip-edge) 16deg 72deg);
+    radial-gradient(circle closest-side at center, #d0d0d0 70%, transparent 70%),
+    repeating-conic-gradient(var(--chip-spot) 0deg 16deg, var(--chip-face) 16deg 72deg);
+}
+
+/* Inner circle is 70% of the face. The mark fills 80% of that circle on its tall side. */
+.chip-mark {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 42.56%;
+  height: 56%;
+  background: url("./ui/bitcoin-mark.svg") center / contain no-repeat;
+  pointer-events: none;
 }
 
 /* Sampled from the rack under the characters in craps-scene-layout_onepiece.png. */
