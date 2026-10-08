@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import type { MarketSnapshot } from '../game/types'
 import { useOpenInterest } from '../data/openInterest'
+import {
+  applyCharacterPnl,
+  characterStakes,
+  loadCharacterPnl,
+  saveCharacterPnl,
+  type CharacterPnlBook,
+} from './characterPnl'
 import { btcPrice, buildBets } from './chipBets'
 import {
   settleColumns,
@@ -44,6 +51,7 @@ export interface DicePresentation {
   result: ThrowResult | null
   point: number | null
   chips: ChipDisc[]
+  pnl: CharacterPnlBook
 }
 
 const toView = (die: Die, id: 'left' | 'right'): DieView => {
@@ -61,11 +69,16 @@ const toView = (die: Die, id: 'left' | 'right'): DieView => {
   }
 }
 
-const present = (state: ThrowState, chips: readonly ChipDisc[]): DicePresentation => ({
+const present = (
+  state: ThrowState,
+  chips: readonly ChipDisc[],
+  pnl: CharacterPnlBook,
+): DicePresentation => ({
   dice: [toView(state.dice[0], 'left'), toView(state.dice[1], 'right')],
   result: state.phase === 'result' ? state.result : null,
   point: state.point,
   chips: chips.slice(),
+  pnl,
 })
 
 export const useDiceThrow = (
@@ -85,13 +98,17 @@ export const useDiceThrow = (
   onCountedRollRef.current = onCountedRoll
   const stateRef = useRef<ThrowState>(createThrowState(performance.now()))
   const worldRef = useRef<ChipWorld | null>(null)
-  const [presentation, setPresentation] = useState<DicePresentation>(() => present(stateRef.current, []))
+  const pnlRef = useRef<CharacterPnlBook>(loadCharacterPnl())
+  const [presentation, setPresentation] = useState<DicePresentation>(() =>
+    present(stateRef.current, [], pnlRef.current),
+  )
 
   useEffect(() => {
     if (!enabled) return undefined
     stateRef.current = createThrowState(performance.now())
     worldRef.current = null
-    setPresentation(present(stateRef.current, []))
+    pnlRef.current = loadCharacterPnl()
+    setPresentation(present(stateRef.current, [], pnlRef.current))
     let frame = 0
     let last = performance.now()
 
@@ -117,9 +134,23 @@ export const useDiceThrow = (
         if (bets && bets.length > 0) worldRef.current = worldFromBets(bets, Math.floor(now))
       }
       const phaseBefore = stateRef.current.phase
+      const pointBefore = stateRef.current.point
       stateRef.current = advanceThrow(stateRef.current, dt, now, volumeRef.current, metrics, poseHook)
       if (phaseBefore !== 'result' && stateRef.current.phase === 'result') {
         const result = stateRef.current.result
+        if (result && 'total' in result) {
+          const snap = oiRef.current
+          const price = btcPrice(marketRef.current)
+          if (snap && price > 0 && snap.openInterest > 0) {
+            pnlRef.current = applyCharacterPnl(
+              pnlRef.current,
+              pointBefore,
+              result.total,
+              characterStakes(snap.openInterest, price, snap.longPct, snap.shortPct),
+            )
+            saveCharacterPnl(pnlRef.current)
+          }
+        }
         const raw = result ? onCountedRollRef.current?.(result) : 0
         const extra = typeof raw === 'number' ? raw : 0
         if (extra > 0) stateRef.current = { ...stateRef.current, resultHoldMs: DIE_RESULT_HOLD_MS + extra }
@@ -132,7 +163,7 @@ export const useDiceThrow = (
       }
       if (worldRef.current?.restack) worldRef.current = tickRestack(worldRef.current, now)
       const chips = worldRef.current ? presentChips(worldRef.current, now, metrics) : []
-      setPresentation(present(stateRef.current, chips))
+      setPresentation(present(stateRef.current, chips, pnlRef.current))
       frame = window.requestAnimationFrame(loop)
     }
     frame = window.requestAnimationFrame(loop)

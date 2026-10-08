@@ -6,7 +6,14 @@ import {
   HISTOGRAM_VISIBLE_MS,
   HISTOGRAM_WINDOW,
 } from './histogramConstants'
-import { histogramColumns, histogramPhase, pushRoll } from './histogramModel'
+import {
+  HISTOGRAM_ROLLS_KEY,
+  histogramColumns,
+  histogramPhase,
+  pushRoll,
+  readStoredRolls,
+  writeStoredRolls,
+} from './histogramModel'
 
 describe('roll histogram window', () => {
   it('keeps only the totals it is given', () => {
@@ -41,6 +48,68 @@ describe('roll histogram window', () => {
 
   it('draws no columns before any counted roll', () => {
     expect(histogramColumns([]).every((column) => column.scale === 0 && column.count === 0)).toBe(true)
+  })
+})
+
+const memoryStorage = (): Storage => {
+  const items = new Map<string, string>()
+  return {
+    get length() {
+      return items.size
+    },
+    clear() {
+      items.clear()
+    },
+    getItem(key) {
+      return items.get(key) ?? null
+    },
+    key(index) {
+      return [...items.keys()][index] ?? null
+    },
+    removeItem(key) {
+      items.delete(key)
+    },
+    setItem(key, value) {
+      items.set(key, value)
+    },
+  }
+}
+
+describe('histogram save point', () => {
+  it('reloads the last saved window', () => {
+    const storage = memoryStorage()
+    writeStoredRolls(storage, [7, 11, 4])
+    expect(readStoredRolls(storage)).toEqual([7, 11, 4])
+    expect(storage.getItem(HISTOGRAM_ROLLS_KEY)).toBe('[7,11,4]')
+  })
+
+  it('keeps only the newest totals when the saved window is too long', () => {
+    const storage = memoryStorage()
+    const rolls = [2, ...Array.from({ length: HISTOGRAM_WINDOW }, () => 8)]
+    storage.setItem(HISTOGRAM_ROLLS_KEY, JSON.stringify(rolls))
+    const loaded = readStoredRolls(storage)
+    expect(loaded).toHaveLength(HISTOGRAM_WINDOW)
+    expect(loaded[0]).toBe(8)
+    expect(loaded.at(-1)).toBe(8)
+  })
+
+  it('ignores a missing, corrupt, or non-total cache', () => {
+    const storage = memoryStorage()
+    expect(readStoredRolls(storage)).toEqual([])
+    expect(readStoredRolls(null)).toEqual([])
+    storage.setItem(HISTOGRAM_ROLLS_KEY, '{')
+    expect(readStoredRolls(storage)).toEqual([])
+    storage.setItem(HISTOGRAM_ROLLS_KEY, JSON.stringify([7, '11', 1, 13, 4.5, 12]))
+    expect(readStoredRolls(storage)).toEqual([7, 12])
+  })
+
+  it('leaves memory alone when the store rejects the write', () => {
+    const storage = memoryStorage()
+    storage.setItem = () => {
+      throw new Error('quota')
+    }
+    expect(() => writeStoredRolls(storage, [7])).not.toThrow()
+    expect(readStoredRolls(storage)).toEqual([])
   })
 })
 

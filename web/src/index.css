@@ -131,7 +131,7 @@ body {
   pointer-events: none;
 }
 
-/* Above the table (1), under the dice (3), chips (4), meme (5), and candle chart (6). */
+/* Above the table (1), under the P/L labels (3), dice (4), chips (5), meme (6), and candle chart (7). */
 .roll-histogram {
   position: absolute;
   z-index: 2;
@@ -235,18 +235,18 @@ body {
   }
 }
 
-/* Above the histogram (2) and table (1), under the meme (5) and candle chart (6). */
+/* Above the P/L labels (3), under the chips (5), meme (6), and candle chart (7). */
 .dice-layer {
   position: absolute;
   inset: 0;
-  z-index: 3;
+  z-index: 4;
   pointer-events: none;
 }
 
 .chip-stack {
   position: absolute;
   inset: 0;
-  z-index: 4;
+  z-index: 5;
   pointer-events: none;
 }
 
@@ -582,6 +582,34 @@ body {
   display: flex;
   column-gap: 0.35em;
   justify-content: flex-start;
+}
+
+/* Above the histogram (2), under the dice (4) and chips (5). */
+.character-pnl-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.character-pnl {
+  position: absolute;
+  margin: 0;
+  transform: translateX(-50%);
+  text-align: center;
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  pointer-events: none;
+  text-shadow:
+    0 1px 0 #000,
+    0 2px 4px #000,
+    0 0 8px rgba(0, 0, 0, 1);
+}
+
+.character-pnl p {
+  margin: 0;
+  white-space: nowrap;
 }
 
 .feed-glyph {

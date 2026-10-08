@@ -15,6 +15,8 @@ import {
   BG2_NEO_TOP_OFFSET_FRACTION,
 } from './androidMirrorConstants'
 import { BtcCandleChart } from './BtcCandleChart'
+import { formatPnlBtc, formatPnlUsd, pnlColor, PL_CHARACTERS, type CharacterPnlBook } from './characterPnl'
+import { PL_LABEL_ANCHOR, PL_LABEL_FONT_PX } from './characterPnlConstants'
 import { ChipLayer } from './ChipStack'
 import { DiceLayer } from './DiceLayer'
 import { RollHistogram } from './RollHistogram'
@@ -65,6 +67,7 @@ interface CrapsSceneProps {
   fg3Width: number
   fg3Height: number
   dice: DicePresentation | null
+  characterPnl: CharacterPnlBook
   rolls: readonly number[]
   histogramReveal: number
   histogramAnimate: boolean
@@ -89,6 +92,7 @@ export const CrapsScene = ({
   fg3Width,
   fg3Height,
   dice,
+  characterPnl,
   rolls,
   histogramReveal,
   histogramAnimate,
@@ -163,6 +167,30 @@ export const CrapsScene = ({
         hits={bonusHits}
         flashing={bonusFlashing}
       />
+      <div className="character-pnl-layer">
+        {PL_CHARACTERS.map((character) => {
+          const amount = characterPnl[character]
+          if (!amount.shown) return null
+          const anchor = PL_LABEL_ANCHOR[character]
+          const sign = amount.usd !== 0 ? amount.usd : amount.btc
+          return (
+            <div
+              key={character}
+              className="character-pnl"
+              style={{
+                left: anchor.x,
+                top: anchor.y,
+                color: pnlColor(amount),
+                fontSize: PL_LABEL_FONT_PX,
+              }}
+              aria-label={sign < 0 ? 'loss' : sign > 0 ? 'profit' : 'flat'}
+            >
+              <p>{formatPnlBtc(amount.btc)}</p>
+              <p>{formatPnlUsd(amount.usd)}</p>
+            </div>
+          )
+        })}
+      </div>
       {showBg2Meme && bg2MemeSrc ? (
         <img src={bg2MemeSrc} alt="" className="scene-layer scene-bg2-meme" style={bg2Style} draggable={false} />
       ) : null}

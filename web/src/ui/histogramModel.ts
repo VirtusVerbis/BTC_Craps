@@ -31,6 +31,53 @@ export interface HistogramPhase {
 
 const CYCLE_MS = HISTOGRAM_RISE_MS + HISTOGRAM_VISIBLE_MS + HISTOGRAM_FALL_MS + HISTOGRAM_HIDDEN_MS
 
+/** Last counted totals. A refresh reads this back as the histogram's save point. */
+export const HISTOGRAM_ROLLS_KEY = 'btc-craps.histogram-rolls'
+
+const COUNTED_TOTALS = new Set<number>(HISTOGRAM_TOTALS)
+
+const isCountedTotal = (value: unknown): value is number =>
+  typeof value === 'number' && COUNTED_TOTALS.has(value)
+
+const safeLocalStorage = (): Storage | null => {
+  try {
+    return globalThis.localStorage ?? null
+  } catch {
+    return null
+  }
+}
+
+/** Totals saved in this browser. Bad or oversized cache entries are dropped. */
+export const readStoredRolls = (storage: Storage | null): number[] => {
+  if (!storage) return []
+  try {
+    const raw = storage.getItem(HISTOGRAM_ROLLS_KEY)
+    if (!raw) return []
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    const rolls = parsed.filter(isCountedTotal)
+    return rolls.length > HISTOGRAM_WINDOW ? rolls.slice(-HISTOGRAM_WINDOW) : rolls
+  } catch {
+    return []
+  }
+}
+
+/** Writes the current window. A full or blocked store leaves memory as the source of truth. */
+export const writeStoredRolls = (storage: Storage | null, rolls: readonly number[]): void => {
+  if (!storage) return
+  try {
+    storage.setItem(HISTOGRAM_ROLLS_KEY, JSON.stringify(rolls))
+  } catch {
+    // Private mode or a full quota.
+  }
+}
+
+export const loadHistogramRolls = (): number[] => readStoredRolls(safeLocalStorage())
+
+export const saveHistogramRolls = (rolls: readonly number[]): void => {
+  writeStoredRolls(safeLocalStorage(), rolls)
+}
+
 /** Append one counted total and drop the oldest once the window is full. */
 export const pushRoll = (rolls: readonly number[], total: number): number[] => {
   const next = rolls.length >= HISTOGRAM_WINDOW ? rolls.slice(rolls.length - HISTOGRAM_WINDOW + 1) : rolls.slice()

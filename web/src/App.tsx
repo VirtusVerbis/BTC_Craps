@@ -3,6 +3,7 @@ import { REFERENCE_HEIGHT, REFERENCE_WIDTH } from './config/constants'
 import { fetchBinanceBtc1mKlines, type Candle } from './data/candles'
 import { BlockHeightService, type BlockState } from './data/blockHeight'
 import { MarketDataService, type MarketFeedUpdate } from './data/marketData'
+import { emptyCharacterPnl } from './ui/characterPnl'
 import { CrapsScene } from './ui/CrapsScene'
 import { Overlay } from './ui/Overlay'
 import { SplashSequence } from './ui/SplashSequence'
@@ -14,7 +15,7 @@ import { BONUS_FLASH_MS, BONUS_LABEL_EXTRA_MS } from './ui/bonusConstants'
 import { applyBonusRoll, bonusFlashTotals, emptyBonusHand } from './ui/bonusCraps'
 import { bonusTestHand, isBonusTestSeed, type BonusTestSeed } from './ui/bonusTest'
 import type { ThrowResult } from './ui/dicePhysics'
-import { pushRoll } from './ui/histogramModel'
+import { loadHistogramRolls, pushRoll, saveHistogramRolls } from './ui/histogramModel'
 import { useDiceThrow } from './ui/useDiceThrow'
 import { useHistogramVisibility } from './ui/useHistogramVisibility'
 import { useFg3CatState } from './ui/useFg3CatState'
@@ -98,7 +99,10 @@ function App() {
   const isVideoActive = videoOverlay.isVideoActive
   const bg2Visible = useBg2ChartVisible(hasActiveBg2Meme || isVideoActive)
   const fg3 = useFg3CatState()
-  const [rolls, setRolls] = useState<number[]>([])
+  const [rolls, setRolls] = useState(loadHistogramRolls)
+  useEffect(() => {
+    saveHistogramRolls(rolls)
+  }, [rolls])
   const [bonusHits, setBonusHits] = useState<number[]>([])
   const [bonusFlashing, setBonusFlashing] = useState<number[]>([])
   const [bonusLines, setBonusLines] = useState<string[]>([])
@@ -212,8 +216,14 @@ function App() {
               bonusHits={bonusHits}
               bonusFlashing={bonusFlashing}
               bonusLines={bonusLines}
+              characterPnl={dice?.pnl ?? emptyCharacterPnl()}
             />
-            <Overlay market={feed.market} block={blockState} onTimeClick={() => {}} status={feed.status} />
+            <Overlay
+              market={feed.market}
+              block={blockState}
+              onTimeClick={() => {}}
+              status={feed.status}
+            />
             {videoOverlay.active ? (
               <VideoOverlay
                 videoId={videoOverlay.active.videoId}
