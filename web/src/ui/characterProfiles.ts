@@ -43,6 +43,18 @@ import {
   OLD_MAN_POINT_8_Y,
   OLD_MAN_POINT_9_X,
   OLD_MAN_POINT_9_Y,
+  OLD_MAN_POINT_LAY_10_X,
+  OLD_MAN_POINT_LAY_10_Y,
+  OLD_MAN_POINT_LAY_4_X,
+  OLD_MAN_POINT_LAY_4_Y,
+  OLD_MAN_POINT_LAY_5_X,
+  OLD_MAN_POINT_LAY_5_Y,
+  OLD_MAN_POINT_LAY_6_X,
+  OLD_MAN_POINT_LAY_6_Y,
+  OLD_MAN_POINT_LAY_8_X,
+  OLD_MAN_POINT_LAY_8_Y,
+  OLD_MAN_POINT_LAY_9_X,
+  OLD_MAN_POINT_LAY_9_Y,
   OLD_MAN_PROFILE_ON,
   WOLF_ACROSS_10_X,
   WOLF_ACROSS_10_Y,
@@ -82,6 +94,18 @@ import {
   WOLF_POINT_8_Y,
   WOLF_POINT_9_X,
   WOLF_POINT_9_Y,
+  WOLF_POINT_LAY_10_X,
+  WOLF_POINT_LAY_10_Y,
+  WOLF_POINT_LAY_4_X,
+  WOLF_POINT_LAY_4_Y,
+  WOLF_POINT_LAY_5_X,
+  WOLF_POINT_LAY_5_Y,
+  WOLF_POINT_LAY_6_X,
+  WOLF_POINT_LAY_6_Y,
+  WOLF_POINT_LAY_8_X,
+  WOLF_POINT_LAY_8_Y,
+  WOLF_POINT_LAY_9_X,
+  WOLF_POINT_LAY_9_Y,
   WOLF_PROFILE_ON,
 } from './characterBetConstants'
 import { betDollars, chipsForDollars, denominationScale, splitColumns, type ChipBet } from './chipBets'
@@ -170,6 +194,15 @@ const oldManPointSpot: Record<PointNumber, Spot> = {
   10: { x: OLD_MAN_POINT_10_X, y: OLD_MAN_POINT_10_Y, label: 'OLD_MAN_POINT_10' },
 }
 
+const oldManPointLaySpot: Record<PointNumber, Spot> = {
+  4: { x: OLD_MAN_POINT_LAY_4_X, y: OLD_MAN_POINT_LAY_4_Y, label: 'OLD_MAN_POINT_LAY_4' },
+  5: { x: OLD_MAN_POINT_LAY_5_X, y: OLD_MAN_POINT_LAY_5_Y, label: 'OLD_MAN_POINT_LAY_5' },
+  6: { x: OLD_MAN_POINT_LAY_6_X, y: OLD_MAN_POINT_LAY_6_Y, label: 'OLD_MAN_POINT_LAY_6' },
+  8: { x: OLD_MAN_POINT_LAY_8_X, y: OLD_MAN_POINT_LAY_8_Y, label: 'OLD_MAN_POINT_LAY_8' },
+  9: { x: OLD_MAN_POINT_LAY_9_X, y: OLD_MAN_POINT_LAY_9_Y, label: 'OLD_MAN_POINT_LAY_9' },
+  10: { x: OLD_MAN_POINT_LAY_10_X, y: OLD_MAN_POINT_LAY_10_Y, label: 'OLD_MAN_POINT_LAY_10' },
+}
+
 const wolfPointSpot: Record<PointNumber, Spot> = {
   4: { x: WOLF_POINT_4_X, y: WOLF_POINT_4_Y, label: 'WOLF_POINT_4' },
   5: { x: WOLF_POINT_5_X, y: WOLF_POINT_5_Y, label: 'WOLF_POINT_5' },
@@ -177,6 +210,15 @@ const wolfPointSpot: Record<PointNumber, Spot> = {
   8: { x: WOLF_POINT_8_X, y: WOLF_POINT_8_Y, label: 'WOLF_POINT_8' },
   9: { x: WOLF_POINT_9_X, y: WOLF_POINT_9_Y, label: 'WOLF_POINT_9' },
   10: { x: WOLF_POINT_10_X, y: WOLF_POINT_10_Y, label: 'WOLF_POINT_10' },
+}
+
+const wolfPointLaySpot: Record<PointNumber, Spot> = {
+  4: { x: WOLF_POINT_LAY_4_X, y: WOLF_POINT_LAY_4_Y, label: 'WOLF_POINT_LAY_4' },
+  5: { x: WOLF_POINT_LAY_5_X, y: WOLF_POINT_LAY_5_Y, label: 'WOLF_POINT_LAY_5' },
+  6: { x: WOLF_POINT_LAY_6_X, y: WOLF_POINT_LAY_6_Y, label: 'WOLF_POINT_LAY_6' },
+  8: { x: WOLF_POINT_LAY_8_X, y: WOLF_POINT_LAY_8_Y, label: 'WOLF_POINT_LAY_8' },
+  9: { x: WOLF_POINT_LAY_9_X, y: WOLF_POINT_LAY_9_Y, label: 'WOLF_POINT_LAY_9' },
+  10: { x: WOLF_POINT_LAY_10_X, y: WOLF_POINT_LAY_10_Y, label: 'WOLF_POINT_LAY_10' },
 }
 
 const laySpot: Record<PointNumber, Spot> = {
@@ -372,19 +414,20 @@ const freshWhilePoint = (
 
 const coverPoint = (character: ChipCharacter, point: PointNumber, purse: LinePurse, placed: ProfileBet[]) => {
   const gap = Math.abs(purse.dont - purse.pass)
-  const spot = (character === 'wolf' ? wolfPointSpot : oldManPointSpot)[point]
+  const placeSpot = (character === 'wolf' ? wolfPointSpot : oldManPointSpot)[point]
+  const laySpotForPoint = (character === 'wolf' ? wolfPointLaySpot : oldManPointLaySpot)[point]
   if (purse.dont > purse.pass) {
     const booked = bookDollars(gap, PLACE_PAY[point].unit).booked
     if (!(booked > 0) || !canAfford(purse, 'dont', booked)) return
     charge(purse, 'dont', booked)
-    placed.push(bet(character, 'point-place', point, booked, 'dont', spot))
+    placed.push(bet(character, 'point-place', point, booked, 'dont', placeSpot))
     return
   }
   if (purse.pass > purse.dont) {
     const booked = bookDollars(gap, LAY_ODDS_PAY[point].unit).booked
     if (!(booked > 0) || !canAfford(purse, 'pass', booked)) return
     charge(purse, 'pass', booked)
-    placed.push(bet(character, 'point-lay', point, booked, 'pass', spot))
+    placed.push(bet(character, 'point-lay', point, booked, 'pass', laySpotForPoint))
   }
 }
 
