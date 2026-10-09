@@ -4,6 +4,7 @@ import { puckPlacement } from './puckState'
 import { dieSize, stageMetrics, type Die, type StageMetrics } from './dicePhysics'
 import { placeBets, type ChipBet } from './chipBets'
 import {
+  CHIP_DEPTH_SCALE,
   CHIP_DIE_RESTITUTION,
   CHIP_FRICTION_PER_S,
   CHIP_HEIGHT_PX,
@@ -38,6 +39,14 @@ export const puckObstacle = (point: number | null): PuckObstacle => {
 export const chipDiameter = (): number => CHIP_WIDTH_PX * CHIP_SIZE_SCALAR
 export const chipRadius = (): number => chipDiameter() / 2
 export const chipThickness = (): number => Math.max(1, Math.round(CHIP_THICKNESS_PX * CHIP_SIZE_SCALAR))
+
+const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value))
+
+/** Draw scale at felt depth `z`. 1 at the near rail, `CHIP_DEPTH_SCALE` at the back wall. */
+export const chipDepthFactor = (z: number, metrics: StageMetrics = stageMetrics()): number => {
+  const depth = clamp(metrics.wallZ > 0 ? z / metrics.wallZ : 0, 0, 1)
+  return CHIP_DEPTH_SCALE + (1 - CHIP_DEPTH_SCALE) * (1 - depth)
+}
 
 export interface ChipOffset {
   x: number
@@ -93,7 +102,10 @@ export interface ChipDisc {
   x: number
   y: number
   spin: number
+  /** Unscaled plate offset, in stage pixels. The renderer multiplies this by `scale`. */
   lift: number
+  /** Draw size at this felt depth. 1 at the near rail. */
+  scale: number
   face: boolean
   zIndex: number
 }
@@ -636,6 +648,7 @@ const disc = (
   y: metrics.height - z,
   spin,
   lift,
+  scale: chipDepthFactor(z, metrics),
   face,
   zIndex,
 })

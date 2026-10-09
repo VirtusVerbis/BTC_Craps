@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createHoldingDice, stageMetrics, type Die } from './dicePhysics'
 import {
+  chipDepthFactor,
   chipRadius,
   chipThickness,
   chipsAHitCanLift,
@@ -15,7 +16,7 @@ import {
   type ChipWorld,
   type StandingStack,
 } from './chipPhysics'
-import { CHIP_WEIGHT } from './chipConstants'
+import { CHIP_DEPTH_SCALE, CHIP_WEIGHT } from './chipConstants'
 import { buildBets } from './chipBets'
 import { PUCK_COLLISION_HEIGHT_PX, PUCK_OFF_X, PUCK_OFF_Y } from './diceConstants'
 import { puckPlacement } from './puckState'
@@ -219,5 +220,33 @@ describe('puck collision', () => {
     const [next] = resolveDiceChips(world, [die, idle()], 1 / 60, metrics, puck)
     expect(next.z).toBeCloseTo(die.z)
     expect(next.vz).toBe(500)
+  })
+})
+
+describe('chip depth scale', () => {
+  it('is 1 at the rail and CHIP_DEPTH_SCALE at the back wall', () => {
+    expect(chipDepthFactor(0, metrics)).toBe(1)
+    expect(chipDepthFactor(metrics.wallZ, metrics)).toBe(CHIP_DEPTH_SCALE)
+    expect(chipDepthFactor(metrics.wallZ / 2, metrics)).toBeCloseTo((1 + CHIP_DEPTH_SCALE) / 2)
+  })
+
+  it('stays on the nearer cap outside the felt', () => {
+    expect(chipDepthFactor(-40, metrics)).toBe(1)
+    expect(chipDepthFactor(metrics.wallZ + 80, metrics)).toBe(CHIP_DEPTH_SCALE)
+  })
+
+  it('stores the felt-depth scale on standing and loose discs', () => {
+    const stack = stackOf(2, 400, metrics.wallZ)
+    const world = worldWith([stack])
+    world.loose.push({ id: 'near', color: 'white', x: 200, z: 0, h: 0, vx: 0, vz: 0, vh: 0, spin: 0 })
+    const discs = presentChips(world, 0, metrics)
+    const standing = discs.filter((disc) => disc.key.startsWith(stack.id))
+    const loose = discs.filter((disc) => disc.key.startsWith('near'))
+    expect(standing.length).toBeGreaterThan(0)
+    expect(loose.length).toBe(chipThickness())
+    expect(standing.every((disc) => disc.scale === chipDepthFactor(stack.z, metrics))).toBe(true)
+    expect(loose.every((disc) => disc.scale === chipDepthFactor(0, metrics))).toBe(true)
+    const face = loose.find((disc) => disc.face)
+    expect(face?.lift).toBe(-(chipThickness() - 1))
   })
 })

@@ -12,12 +12,12 @@ export const ChipLayer = ({ discs }: ChipLayerProps) => {
     <div className="chip-stack" aria-hidden>
       {discs.map((disc) => {
         const style = {
-          width,
-          height,
+          width: width * disc.scale,
+          height: height * disc.scale,
           left: disc.x,
           top: disc.y,
           zIndex: disc.zIndex,
-          transform: `translate(-50%, -50%) translateY(${disc.lift}px) rotateX(${CHIP_FELT_TILT_DEG}deg) rotateZ(${disc.spin}deg)`,
+          transform: `translate(-50%, -50%) translateY(${disc.lift * disc.scale}px) rotateX(${CHIP_FELT_TILT_DEG}deg) rotateZ(${disc.spin}deg)`,
         } as CSSProperties
         return (
           <div key={disc.key} className={`chip chip-${disc.color}${disc.face ? ' chip-top' : ' chip-wall'}`} style={style}>
