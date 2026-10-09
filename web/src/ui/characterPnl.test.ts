@@ -12,6 +12,7 @@ import {
   writeStoredPnl,
 } from './characterPnl'
 import { PL_LOSS_COLOR, PL_PROFIT_COLOR } from './characterPnlConstants'
+import type { ProfileBet } from './characterProfiles'
 
 describe('line decision', () => {
   it('pays Pass minus Don\'t Pass on a come-out 7 or 11 and on a made point', () => {
@@ -80,6 +81,26 @@ describe('character stakes and running total', () => {
     const won = applyCharacterPnl(emptyCharacterPnl(), null, 11, stakes)
     const point = applyCharacterPnl(won, null, 4, stakes)
     expect(point).toBe(won)
+  })
+
+  it('pays a working place bet and keeps those dollars off the line', () => {
+    const place: ProfileBet = {
+      id: 'cat-place-6',
+      character: 'cat',
+      role: 'place',
+      number: 6,
+      dollars: 6_000_000,
+      fundedFrom: 'pass',
+      label: 'CAT_PLACE_6',
+      x: 0,
+      y: 0,
+    }
+    const hit = applyCharacterPnl(emptyCharacterPnl(), 9, 6, stakes, [place])
+    expect(hit.cat.btc).toBeCloseTo(116.666666)
+    expect(hit.cat.usd).toBeCloseTo(7_000_000)
+
+    const out = applyCharacterPnl(emptyCharacterPnl(), 8, 7, stakes, [place])
+    expect(out.cat.btc).toBeCloseTo(-150)
   })
 })
 

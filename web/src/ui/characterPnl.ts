@@ -1,7 +1,8 @@
 import { betDollars } from './chipBets'
 import type { ChipCharacter } from './chipConstants'
+import type { ProfileBet } from './characterProfiles'
 import { PL_FLAT_COLOR, PL_LOSS_COLOR, PL_PROFIT_COLOR } from './characterPnlConstants'
-import { settleDontPass, settlePassLine } from './crapsPayouts'
+import { settleDontPass, settleField, settleLay, settlePassLine, settlePlace } from './crapsPayouts'
 
 /** Left to right along the rack. */
 export const PL_CHARACTERS: readonly ChipCharacter[] = ['wolf', 'oldLady', 'cat', 'oldMan']
@@ -155,25 +156,41 @@ const stakePrice = (stake: CharacterStakePair): number => {
   return 0
 }
 
+const profileProfit = (point: number | null, total: number, bet: ProfileBet): number => {
+  if (bet.role === 'field') return settleField(point, total, bet.dollars).profit
+  if (bet.number == null) return 0
+  if (bet.role === 'lay' || bet.role === 'point-lay') return settleLay(point, total, bet.number, bet.dollars).profit
+  return settlePlace(point, total, bet.number, bet.dollars).profit
+}
+
 /**
  * Add this roll's bitcoin result. USD is that bitcoin total at the current price,
  * so a later roll that gives the coins back shows 0 BTC and 0 USD together.
+ * Profile stakes are already off the line, so the line uses what is still on Pass and Don't Pass.
  */
 export const applyCharacterPnl = (
   book: CharacterPnlBook,
   point: number | null,
   total: number,
   stakes: CharacterStakes,
+  profiles: readonly ProfileBet[] = [],
 ): CharacterPnlBook => {
   let changed = false
   const next: CharacterPnlBook = { ...book }
   for (const character of PL_CHARACTERS) {
     const stake = stakes[character]
-    const btc = lineDecisionPnl(point, total, stake.btc.pass, stake.btc.dont)
+    const price = stakePrice(stake)
+    const mine = profiles.filter((bet) => bet.character === character)
+    const passUsd = mine.filter((bet) => bet.fundedFrom === 'pass').reduce((sum, bet) => sum + bet.dollars, 0)
+    const dontUsd = mine.filter((bet) => bet.fundedFrom === 'dont').reduce((sum, bet) => sum + bet.dollars, 0)
+    const passBtc = price > 0 ? Math.max(0, stake.btc.pass - passUsd / price) : stake.btc.pass
+    const dontBtc = price > 0 ? Math.max(0, stake.btc.dont - dontUsd / price) : stake.btc.dont
+    const profileBtc = price > 0 ? mine.reduce((sum, bet) => sum + profileProfit(point, total, bet), 0) / price : 0
+    const btc = lineDecisionPnl(point, total, passBtc, dontBtc) + profileBtc
     if (btc === 0) continue
     changed = true
     const totalBtc = book[character].btc + btc
-    next[character] = { btc: totalBtc, usd: totalBtc * stakePrice(stake), shown: true }
+    next[character] = { btc: totalBtc, usd: totalBtc * price, shown: true }
   }
   return changed ? next : book
 }

@@ -204,3 +204,42 @@ export const settlePlace = (
   if (point == null || !isPointNumber(point)) return resting(booked, unbooked)
   return settleBooked(booked, unbooked, total === number, total === 7, false, true, PLACE_PAY[number])
 }
+
+const FIELD_PAY: WholeDollarPay = { unit: 1, profit: 1 }
+const FIELD_TRIPLE_PAY: WholeDollarPay = { unit: 1, profit: 3 }
+const FIELD_WINNERS = new Set([2, 3, 4, 9, 10, 11, 12])
+
+/**
+ * One roll. Wins on 2, 3, 4, 9, 10, 11, and 12. Loses on 5, 6, 7, and 8.
+ * 2 and 12 pay 3:1. The other winners pay 1:1. Off on the come-out.
+ */
+export const settleField = (point: number | null, total: number, stake: number): BetSettlement => {
+  const { booked, unbooked } = bookDollars(stake, FIELD_PAY.unit)
+  if (point == null || !isPointNumber(point)) return noBet(stake)
+  const triple = total === 2 || total === 12
+  return settleBooked(
+    booked,
+    unbooked,
+    FIELD_WINNERS.has(total),
+    !FIELD_WINNERS.has(total),
+    false,
+    false,
+    triple ? FIELD_TRIPLE_PAY : FIELD_PAY,
+  )
+}
+
+/**
+ * A lay wins when a 7 beats the number, and loses when the number rolls.
+ * True odds, no commission, no line-odds cap. Off on the come-out.
+ */
+export const settleLay = (
+  point: number | null,
+  total: number,
+  number: number,
+  stake: number,
+): BetSettlement => {
+  if (!isPointNumber(number)) return noBet(stake)
+  const { booked, unbooked } = bookDollars(stake, LAY_ODDS_PAY[number].unit)
+  if (point == null || !isPointNumber(point)) return resting(booked, unbooked)
+  return settleBooked(booked, unbooked, total === 7, total === number, false, false, LAY_ODDS_PAY[number])
+}

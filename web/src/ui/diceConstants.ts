@@ -98,7 +98,7 @@ export const PUCK_ON_8_Y = 1290
 export const PUCK_ON_8_SCALE = 0.37//0.34
 
 export const PUCK_ON_6_X = 180
-export const PUCK_ON_6_Y = 1180
+export const PUCK_ON_6_Y = 1420
 export const PUCK_ON_6_SCALE = 0.40//0.37
 
 export const PUCK_ON_5_X = 170

@@ -7,6 +7,8 @@ import {
   maxOddsDollars,
   settleDontPass,
   settleDontPassOdds,
+  settleField,
+  settleLay,
   settlePassLine,
   settlePassOdds,
   settlePlace,
@@ -109,6 +111,46 @@ describe('place bets', () => {
 
   it('drops a stake below one payout unit', () => {
     expect(settlePlace(8, 8, 8, 5)).toMatchObject({ outcome: 'none', booked: 0, profit: 0, staysUp: false })
+  })
+})
+
+describe('field', () => {
+  it('pays even money on 3, 4, 9, 10, and 11, and triple on 2 and 12', () => {
+    expect(settleField(6, 4, 10)).toMatchObject({ outcome: 'win', profit: 10, staysUp: false, booked: 10 })
+    expect(settleField(6, 9, 10)).toMatchObject({ outcome: 'win', profit: 10, staysUp: false })
+    expect(settleField(6, 11, 10)).toMatchObject({ outcome: 'win', profit: 10, staysUp: false })
+    expect(settleField(6, 2, 10)).toMatchObject({ outcome: 'win', profit: 30, staysUp: false })
+    expect(settleField(6, 12, 10)).toMatchObject({ outcome: 'win', profit: 30, staysUp: false })
+  })
+
+  it('loses on 5, 6, 7, and 8', () => {
+    for (const total of [5, 6, 7, 8]) {
+      expect(settleField(9, total, 10)).toMatchObject({ outcome: 'lose', profit: -10, staysUp: false })
+    }
+  })
+
+  it('is off on the come-out', () => {
+    expect(settleField(null, 2, 10)).toMatchObject({ outcome: 'none', booked: 0, profit: 0, staysUp: false })
+  })
+})
+
+describe('lay bets', () => {
+  it('pays true odds when a 7 beats the number and comes down', () => {
+    expect(settleLay(6, 7, 4, 12_500_000)).toMatchObject({ outcome: 'win', profit: 6_250_000, staysUp: false })
+    expect(settleLay(6, 7, 10, 2)).toMatchObject({ outcome: 'win', profit: 1, booked: 2 })
+    expect(settleLay(6, 7, 5, 13_500_000)).toMatchObject({ outcome: 'win', profit: 9_000_000, booked: 13_500_000 })
+    expect(settleLay(6, 7, 9, 3)).toMatchObject({ outcome: 'win', profit: 2, booked: 3 })
+    expect(settleLay(6, 7, 6, 13_500_000)).toMatchObject({ outcome: 'win', profit: 11_250_000, booked: 13_500_000 })
+    expect(settleLay(6, 7, 8, 6)).toMatchObject({ outcome: 'win', profit: 5, booked: 6 })
+  })
+
+  it('loses when its number rolls', () => {
+    expect(settleLay(6, 4, 4, 10)).toMatchObject({ outcome: 'lose', profit: -10, staysUp: false })
+    expect(settleLay(6, 9, 4, 10)).toMatchObject({ outcome: 'none', profit: 0, staysUp: true, booked: 10 })
+  })
+
+  it('rests off on the come-out', () => {
+    expect(settleLay(null, 7, 4, 10)).toMatchObject({ outcome: 'none', profit: 0, staysUp: true, booked: 10 })
   })
 })
 

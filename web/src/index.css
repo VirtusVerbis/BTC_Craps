@@ -235,7 +235,7 @@ body {
   }
 }
 
-/* Above the P/L labels (3), under the chips (5), meme (6), and candle chart (7). */
+/* Above the P/L labels (3), under the chips (5), speech (6), meme (7), and candle chart (8). */
 .dice-layer {
   position: absolute;
   inset: 0;
@@ -248,6 +248,47 @@ body {
   inset: 0;
   z-index: 5;
   pointer-events: none;
+}
+
+.stack-guide {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid;
+  pointer-events: none;
+}
+
+.stack-guide-caption {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 2px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px #000, 0 0 2px #000;
+}
+
+.speech-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+}
+
+.speech-bubble {
+  position: absolute;
+  box-sizing: border-box;
+  background: #fff;
+  color: #000;
+  border: 2px solid #000;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.speech-bubble p {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow: hidden;
 }
 
 .chip {

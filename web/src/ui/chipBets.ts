@@ -41,6 +41,10 @@ export interface ChipBet {
   dollars: number
   /** Bottom to top. At most two columns, each at most 20 high. */
   columns: ChipColor[][]
+  /** Strategy stacks sit on this point and do not jitter. */
+  anchor?: { x: number; y: number }
+  /** Testing outline. Absent on Pass and Don't Pass. */
+  guide?: { label: string; color: string }
 }
 
 export const btcPrice = (market: MarketSnapshot): number => {
@@ -133,16 +137,20 @@ export interface PlacedColumn {
   /** Felt depth. Screen y is `REFERENCE_HEIGHT - z`. */
   z: number
   colors: ChipColor[]
+  /** Snap back to the constant each restack. Pass and Don't Pass keep a nudged spot. */
+  pinned?: boolean
+  guide?: { label: string; color: string }
 }
 
 /** Second column steps sideways. Stacks near the right rail step left. */
 export const placeBets = (bets: readonly ChipBet[], seed: number, columnGap: number): PlacedColumn[] => {
   const placed: PlacedColumn[] = []
   for (const bet of bets) {
-    const anchor = CHIP_ANCHORS.find((item) => item.character === bet.character && item.side === bet.side)
+    const anchored = bet.anchor
+    const anchor = anchored ?? CHIP_ANCHORS.find((item) => item.character === bet.character && item.side === bet.side)
     if (!anchor) continue
-    const jx = (unit(seed + anchor.x * 0.17 + anchor.y) - 0.5) * 2 * CHIP_ANCHOR_JITTER_PX
-    const jy = (unit(seed + anchor.y * 0.13 + anchor.x) - 0.5) * 2 * CHIP_ANCHOR_JITTER_PX
+    const jx = anchored ? 0 : (unit(seed + anchor.x * 0.17 + anchor.y) - 0.5) * 2 * CHIP_ANCHOR_JITTER_PX
+    const jy = anchored ? 0 : (unit(seed + anchor.y * 0.13 + anchor.x) - 0.5) * 2 * CHIP_ANCHOR_JITTER_PX
     const x0 = anchor.x + jx
     const y0 = anchor.y + jy
     const sign = x0 > REFERENCE_WIDTH * 0.72 ? -1 : 1
@@ -155,6 +163,8 @@ export const placeBets = (bets: readonly ChipBet[], seed: number, columnGap: num
         x,
         z: REFERENCE_HEIGHT - y,
         colors,
+        pinned: anchored != null,
+        guide: bet.guide,
       })
     })
   }

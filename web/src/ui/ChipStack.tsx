@@ -1,12 +1,14 @@
 import type { CSSProperties } from 'react'
+import { BET_STACK_GUIDES_ON, STACK_GUIDE_FONT_PX } from './characterBetConstants'
 import { CHIP_FELT_TILT_DEG } from './chipConstants'
-import { chipDrawSize, type ChipDisc } from './chipPhysics'
+import { chipDrawSize, type ChipDisc, type StackGuideView } from './chipPhysics'
 
 interface ChipLayerProps {
   discs: readonly ChipDisc[]
+  guides?: readonly StackGuideView[]
 }
 
-export const ChipLayer = ({ discs }: ChipLayerProps) => {
+export const ChipLayer = ({ discs, guides = [] }: ChipLayerProps) => {
   const { width, height } = chipDrawSize()
   return (
     <div className="chip-stack" aria-hidden>
@@ -27,6 +29,25 @@ export const ChipLayer = ({ discs }: ChipLayerProps) => {
           </div>
         )
       })}
+      {BET_STACK_GUIDES_ON
+        ? guides.map((guide) => (
+          <div
+            key={guide.label}
+            className="stack-guide"
+            style={{
+              left: guide.left,
+              top: guide.top,
+              width: guide.width,
+              height: guide.height,
+              borderColor: guide.color,
+              color: guide.color,
+              fontSize: STACK_GUIDE_FONT_PX,
+            }}
+          >
+            <span className="stack-guide-caption">{guide.label}</span>
+          </div>
+        ))
+        : null}
     </div>
   )
 }

@@ -60,6 +60,8 @@ export interface StandingStack {
   colors: ChipColor[]
   /** Felt shift of each plate. The bottom stays at zero until a bump leans the column. */
   offsets: ChipOffset[]
+  pinned?: boolean
+  guide?: { label: string; color: string }
 }
 
 export interface LooseChip {
@@ -135,6 +137,8 @@ export const worldFromBets = (bets: readonly ChipBet[], seed: number): ChipWorld
     z: column.z,
     colors: column.colors,
     offsets: zeroOffsets(column.colors.length),
+    pinned: column.pinned,
+    guide: column.guide,
   })),
   loose: [],
   restack: null,
@@ -578,14 +582,24 @@ export const settleColumns = (
     stacks: placed.map((column) => {
       const existing = byId.get(column.id)
       if (!existing) {
-        return { id: column.id, x: column.x, z: column.z, colors: column.colors.slice(), offsets: zeroOffsets(column.colors.length) }
+        return {
+          id: column.id,
+          x: column.x,
+          z: column.z,
+          colors: column.colors.slice(),
+          offsets: zeroOffsets(column.colors.length),
+          pinned: column.pinned,
+          guide: column.guide,
+        }
       }
       return {
         id: existing.id,
-        x: existing.x,
-        z: existing.z,
+        x: column.pinned ? column.x : existing.x,
+        z: column.pinned ? column.z : existing.z,
         colors: column.colors.slice(),
         offsets: fitOffsets(existing.offsets, column.colors.length),
+        pinned: column.pinned,
+        guide: column.guide,
       }
     }),
   }
@@ -716,3 +730,55 @@ export const chipDrawSize = (): { width: number; height: number } => ({
   width: CHIP_WIDTH_PX * CHIP_SIZE_SCALAR,
   height: CHIP_HEIGHT_PX * CHIP_SIZE_SCALAR,
 })
+
+export interface StackGuideView {
+  label: string
+  color: string
+  left: number
+  top: number
+  width: number
+  height: number
+}
+
+/** One box around every column that shares a strategy label, after the current lean. */
+export const guideFrames = (world: ChipWorld, metrics: StageMetrics = stageMetrics()): StackGuideView[] => {
+  const stacks = world.stacks.length > 0 ? world.stacks : (world.restack?.nextStacks ?? [])
+  const groups = new Map<string, StandingStack[]>()
+  for (const stack of stacks) {
+    if (!stack.guide) continue
+    const list = groups.get(stack.guide.label) ?? []
+    list.push(stack)
+    groups.set(stack.guide.label, list)
+  }
+  const frames: StackGuideView[] = []
+  for (const [label, columns] of groups) {
+    let minX = Number.POSITIVE_INFINITY
+    let maxX = Number.NEGATIVE_INFINITY
+    let minTop = Number.POSITIVE_INFINITY
+    let maxBottom = Number.NEGATIVE_INFINITY
+    for (const stack of columns) {
+      const scale = chipDepthFactor(stack.z, metrics)
+      const diameter = chipDiameter() * scale
+      const thick = chipThickness() * scale
+      const plates = Math.max(1, stack.colors.length)
+      for (let index = 0; index < plates; index += 1) {
+        const x = stack.x + (stack.offsets[index]?.x ?? 0)
+        const y = metrics.height - (stack.z + (stack.offsets[index]?.z ?? 0))
+        const top = y - index * thick - diameter / 2
+        minX = Math.min(minX, x - diameter / 2)
+        maxX = Math.max(maxX, x + diameter / 2)
+        minTop = Math.min(minTop, top)
+        maxBottom = Math.max(maxBottom, y + diameter / 2)
+      }
+    }
+    frames.push({
+      label,
+      color: columns[0]?.guide?.color ?? '#ffffff',
+      left: minX,
+      top: minTop,
+      width: Math.max(0, maxX - minX),
+      height: Math.max(0, maxBottom - minTop),
+    })
+  }
+  return frames
+}

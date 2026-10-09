@@ -19,6 +19,7 @@ import { formatPnlBtc, formatPnlUsd, pnlColor, PL_CHARACTERS, type CharacterPnlB
 import { PL_LABEL_ANCHOR, PL_LABEL_FONT_PX } from './characterPnlConstants'
 import { ChipLayer } from './ChipStack'
 import { DiceLayer } from './DiceLayer'
+import { SpeechLayer } from './SpeechLayer'
 import { RollHistogram } from './RollHistogram'
 import type { DicePresentation } from './useDiceThrow'
 import type { Bg2ActiveMeme } from './useBg2MemeState'
@@ -208,7 +209,8 @@ export const CrapsScene = ({
           draggable={false}
         />
       ) : null}
-      <ChipLayer discs={dice?.chips ?? []} />
+      <ChipLayer discs={dice?.chips ?? []} guides={dice?.guides ?? []} />
+      <SpeechLayer speech={dice?.speech ?? []} />
       {dice ? <DiceLayer presentation={dice} bonusLines={bonusLines} /> : null}
     </div>
   )

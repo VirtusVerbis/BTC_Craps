@@ -18,8 +18,9 @@ import {
  * - 2: bg5 audience
  * - 3: bg4 buy signs
  * - 4: bg3 flash
- * - 6: bg2 memes
- * - 7: bg1 chart band
+ * - 6: speech bubbles
+ * - 7: bg2 memes
+ * - 8: bg1 chart band
  * - 7: bg0 ring (closest background)
  * - 8: fg1 Lizard (behind Satoshi)
  * - 9: fg2 Satoshi
@@ -59,7 +60,7 @@ export const mobileAssetManifest = {
   },
 
   meme: {
-    zIndex: 6,
+    zIndex: 7,
     left: 0.08,
     top: 0.06,
     width: 0.84,
@@ -68,7 +69,7 @@ export const mobileAssetManifest = {
   },
 
   chartBand: {
-    zIndex: 7,
+    zIndex: 8,
     left: 0,
     width: 1,
     top: BG2_CHART_TOP_OFFSET_FRACTION,

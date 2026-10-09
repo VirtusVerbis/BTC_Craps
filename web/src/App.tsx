@@ -155,7 +155,7 @@ function App() {
     }
   }, [armBonusTest])
   const histogram = useHistogramVisibility(splashDone, histogramBoost)
-  const dice = useDiceThrow(feed.market, splashDone, onCountedRoll)
+  const dice = useDiceThrow(feed.market, splashDone, rolls, onCountedRoll)
 
   const marketService = useMemo(
     () =>
