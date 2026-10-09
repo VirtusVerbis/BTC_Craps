@@ -4,6 +4,7 @@ import { fetchBinanceBtc1mKlines, type Candle } from './data/candles'
 import { BlockHeightService, type BlockState } from './data/blockHeight'
 import { MarketDataService, type MarketFeedUpdate } from './data/marketData'
 import { emptyCharacterPnl } from './ui/characterPnl'
+import { loadShooterBook } from './ui/shooterProfile'
 import { CrapsScene } from './ui/CrapsScene'
 import { Overlay } from './ui/Overlay'
 import { SplashSequence } from './ui/SplashSequence'
@@ -155,7 +156,7 @@ function App() {
     }
   }, [armBonusTest])
   const histogram = useHistogramVisibility(splashDone, histogramBoost)
-  const dice = useDiceThrow(feed.market, splashDone, rolls, onCountedRoll)
+  const dice = useDiceThrow(feed.market, splashDone, rolls, onCountedRoll, bonusHandRef)
 
   const marketService = useMemo(
     () =>
@@ -222,6 +223,7 @@ function App() {
               market={feed.market}
               block={blockState}
               onTimeClick={() => {}}
+              shooter={dice?.shooter ?? loadShooterBook()}
               status={feed.status}
             />
             {videoOverlay.active ? (

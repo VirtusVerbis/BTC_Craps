@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { REFERENCE_HEIGHT } from '../config/constants'
 import { CHIP_MAX_BET_CHIPS, CHIP_MAX_COLUMNS, CHIP_MAX_STACK } from './chipConstants'
 import {
   CHIP_FACE_VALUE,
@@ -8,6 +9,7 @@ import {
   buildBets,
   chipsForDollars,
   denominationScale,
+  placeBets,
   splitColumns,
 } from './chipBets'
 
@@ -68,6 +70,22 @@ describe('felt bets', () => {
       expect(bet.columns.length).toBeLessThanOrEqual(CHIP_MAX_COLUMNS)
       for (const column of bet.columns) expect(column.length).toBeLessThanOrEqual(CHIP_MAX_STACK)
     }
+  })
+
+  it('keeps a Pass anchor on the bottom edge of the stage', () => {
+    const placed = placeBets(
+      [{
+        id: 'shooter-pass',
+        character: 'shooter',
+        side: 'pass',
+        dollars: 1,
+        columns: [['red']],
+        anchor: { x: 500, y: REFERENCE_HEIGHT },
+      }],
+      1,
+      () => 0,
+    )
+    expect(placed[0]?.z).toBe(0)
   })
 
   it('splits a tall bet into a second column', () => {

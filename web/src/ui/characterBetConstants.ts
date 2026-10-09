@@ -6,6 +6,23 @@ export const OLD_LADY_PROFILE_ON = true//false
 export const OLD_MAN_PROFILE_ON = true//false
 export const WOLF_PROFILE_ON = false
 
+/** Fixed one-red Pass, Don't Pass, and Make 'Em All. Off hides the chips and both labels. */
+export const SHOOTER_ON = true
+
+/**
+ * Forces the shooter's stacks to ignore dice and loose chips for the whole throw.
+ * Off is the default: a die passes through at launch, then collides after it crosses mid-felt.
+ */
+export const SHOOTER_STACK_COLLISION_OFF = false
+
+/** One red on the near Pass line, left of center at the launch rail. Stage pixels (1080×1920). */
+export const SHOOTER_PASS_X = 500
+export const SHOOTER_PASS_Y = 1895
+
+/** One red on Don't Pass, just inside that Pass chip and still left of center. */
+export const SHOOTER_DONT_X = 500
+export const SHOOTER_DONT_Y = 1840
+
 /** Wolf's cold lays. The across bet does not need this. */
 export const WOLF_LAY_ON = false
 

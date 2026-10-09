@@ -36,7 +36,8 @@ const CHARACTERS: readonly ChipCharacter[] = ['wolf', 'oldLady', 'cat', 'oldMan'
 
 export interface ChipBet {
   id: string
-  character: ChipCharacter
+  /** Shooter is a fixed one-red bettor, not an open-interest character. */
+  character: ChipCharacter | 'shooter'
   side: ChipSide
   dollars: number
   /** Bottom to top. At most two columns, each at most 20 high. */
@@ -183,7 +184,7 @@ export const placeBets = (
     const y0 = anchor.y + jy
     const sign = x0 > REFERENCE_WIDTH * 0.72 ? -1 : 1
     bet.columns.forEach((colors, index) => {
-      const y = Math.min(REFERENCE_HEIGHT - 40, Math.max(40, y0))
+      const y = Math.min(REFERENCE_HEIGHT, Math.max(0, y0))
       const z = REFERENCE_HEIGHT - y
       const x = Math.min(REFERENCE_WIDTH - 40, Math.max(40, x0 + sign * index * columnStep(z)))
       placed.push({

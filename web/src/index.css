@@ -625,6 +625,36 @@ body {
   justify-content: flex-start;
 }
 
+.shooter-hud {
+  margin: 0.15rem 0 0;
+  color: #ffffff;
+  line-height: 1.25;
+  white-space: nowrap;
+  pointer-events: none;
+  text-shadow:
+    0 1px 0 #000,
+    0 2px 4px #000,
+    0 0 8px rgba(0, 0, 0, 1),
+    0 0 18px rgba(0, 0, 0, 0.95);
+}
+
+.shooter-hud-pnl {
+  font-weight: 700;
+  text-shadow:
+    0 2.109375px 0 #000,
+    0 4.21875px 8.4375px #000,
+    0 0 16.875px rgba(0, 0, 0, 1),
+    0 0 37.96875px rgba(0, 0, 0, 0.95);
+}
+
+.shooter-hud-tag {
+  color: #ffffff;
+}
+
+.shooter-hud-end {
+  text-align: right;
+}
+
 .liq-ticker {
   position: absolute;
   left: 0;

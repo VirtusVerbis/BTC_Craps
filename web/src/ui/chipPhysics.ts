@@ -2,6 +2,7 @@ import { REFERENCE_HEIGHT } from '../config/constants'
 import { DIE_GRAVITY_PX_PER_S2, PUCK_COLLISION_HEIGHT_PX, PUCK_IMAGE_WIDTH_PX } from './diceConstants'
 import { puckPlacement } from './puckState'
 import { dieSize, stageMetrics, type Die, type StageMetrics } from './dicePhysics'
+import { SHOOTER_STACK_COLLISION_OFF } from './characterBetConstants'
 import { placeBets, type ChipBet } from './chipBets'
 import {
   CHIP_COLUMN_GAP_PX,
@@ -229,6 +230,23 @@ const nudgeStack = (stack: StandingStack, dirX: number, dirZ: number) => {
   }
 }
 
+const isShooterStack = (stack: StandingStack): boolean => stack.id.startsWith('shooter-')
+
+/** A die remembers the crossing, so the trip back to the rail still hits the stacks. */
+const markFeltMid = (die: Die, metrics: StageMetrics) => {
+  if (metrics.wallZ > 0 && die.z >= metrics.wallZ / 2) die.pastFeltMid = true
+}
+
+/**
+ * Other stacks always collide. Shooter stacks stay clear at launch.
+ * `SHOOTER_STACK_COLLISION_OFF` keeps them clear after mid-felt too.
+ */
+const stackBlocksDie = (stack: StandingStack, die: Die): boolean => {
+  if (!isShooterStack(stack)) return true
+  if (SHOOTER_STACK_COLLISION_OFF) return false
+  return die.pastFeltMid === true
+}
+
 const hitStack = (
   die: Die,
   stack: StandingStack,
@@ -256,8 +274,10 @@ const hitStack = (
 const resolveDieStacks = (world: ChipWorld, dice: [Die, Die], metrics: StageMetrics) => {
   const born: LooseChip[] = []
   for (const die of dice) {
+    markFeltMid(die, metrics)
     if (!die.alive || die.leaving || die.resting) continue
     for (const stack of world.stacks) {
+      if (!stackBlocksDie(stack, die)) continue
       const hit = hitStack(die, stack, metrics)
       if (!hit) continue
       const approach = die.vx * hit.nx + die.vz * hit.nz
@@ -392,13 +412,14 @@ const resolveLooseDice = (chips: LooseChip[], dice: [Die, Die], metrics: StageMe
   }
 }
 
-const resolveLooseStacks = (world: ChipWorld) => {
+const resolveLooseStacks = (world: ChipWorld, shooterLive: boolean) => {
   const radius = chipRadius()
   const born: LooseChip[] = []
   for (const chip of world.loose) {
     const speed = Math.hypot(chip.vx, chip.vz)
     if (chip.h > chipThickness()) continue
     for (const stack of world.stacks) {
+      if (isShooterStack(stack) && !shooterLive) continue
       const dx = chip.x - stack.x
       const dz = chip.z - stack.z
       const dist = Math.hypot(dx, dz)
@@ -500,7 +521,8 @@ export const resolveDiceChips = (
   world.loose = world.loose.map((chip) => constrainLoose(integrateLoose(chip, dt), metrics, dt))
   resolveLoosePairs(world.loose)
   resolveLooseDice(world.loose, next, metrics)
-  resolveLooseStacks(world)
+  const stillLaunching = next.some((die) => die.alive && !die.leaving && !die.resting && die.pastFeltMid !== true)
+  resolveLooseStacks(world, !SHOOTER_STACK_COLLISION_OFF && !stillLaunching)
   resolvePuckChips(world.loose, puck)
   return next
 }
@@ -524,7 +546,7 @@ export const driftLooseChips = (
   }
   next.loose = next.loose.map((chip) => constrainLoose(integrateLoose(chip, dt), metrics, dt))
   resolveLoosePairs(next.loose)
-  resolveLooseStacks(next)
+  resolveLooseStacks(next, !SHOOTER_STACK_COLLISION_OFF)
   resolvePuckChips(next.loose, puck)
   return next
 }

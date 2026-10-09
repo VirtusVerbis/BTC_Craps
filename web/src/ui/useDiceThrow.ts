@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
 import type { MarketSnapshot } from '../game/types'
 import { useOpenInterest } from '../data/openInterest'
 import {
@@ -41,6 +41,14 @@ import {
 } from './dicePhysics'
 import type { ChipCharacter } from './chipConstants'
 import { useDiceVolumeWindow } from './useDiceVolumeWindow'
+import { emptyBonusHand, type BonusHand } from './bonusCraps'
+import {
+  applyShooterRoll,
+  loadShooterBook,
+  saveShooterBook,
+  shooterLineBets,
+  type ShooterBook,
+} from './shooterProfile'
 
 export interface DieView {
   id: 'left' | 'right'
@@ -66,6 +74,7 @@ export interface DicePresentation {
   guides: StackGuideView[]
   speech: SpeechView[]
   pnl: CharacterPnlBook
+  shooter: ShooterBook
 }
 
 const toView = (die: Die, id: 'left' | 'right'): DieView => {
@@ -89,6 +98,7 @@ const present = (
   guides: readonly StackGuideView[],
   speech: readonly SpeechView[],
   pnl: CharacterPnlBook,
+  shooter: ShooterBook,
 ): DicePresentation => ({
   dice: [toView(state.dice[0], 'left'), toView(state.dice[1], 'right')],
   result: state.phase === 'result' ? state.result : null,
@@ -97,6 +107,7 @@ const present = (
   guides: guides.slice(),
   speech: speech.slice(),
   pnl,
+  shooter,
 })
 
 const liveSpeech = (
@@ -120,6 +131,7 @@ export const useDiceThrow = (
   enabled: boolean,
   rolls: readonly number[],
   onCountedRoll?: (result: ThrowResult) => number | void,
+  bonusHandRef?: RefObject<BonusHand>,
 ): DicePresentation | null => {
   const oi = useOpenInterest()
   const volume = useDiceVolumeWindow(market)
@@ -136,11 +148,12 @@ export const useDiceThrow = (
   const stateRef = useRef<ThrowState>(createThrowState(performance.now()))
   const worldRef = useRef<ChipWorld | null>(null)
   const pnlRef = useRef<CharacterPnlBook>(loadCharacterPnl())
+  const shooterRef = useRef<ShooterBook>(loadShooterBook())
   const profilesRef = useRef<ProfileBet[]>([])
   const sevenOutRef = useRef(false)
   const speechRef = useRef<Partial<Record<ChipCharacter, { text: string; until: number }>>>({})
   const [presentation, setPresentation] = useState<DicePresentation>(() =>
-    present(stateRef.current, [], [], [], pnlRef.current),
+    present(stateRef.current, [], [], [], pnlRef.current, shooterRef.current),
   )
 
   useEffect(() => {
@@ -148,17 +161,19 @@ export const useDiceThrow = (
     stateRef.current = createThrowState(performance.now())
     worldRef.current = null
     pnlRef.current = loadCharacterPnl()
+    shooterRef.current = loadShooterBook()
     profilesRef.current = []
     sevenOutRef.current = false
     speechRef.current = {}
-    setPresentation(present(stateRef.current, [], [], [], pnlRef.current))
+    setPresentation(present(stateRef.current, [], [], [], pnlRef.current, shooterRef.current))
     let frame = 0
     let last = performance.now()
 
     const betsNow = (now: number) => {
       const snap = oiRef.current
       const price = btcPrice(marketRef.current)
-      if (!snap || !(price > 0)) return null
+      const shooter = shooterLineBets()
+      if (!snap || !(price > 0)) return shooter
       const table = composeTableBets(
         snap.openInterest * price,
         snap.longPct,
@@ -174,7 +189,7 @@ export const useDiceThrow = (
         const text = table.callouts[character]
         if (text) speechRef.current[character] = { text, until: now + SPEECH_SHOW_MS }
       }
-      return table.bets
+      return [...table.bets, ...shooter]
     }
 
     const poseHook: DicePoseHook = (dice, dt, metrics) => {
@@ -189,7 +204,7 @@ export const useDiceThrow = (
       const metrics = stageMetrics()
       if (!worldRef.current) {
         const bets = betsNow(now)
-        if (bets && bets.length > 0) worldRef.current = worldFromBets(bets, Math.floor(now))
+        if (bets.length > 0) worldRef.current = worldFromBets(bets, Math.floor(now))
       }
       const phaseBefore = stateRef.current.phase
       const pointBefore = stateRef.current.point
@@ -210,6 +225,17 @@ export const useDiceThrow = (
             saveCharacterPnl(pnlRef.current)
           }
           if (pointBefore != null && result.total === 7) sevenOutRef.current = true
+          const nextShooter = applyShooterRoll(
+            shooterRef.current,
+            pointBefore,
+            result.total,
+            bonusHandRef?.current ?? emptyBonusHand(),
+            price,
+          )
+          if (nextShooter !== shooterRef.current) {
+            shooterRef.current = nextShooter
+            saveShooterBook(nextShooter)
+          }
         }
         const raw = result ? onCountedRollRef.current?.(result) : 0
         const extra = typeof raw === 'number' ? raw : 0
@@ -217,14 +243,14 @@ export const useDiceThrow = (
       }
       if (phaseBefore !== 'holding' && stateRef.current.phase === 'holding') {
         const bets = betsNow(now)
-        if (bets) worldRef.current = settleColumns(worldRef.current ?? emptyChipWorld(), bets, now, Math.floor(now))
+        worldRef.current = settleColumns(worldRef.current ?? emptyChipWorld(), bets, now, Math.floor(now))
       } else if (stateRef.current.phase === 'result' && worldRef.current) {
         worldRef.current = driftLooseChips(worldRef.current, dt, metrics, puckObstacle(stateRef.current.point))
       }
       if (worldRef.current?.restack) worldRef.current = tickRestack(worldRef.current, now)
       const chips = worldRef.current ? presentChips(worldRef.current, now, metrics) : []
       const guides = worldRef.current ? guideFrames(worldRef.current, metrics) : []
-      setPresentation(present(stateRef.current, chips, guides, liveSpeech(speechRef.current, now), pnlRef.current))
+      setPresentation(present(stateRef.current, chips, guides, liveSpeech(speechRef.current, now), pnlRef.current, shooterRef.current))
       frame = window.requestAnimationFrame(loop)
     }
     frame = window.requestAnimationFrame(loop)

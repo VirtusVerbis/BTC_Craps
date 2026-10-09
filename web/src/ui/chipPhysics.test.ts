@@ -79,6 +79,38 @@ describe('chip topples', () => {
     expect(world.stacks[0]?.colors.length).toBeGreaterThanOrEqual(7)
   })
 
+  it('lets a launching die pass through a shooter stack before mid-felt', () => {
+    const stack = { ...stackOf(1, 200, 40), id: 'shooter-pass-0' }
+    const world = worldWith([stack])
+    const die = flyingDie({ x: 200, z: 40, h: 0, vx: 0, vz: 400, vh: 0 })
+    const [next] = resolveDiceChips(world, [die, flyingDie({ alive: false, x: 10, z: 10 })], 1 / 60, metrics)
+    expect(next.pastFeltMid).toBeUndefined()
+    expect(next.x).toBe(200)
+    expect(next.z).toBe(40)
+    expect(next.vz).toBe(400)
+    expect(world.loose).toHaveLength(0)
+    expect(world.stacks[0]?.colors).toHaveLength(1)
+  })
+
+  it('hits a shooter stack once the die has crossed mid-felt', () => {
+    const mid = metrics.wallZ / 2
+    const stack = { ...stackOf(1, 200, mid), id: 'shooter-dont-0' }
+    const world = worldWith([stack])
+    const die = flyingDie({ x: 200, z: mid, h: 0, vx: 0, vz: 400, vh: 0 })
+    const [next] = resolveDiceChips(world, [die, flyingDie({ alive: false, x: 10, z: 10 })], 1 / 60, metrics)
+    expect(next.pastFeltMid).toBe(true)
+    expect(next.z === mid && next.vz === 400).toBe(false)
+  })
+
+  it('keeps shooter collision on after the die returns to the rail', () => {
+    const stack = { ...stackOf(1, 200, 40), id: 'shooter-pass-0' }
+    const world = worldWith([stack])
+    const die = flyingDie({ x: 200, z: 40, h: 0, vx: 0, vz: -400, vh: 0, pastFeltMid: true })
+    const [next] = resolveDiceChips(world, [die, flyingDie({ alive: false, x: 10, z: 10 })], 1 / 60, metrics)
+    expect(next.pastFeltMid).toBe(true)
+    expect(next.z === 40 && next.vz === -400).toBe(false)
+  })
+
   it('lets a light hit bounce without peeling the stack', () => {
     const stack = stackOf(10, 400, 800)
     const world = worldWith([stack])

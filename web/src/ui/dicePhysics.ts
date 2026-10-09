@@ -59,6 +59,8 @@ export interface Die {
   q: Quat
   w: Vec3
   topFace: number | null
+  /** Latched once this die crosses mid-felt. Shooter stacks collide after that. */
+  pastFeltMid?: boolean
 }
 
 export interface VolumeTotals {

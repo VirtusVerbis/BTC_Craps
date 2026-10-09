@@ -8,11 +8,19 @@ import { resolveMobileAssetUrl } from './mobileAssetUrls'
 import { formatElapsed, formatExchangePriceLabel, formatLiqBtc, formatLiqUsd } from './format'
 import { LiqTicker } from './LiqTicker'
 import { LIQ_LABEL_X, LIQ_LABEL_Y, OI_LABEL_FONT_REM, OI_LABEL_X, OI_LABEL_Y } from './overlayConstants'
+import { SHOOTER_ON } from './characterBetConstants'
+import {
+  formatMakeEmAll,
+  formatShooterPnl,
+  shooterFigureColor,
+  type ShooterBook,
+} from './shooterProfile'
 
 interface OverlayProps {
   market: MarketSnapshot
   block: BlockState
   onTimeClick: () => void
+  shooter: ShooterBook
   status: {
     binance: FeedStatus
     coinbase: FeedStatus
@@ -108,7 +116,7 @@ const formatOpenInterest = (value: number): string => Math.round(value).toLocale
 
 const formatAccountPct = (value: number): string => `${Math.round(value)}%`
 
-export const Overlay = ({ market, block, onTimeClick, status }: OverlayProps) => {
+export const Overlay = ({ market, block, onTimeClick, shooter, status }: OverlayProps) => {
   const openInterest = useOpenInterest()
   const liqCountdown = useLiqCountdown(openInterest?.liqBarStart ?? null)
   const longLiqBtc = openInterest?.longLiqBtc
@@ -314,6 +322,12 @@ export const Overlay = ({ market, block, onTimeClick, status }: OverlayProps) =>
             alignEnd={false}
             animate={binPulse}
           />
+          {SHOOTER_ON && shooter.pnl.shown ? (
+            <p className="shooter-hud shooter-hud-pnl" style={{ fontSize: `${OI_LABEL_FONT_REM}rem` }}>
+              <span className="shooter-hud-tag">P/L </span>
+              <span style={{ color: shooterFigureColor(shooter) }}>{formatShooterPnl(shooter)}</span>
+            </p>
+          ) : null}
         </div>
         <button className="time-button" type="button" onClick={onTimeClick}>
           <span className="overlay-label time-label">Time</span>
@@ -343,6 +357,11 @@ export const Overlay = ({ market, block, onTimeClick, status }: OverlayProps) =>
             alignEnd
             animate={cbPulse}
           />
+          {SHOOTER_ON ? (
+            <p className="shooter-hud shooter-hud-end" style={{ fontSize: `${OI_LABEL_FONT_REM}rem` }}>
+              {formatMakeEmAll(shooter.allWorking)}
+            </p>
+          ) : null}
         </div>
       </div>
       <div
