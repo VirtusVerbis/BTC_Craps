@@ -12,6 +12,7 @@ import {
   DIE_MIN_REACH_FRACTION,
   DIE_NO_ROLL_PAUSE_MS,
   DIE_RESULT_HOLD_MS,
+  DIE_UP_ADD_PX_PER_S,
   PUCK_OFF_SCALE,
   PUCK_OFF_X,
   PUCK_OFF_Y,
@@ -237,9 +238,11 @@ describe('launch axes', () => {
     expect(launched.forward).toBeGreaterThan(launched.up)
   })
 
-  it('leaves upward speed at zero when Coinbase buy is zero', () => {
+  it('adds the upward boost when Coinbase buy is zero', () => {
     const launched = speeds(DIE_BINANCE_BUY_REF, 0)
-    expect(launched.up).toBe(0)
+    const withBuy = speeds(DIE_BINANCE_BUY_REF, DIE_COINBASE_BUY_REF)
+    expect(launched.up).toBe(DIE_UP_ADD_PX_PER_S)
+    expect(withBuy.up - launched.up).toBeGreaterThan(0)
     expect(launched.forward).toBeGreaterThan(0)
   })
 
@@ -253,7 +256,7 @@ describe('launch axes', () => {
   it('raises a weak Binance buy so the throw still reaches the felt floor', () => {
     const launched = speeds(0.05, 0)
     const raw = speeds(DIE_BINANCE_BUY_REF, 0).forward * logUnit(0.05, DIE_BINANCE_BUY_REF)
-    expect(launched.up).toBe(0)
+    expect(launched.up).toBe(DIE_UP_ADD_PX_PER_S)
     expect(launched.forward).toBeGreaterThan(raw)
     const flight = travel(0.05, 0.02)
     expect(flight.maxZ).toBeGreaterThan(metrics.wallZ * DIE_MIN_REACH_FRACTION * 0.9)
@@ -315,6 +318,22 @@ describe('throw cycle', () => {
       coinbaseSell: 1,
     })
     expect(quiet.phase).toBe('holding')
+  })
+
+  it('starts a Coinbase-quiet throw only when the upward boost is set', () => {
+    const state = createThrowState(0, 540)
+    const launched = advanceThrow(state, 0.016, DIE_LAUNCH_DELAY_MS + 10, {
+      binanceBuy: 2,
+      coinbaseBuy: 0,
+      binanceSell: 0,
+      coinbaseSell: 0,
+    })
+    if (DIE_UP_ADD_PX_PER_S > 0) {
+      expect(launched.phase).toBe('flying')
+      expect(launched.dice[0].vh).toBeCloseTo(DIE_UP_ADD_PX_PER_S)
+    } else {
+      expect(launched.phase).toBe('holding')
+    }
   })
 
   it('launches both dice from the same speed once both buys are live', () => {

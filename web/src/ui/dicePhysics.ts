@@ -23,6 +23,7 @@ import {
   DIE_SLIDE_DAMP_PER_S,
   DIE_SPIN_DAMP,
   DIE_SPIN_KICK,
+  DIE_UP_ADD_PX_PER_S,
   DIE_WALL_BOTTOM_FRACTION,
   DIE_WALL_RESTITUTION,
   DIE_WALL_SCATTER_RAD,
@@ -228,7 +229,8 @@ export const advanceThrow = (
 ): ThrowState => {
   if (state.phase === 'holding') {
     if (nowMs - state.phaseStartedMs < DIE_LAUNCH_DELAY_MS) return state
-    if (!(volume.binanceBuy > 0) || !(volume.coinbaseBuy > 0)) return state
+    if (!(volume.binanceBuy > 0)) return state
+    if (!(volume.coinbaseBuy > 0) && !(DIE_UP_ADD_PX_PER_S > 0)) return state
     return {
       ...state,
       phase: 'flying',
@@ -305,10 +307,10 @@ export const advanceThrow = (
   }
 }
 
-/** Binance buy sets forward speed. Coinbase buy sets upward speed. A short throw raises forward speed only. */
+/** Binance buy sets forward speed. Coinbase buy sets upward speed, then `DIE_UP_ADD_PX_PER_S` is added. A short throw raises forward speed only. */
 export const launchSpeeds = (volume: VolumeTotals, metrics: StageMetrics = stageMetrics()): { forward: number; up: number } => {
   const full = fullStrengthSpeeds(metrics)
-  const up = full.up * logUnit(volume.coinbaseBuy, DIE_COINBASE_BUY_REF)
+  const up = full.up * logUnit(volume.coinbaseBuy, DIE_COINBASE_BUY_REF) + DIE_UP_ADD_PX_PER_S
   const rawForward = full.forward * logUnit(volume.binanceBuy, DIE_BINANCE_BUY_REF)
   const targetZ = metrics.wallZ * DIE_MIN_REACH_FRACTION
   return { forward: forwardForReach(rawForward, up, targetZ, full.forward, metrics), up }

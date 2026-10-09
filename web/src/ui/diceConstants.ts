@@ -63,9 +63,16 @@ export const DIE_FORWARD_SPIN_SCALE = 2
 
 /**
  * Minimum felt distance for a throw, as a fraction of the depth to the back wall.
- * Forward speed is raised to meet it. Upward speed stays on Coinbase buy volume.
+ * Forward speed is raised to meet it. Upward speed stays on Coinbase buy volume, plus `DIE_UP_ADD_PX_PER_S`.
  */
 export const DIE_MIN_REACH_FRACTION =  0.983 //0.985
+
+/**
+ * Added to Coinbase-buy upward speed, in px/s. Same boost at every volume, including zero.
+ * Full Coinbase buy is about 1000 px/s, so a few hundred is a modest extra arc.
+ * Above zero, a throw can start with no Coinbase buy. Binance buy must still be positive.
+ */
+export const DIE_UP_ADD_PX_PER_S = 300
 
 /** Log-scale references for one volume window. Tune per exchange. */
 export const DIE_BINANCE_BUY_REF = 6
