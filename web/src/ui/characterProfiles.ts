@@ -67,11 +67,11 @@ import {
 import { betDollars, chipsForDollars, denominationScale, splitColumns, type ChipBet } from './chipBets'
 import { bookDollars, isPointNumber, LAY_ODDS_PAY, PLACE_PAY, type PointNumber } from './crapsPayouts'
 
-/** One green chip. Place 4, 5, 9, 10, the field, and a lay of 4 or 10. */
-export const PROFILE_GREEN = 12_500_000
+/** One red chip. Place 4, 5, 9, 10, the field, and a lay of 4 or 10. */
+export const PROFILE_RED = 2_500_000
 
-/** One green plus two white. Place 6 and 8, and a lay of 5, 9, 6, or 8. */
-export const PROFILE_SIX = 13_500_000
+/** One red plus one white. Place 6 and 8, and a lay of 5, 6, 8, or 9. */
+export const PROFILE_SIX = 3_000_000
 
 const MIN_HISTOGRAM_ROLLS = 3
 const PLACE_NUMBERS: readonly PointNumber[] = [4, 5, 6, 8, 9, 10]
@@ -179,9 +179,9 @@ const charge = (purse: LinePurse, side: ChipSide, amount: number) => {
   purse[side] = Math.max(0, purse[side] - amount)
 }
 
-export const placeUnit = (number: PointNumber): number => (number === 6 || number === 8 ? PROFILE_SIX : PROFILE_GREEN)
+export const placeUnit = (number: PointNumber): number => (number === 6 || number === 8 ? PROFILE_SIX : PROFILE_RED)
 
-export const layUnit = (number: PointNumber): number => (number === 4 || number === 10 ? PROFILE_GREEN : PROFILE_SIX)
+export const layUnit = (number: PointNumber): number => (number === 4 || number === 10 ? PROFILE_RED : PROFILE_SIX)
 
 const placeCounts = (rolls: readonly number[]): Record<PointNumber, number> => {
   const counts = { 4: 0, 5: 0, 6: 0, 8: 0, 9: 0, 10: 0 }
@@ -288,14 +288,14 @@ const freshWhilePoint = (
   if (switches.oldMan) {
     const purse = purses.oldMan
     const numbers = exceptPoint(point, [5, 6, 8])
-    const cost = numbers.reduce((sum, number) => sum + placeUnit(number), 0) + PROFILE_GREEN
+    const cost = numbers.reduce((sum, number) => sum + placeUnit(number), 0) + PROFILE_RED
     if (canAfford(purse, 'pass', cost)) {
       charge(purse, 'pass', cost)
       for (const number of numbers) {
         const spot = ironSpot[number as 5 | 6 | 8]
         placed.push(bet('oldMan', 'iron', number, placeUnit(number), 'pass', spot))
       }
-      placed.push(bet('oldMan', 'field', null, PROFILE_GREEN, 'pass', {
+      placed.push(bet('oldMan', 'field', null, PROFILE_RED, 'pass', {
         x: OLD_MAN_FIELD_X,
         y: OLD_MAN_FIELD_Y,
         label: 'OLD_MAN_FIELD',
@@ -475,10 +475,10 @@ const literalColors = (dollars: number): ChipColor[] => {
   const sixes = dollars / PROFILE_SIX
   if (sixes >= 1 && Math.abs(sixes - Math.round(sixes)) < 1e-4) {
     const count = Math.round(sixes)
-    return [...Array<ChipColor>(count).fill('green'), ...Array<ChipColor>(count * 2).fill('white')]
+    return [...Array<ChipColor>(count).fill('red'), ...Array<ChipColor>(count).fill('white')]
   }
-  const greens = Math.max(1, Math.round(dollars / PROFILE_GREEN))
-  return Array<ChipColor>(greens).fill('green')
+  const reds = Math.max(1, Math.round(dollars / PROFILE_RED))
+  return Array<ChipColor>(reds).fill('red')
 }
 
 export const strategyChipBet = (item: ProfileBet, scale: number): ChipBet => {

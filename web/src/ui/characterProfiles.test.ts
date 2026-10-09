@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  PROFILE_GREEN,
+  PROFILE_RED,
   PROFILE_SIX,
   allocateProfiles,
   calloutText,
@@ -51,10 +51,10 @@ describe('histogram gates', () => {
 
 describe('profile allocation', () => {
   it('abstains from a whole strategy that the pass stake cannot cover', () => {
-    const result = allocateProfiles(purses(10_000_000), [], 9, [], false, on)
+    const result = allocateProfiles(purses(5_000_000), [], 9, [], false, on)
     expect(result.profiles.filter((bet) => bet.character === 'cat')).toEqual([])
     expect(result.profiles.filter((bet) => bet.character === 'oldLady')).toEqual([])
-    expect(result.remainder.cat.pass).toBe(10_000_000)
+    expect(result.remainder.cat.pass).toBe(5_000_000)
   })
 
   it('keeps the line plus the strategy equal to the original stake', () => {
@@ -92,10 +92,10 @@ describe('profile allocation', () => {
     })
     expect(placed.profiles.find((bet) => bet.role === 'point-place')).toMatchObject({
       number: 4,
-      dollars: 72_000_000,
+      dollars: 31_000_000,
       fundedFrom: 'dont',
     })
-    expect(placed.remainder.oldMan).toEqual({ pass: 28_000_000, dont: 28_000_000 })
+    expect(placed.remainder.oldMan).toEqual({ pass: 69_000_000, dont: 69_000_000 })
 
     const laid = allocateProfiles(purses(200_000_000, 40_000_000), [], 4, [], false, {
       ...on,
@@ -106,7 +106,7 @@ describe('profile allocation', () => {
     })
     expect(laid.profiles.find((bet) => bet.role === 'point-lay')).toMatchObject({
       number: 4,
-      dollars: 108_000_000,
+      dollars: 149_000_000,
       fundedFrom: 'pass',
     })
     expect(laid.remainder.oldMan).toEqual({ pass: 40_000_000, dont: 40_000_000 })
@@ -128,7 +128,7 @@ describe('callouts', () => {
     const cat = allocateProfiles(stakes, [], 9, [], false, { ...on, oldLady: false, oldMan: false, wolf: false, wolfLay: false })
     expect(cat.callouts.cat).toBe(`Place 6, 8 for ${PROFILE_SIX / 1_000_000}M`)
     const wolf = allocateProfiles(stakes, [], 4, [], false, { ...on, cat: false, oldLady: false, oldMan: false, wolfLay: false })
-    expect(wolf.callouts.wolf).toContain('Across for 64.5M')
+    expect(wolf.callouts.wolf).toContain('Across for 13.5M')
   })
 
   it('lists a different place price on its own line', () => {
@@ -143,8 +143,8 @@ describe('callouts', () => {
       x: 0,
       y: 0,
     })
-    expect(calloutText([place(6, PROFILE_SIX), place(8, PROFILE_SIX), place(10, PROFILE_GREEN)]))
-      .toBe('Place 6, 8 for 13.5M\nPlace 10 for 12.5M')
+    expect(calloutText([place(6, PROFILE_SIX), place(8, PROFILE_SIX), place(10, PROFILE_RED)]))
+      .toBe('Place 6, 8 for 3M\nPlace 10 for 2.5M')
   })
 
   it('builds a lay line from the added stake on each number', () => {
@@ -153,28 +153,30 @@ describe('callouts', () => {
       character: 'wolf',
       role: 'lay',
       number: 4,
-      dollars: PROFILE_GREEN,
+      dollars: PROFILE_RED,
       fundedFrom: 'dont',
       label: 'WOLF_LAY_4',
       x: 0,
       y: 0,
     } satisfies ProfileBet
     const other = { ...lay, id: 'wolf-lay-10', number: 10, label: 'WOLF_LAY_10' }
-    expect(calloutText([lay, other])).toBe('Lay 4, 10 for 12.5M')
+    expect(calloutText([lay, other])).toBe('Lay 4, 10 for 2.5M')
   })
 })
 
 describe('strategy chips', () => {
-  it('stacks one green and two whites on a 6 or 8', () => {
+  it('stacks one red on a table unit and one red plus one white on a 6 or 8', () => {
     const placed = allocateProfiles(purses(500_000_000), [], 9, [], false, {
       ...on,
       oldLady: false,
-      oldMan: false,
       wolf: false,
       wolfLay: false,
     })
     const six = placed.profiles.find((bet) => bet.id === 'cat-place-6')
+    const field = placed.profiles.find((bet) => bet.id === 'oldMan-field')
     expect(six).toBeDefined()
-    expect(strategyChipBet(six!, 1).columns).toEqual([['green', 'white', 'white']])
+    expect(field).toBeDefined()
+    expect(strategyChipBet(six!, 1).columns).toEqual([['red', 'white']])
+    expect(strategyChipBet(field!, 1).columns).toEqual([['red']])
   })
 })

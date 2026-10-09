@@ -2,7 +2,7 @@ import type { ChipCharacter } from './chipConstants'
 
 /** New place, lay, and field bets. Pass and Don't Pass stay up either way. */
 export const CAT_PROFILE_ON = true//false
-export const OLD_LADY_PROFILE_ON = false
+export const OLD_LADY_PROFILE_ON = true//false
 export const OLD_MAN_PROFILE_ON = false
 export const WOLF_PROFILE_ON = false
 
@@ -50,29 +50,39 @@ export const SPEECH_ANCHOR: Record<ChipCharacter, { x: number; y: number }> = {
   oldMan: { x: OLD_MAN_SPEECH_X, y: OLD_MAN_SPEECH_Y },
 }
 
-export const CAT_PLACE_4_X = 560
-export const CAT_PLACE_4_Y = 700
-export const CAT_PLACE_5_X = 610
-export const CAT_PLACE_5_Y = 700
 
-export const CAT_PLACE_6_X = 270
-export const CAT_PLACE_6_Y = 1290
-export const CAT_PLACE_8_X = 270
-export const CAT_PLACE_8_Y = 1420
+export const CAT_PLACE_10_X = 280
+export const CAT_PLACE_10_Y = 1025
+export const CAT_PLACE_9_X = 280
+export const CAT_PLACE_9_Y = 1110
 
-export const CAT_PLACE_9_X = 760
-export const CAT_PLACE_9_Y = 700
-export const CAT_PLACE_10_X = 810
-export const CAT_PLACE_10_Y = 700
+export const CAT_PLACE_8_X = 280
+export const CAT_PLACE_8_Y = 1250
+export const CAT_PLACE_6_X = 280
+export const CAT_PLACE_6_Y = 1380
 
-export const OLD_LADY_INSIDE_5_X = 340
-export const OLD_LADY_INSIDE_5_Y = 700
-export const OLD_LADY_INSIDE_6_X = 400
-export const OLD_LADY_INSIDE_6_Y = 660
-export const OLD_LADY_INSIDE_8_X = 460
-export const OLD_LADY_INSIDE_8_Y = 660
-export const OLD_LADY_INSIDE_9_X = 520
-export const OLD_LADY_INSIDE_9_Y = 700
+export const CAT_PLACE_5_X = 280
+export const CAT_PLACE_5_Y = 1500
+export const CAT_PLACE_4_X = 280
+export const CAT_PLACE_4_Y = 1660
+
+
+
+
+export const OLD_LADY_INSIDE_9_X = 220
+export const OLD_LADY_INSIDE_9_Y = 1110
+
+export const OLD_LADY_INSIDE_8_X = 220
+export const OLD_LADY_INSIDE_8_Y = 1250
+export const OLD_LADY_INSIDE_6_X = 220
+export const OLD_LADY_INSIDE_6_Y = 1380
+
+export const OLD_LADY_INSIDE_5_X = 220
+export const OLD_LADY_INSIDE_5_Y = 1500
+
+
+
+
 
 export const OLD_MAN_IRON_5_X = 860
 export const OLD_MAN_IRON_5_Y = 820
