@@ -31,8 +31,18 @@ import {
   OLD_MAN_IRON_6_Y,
   OLD_MAN_IRON_8_X,
   OLD_MAN_IRON_8_Y,
-  OLD_MAN_POINT_X,
-  OLD_MAN_POINT_Y,
+  OLD_MAN_POINT_10_X,
+  OLD_MAN_POINT_10_Y,
+  OLD_MAN_POINT_4_X,
+  OLD_MAN_POINT_4_Y,
+  OLD_MAN_POINT_5_X,
+  OLD_MAN_POINT_5_Y,
+  OLD_MAN_POINT_6_X,
+  OLD_MAN_POINT_6_Y,
+  OLD_MAN_POINT_8_X,
+  OLD_MAN_POINT_8_Y,
+  OLD_MAN_POINT_9_X,
+  OLD_MAN_POINT_9_Y,
   OLD_MAN_PROFILE_ON,
   WOLF_ACROSS_10_X,
   WOLF_ACROSS_10_Y,
@@ -60,8 +70,18 @@ import {
   WOLF_LAY_9_Y,
   LINE_STACKS_ON,
   WOLF_LAY_ON,
-  WOLF_POINT_X,
-  WOLF_POINT_Y,
+  WOLF_POINT_10_X,
+  WOLF_POINT_10_Y,
+  WOLF_POINT_4_X,
+  WOLF_POINT_4_Y,
+  WOLF_POINT_5_X,
+  WOLF_POINT_5_Y,
+  WOLF_POINT_6_X,
+  WOLF_POINT_6_Y,
+  WOLF_POINT_8_X,
+  WOLF_POINT_8_Y,
+  WOLF_POINT_9_X,
+  WOLF_POINT_9_Y,
   WOLF_PROFILE_ON,
 } from './characterBetConstants'
 import { betDollars, chipsForDollars, denominationScale, splitColumns, type ChipBet } from './chipBets'
@@ -139,6 +159,24 @@ const acrossSpot: Record<PointNumber, Spot> = {
   8: { x: WOLF_ACROSS_8_X, y: WOLF_ACROSS_8_Y, label: 'WOLF_ACROSS_8' },
   9: { x: WOLF_ACROSS_9_X, y: WOLF_ACROSS_9_Y, label: 'WOLF_ACROSS_9' },
   10: { x: WOLF_ACROSS_10_X, y: WOLF_ACROSS_10_Y, label: 'WOLF_ACROSS_10' },
+}
+
+const oldManPointSpot: Record<PointNumber, Spot> = {
+  4: { x: OLD_MAN_POINT_4_X, y: OLD_MAN_POINT_4_Y, label: 'OLD_MAN_POINT_4' },
+  5: { x: OLD_MAN_POINT_5_X, y: OLD_MAN_POINT_5_Y, label: 'OLD_MAN_POINT_5' },
+  6: { x: OLD_MAN_POINT_6_X, y: OLD_MAN_POINT_6_Y, label: 'OLD_MAN_POINT_6' },
+  8: { x: OLD_MAN_POINT_8_X, y: OLD_MAN_POINT_8_Y, label: 'OLD_MAN_POINT_8' },
+  9: { x: OLD_MAN_POINT_9_X, y: OLD_MAN_POINT_9_Y, label: 'OLD_MAN_POINT_9' },
+  10: { x: OLD_MAN_POINT_10_X, y: OLD_MAN_POINT_10_Y, label: 'OLD_MAN_POINT_10' },
+}
+
+const wolfPointSpot: Record<PointNumber, Spot> = {
+  4: { x: WOLF_POINT_4_X, y: WOLF_POINT_4_Y, label: 'WOLF_POINT_4' },
+  5: { x: WOLF_POINT_5_X, y: WOLF_POINT_5_Y, label: 'WOLF_POINT_5' },
+  6: { x: WOLF_POINT_6_X, y: WOLF_POINT_6_Y, label: 'WOLF_POINT_6' },
+  8: { x: WOLF_POINT_8_X, y: WOLF_POINT_8_Y, label: 'WOLF_POINT_8' },
+  9: { x: WOLF_POINT_9_X, y: WOLF_POINT_9_Y, label: 'WOLF_POINT_9' },
+  10: { x: WOLF_POINT_10_X, y: WOLF_POINT_10_Y, label: 'WOLF_POINT_10' },
 }
 
 const laySpot: Record<PointNumber, Spot> = {
@@ -334,9 +372,7 @@ const freshWhilePoint = (
 
 const coverPoint = (character: ChipCharacter, point: PointNumber, purse: LinePurse, placed: ProfileBet[]) => {
   const gap = Math.abs(purse.dont - purse.pass)
-  const spot = character === 'wolf'
-    ? { x: WOLF_POINT_X, y: WOLF_POINT_Y, label: 'WOLF_POINT' }
-    : { x: OLD_MAN_POINT_X, y: OLD_MAN_POINT_Y, label: 'OLD_MAN_POINT' }
+  const spot = (character === 'wolf' ? wolfPointSpot : oldManPointSpot)[point]
   if (purse.dont > purse.pass) {
     const booked = bookDollars(gap, PLACE_PAY[point].unit).booked
     if (!(booked > 0) || !canAfford(purse, 'dont', booked)) return

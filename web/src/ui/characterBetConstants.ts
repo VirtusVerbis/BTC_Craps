@@ -3,7 +3,7 @@ import type { ChipCharacter } from './chipConstants'
 /** New place, lay, and field bets. Pass and Don't Pass stay up either way. */
 export const CAT_PROFILE_ON = true//false
 export const OLD_LADY_PROFILE_ON = true//false
-export const OLD_MAN_PROFILE_ON = false
+export const OLD_MAN_PROFILE_ON = true//false
 export const WOLF_PROFILE_ON = false
 
 /** Wolf's cold lays. The across bet does not need this. */
@@ -35,13 +35,13 @@ export const SPEECH_PAD_PX = 8
 
 /** Top-left of each character's bubble. */
 export const WOLF_SPEECH_X = 40
-export const WOLF_SPEECH_Y = 500
+export const WOLF_SPEECH_Y = 520  
 export const OLD_LADY_SPEECH_X = 340
-export const OLD_LADY_SPEECH_Y = 500
+export const OLD_LADY_SPEECH_Y = 520
 export const CAT_SPEECH_X = 560
 export const CAT_SPEECH_Y = 520
-export const OLD_MAN_SPEECH_X = 800
-export const OLD_MAN_SPEECH_Y = 640
+export const OLD_MAN_SPEECH_X = 830
+export const OLD_MAN_SPEECH_Y = 520
 
 export const SPEECH_ANCHOR: Record<ChipCharacter, { x: number; y: number }> = {
   wolf: { x: WOLF_SPEECH_X, y: WOLF_SPEECH_Y },
@@ -81,19 +81,33 @@ export const OLD_LADY_INSIDE_5_X = 220
 export const OLD_LADY_INSIDE_5_Y = 1500
 
 
+export const OLD_MAN_POINT_10_X = 310
+export const OLD_MAN_POINT_10_Y = 1025
+export const OLD_MAN_POINT_9_X = 310
+export const OLD_MAN_POINT_9_Y = 1110
+
+export const OLD_MAN_POINT_8_X = 310
+export const OLD_MAN_POINT_8_Y = 1250
+export const OLD_MAN_POINT_6_X = 310
+export const OLD_MAN_POINT_6_Y = 1380
+
+export const OLD_MAN_POINT_5_X = 320
+export const OLD_MAN_POINT_5_Y = 1500
+export const OLD_MAN_POINT_4_X = 320
+export const OLD_MAN_POINT_4_Y = 1660
 
 
 
-export const OLD_MAN_IRON_5_X = 860
-export const OLD_MAN_IRON_5_Y = 820
-export const OLD_MAN_IRON_6_X = 920
-export const OLD_MAN_IRON_6_Y = 780
 export const OLD_MAN_IRON_8_X = 980
 export const OLD_MAN_IRON_8_Y = 780
+export const OLD_MAN_IRON_6_X = 920
+export const OLD_MAN_IRON_6_Y = 780
+export const OLD_MAN_IRON_5_X = 860
+export const OLD_MAN_IRON_5_Y = 820
+
 export const OLD_MAN_FIELD_X = 920
 export const OLD_MAN_FIELD_Y = 880
-export const OLD_MAN_POINT_X = 860
-export const OLD_MAN_POINT_Y = 940
+
 
 export const WOLF_ACROSS_4_X = 40
 export const WOLF_ACROSS_4_Y = 700
@@ -121,5 +135,15 @@ export const WOLF_LAY_9_Y = 780
 export const WOLF_LAY_10_X = 290
 export const WOLF_LAY_10_Y = 780
 
-export const WOLF_POINT_X = 170
-export const WOLF_POINT_Y = 600
+export const WOLF_POINT_4_X = 170
+export const WOLF_POINT_4_Y = 600
+export const WOLF_POINT_5_X = 170
+export const WOLF_POINT_5_Y = 600
+export const WOLF_POINT_6_X = 170
+export const WOLF_POINT_6_Y = 600
+export const WOLF_POINT_8_X = 170
+export const WOLF_POINT_8_Y = 600
+export const WOLF_POINT_9_X = 170
+export const WOLF_POINT_9_Y = 600
+export const WOLF_POINT_10_X = 170
+export const WOLF_POINT_10_Y = 600
