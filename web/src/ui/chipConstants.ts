@@ -100,7 +100,7 @@ export const CHIP_ANCHORS: readonly ChipAnchor[] = [
   { character: 'wolf', side: 'dont', x: 195, y: 880 },
   { character: 'oldLady', side: 'dont', x: 440, y: 880 },
   { character: 'cat', side: 'dont', x: 765, y: 930 },
-  { character: 'oldMan', side: 'dont', x: 815, y: 1050 },
+  { character: 'oldMan', side: 'dont', x: 815, y: 1000 },
 ]
 
 export type ChipColor = 'white' | 'red' | 'green' | 'blue' | 'black'

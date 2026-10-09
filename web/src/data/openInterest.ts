@@ -118,7 +118,7 @@ export const useOpenInterest = (): OpenInterestSnapshot | null => {
   return snapshot
 }
 
-/** Counts down to the next 5-minute bar swap. The bar time comes from the worker; the tick is local. */
+/** Counts down to the next 5-minute boundary. The tick is local; no bar means there is nothing to wait on. */
 export const useLiqCountdown = (liqBarStart: number | null): string => {
   const [label, setLabel] = useState('—')
 
@@ -127,7 +127,7 @@ export const useLiqCountdown = (liqBarStart: number | null): string => {
       setLabel('—')
       return
     }
-    const tick = () => setLabel(formatLiqCountdown(liqSwapAtMs(liqBarStart) - Date.now()))
+    const tick = () => setLabel(formatLiqCountdown(liqSwapAtMs(Date.now()) - Date.now()))
     tick()
     const id = window.setInterval(tick, 1000)
     return () => window.clearInterval(id)

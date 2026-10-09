@@ -17,10 +17,12 @@ describe('liquidation labels', () => {
     expect(formatLiqUsd(8_400)).toBe('$8.4K')
   })
 
-  it('counts down as mm:ss and holds a closed bar until the next 5-minute bar ends', () => {
+  it('counts down as mm:ss to the next 5-minute boundary', () => {
     expect(formatLiqCountdown(4 * 60 * 1000 + 12 * 1000)).toBe('04:12')
     expect(formatLiqCountdown(5 * 60 * 1000)).toBe('05:00')
     expect(formatLiqCountdown(0)).toBe('00:00')
-    expect(liqSwapAtMs(1_700_000_000)).toBe((1_700_000_000 + 10 * 60) * 1000)
+    const boundary = 1_700_000_100 * 1000
+    expect(liqSwapAtMs(boundary)).toBe(boundary + 5 * 60 * 1000)
+    expect(liqSwapAtMs(boundary + 90_000)).toBe(boundary + 5 * 60 * 1000)
   })
 })

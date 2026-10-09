@@ -51,8 +51,12 @@ export const formatLiqCountdown = (remainingMs: number): string => {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
-/** Closed liquidation bar length, in seconds. Matches the worker's 5-minute request. */
-const LIQ_BAR_SEC = 5 * 60
+/** Closed liquidation bar length. Matches the worker's 5-minute request. */
+const LIQ_BAR_MS = 5 * 60 * 1000
 
-/** The closed 5-minute bar stays up until the following bar ends. */
-export const liqSwapAtMs = (liqBarStartSec: number): number => (liqBarStartSec + 2 * LIQ_BAR_SEC) * 1000
+/**
+ * Next 5-minute clock boundary after `nowMs`.
+ * Coinalyze often publishes a bar after `bar start + 10 minutes`, so a countdown
+ * anchored to the stored bar sits at 00:00. The clock keeps moving either way.
+ */
+export const liqSwapAtMs = (nowMs: number): number => Math.floor(nowMs / LIQ_BAR_MS) * LIQ_BAR_MS + LIQ_BAR_MS
