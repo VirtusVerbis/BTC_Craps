@@ -98,7 +98,7 @@ export const OLD_MAN_POINT_6_Y = 1380
 export const OLD_MAN_POINT_5_X = 330
 export const OLD_MAN_POINT_5_Y = 1500
 export const OLD_MAN_POINT_4_X = 330
-export const OLD_MAN_POINT_4_Y = 1660
+export const OLD_MAN_POINT_4_Y = 1630
 
 export const OLD_MAN_POINT_LAY_10_X = 140
 export const OLD_MAN_POINT_LAY_10_Y = 1000
@@ -110,10 +110,10 @@ export const OLD_MAN_POINT_LAY_8_Y = 1250
 export const OLD_MAN_POINT_LAY_6_X = 120
 export const OLD_MAN_POINT_LAY_6_Y = 1380
 
-export const OLD_MAN_POINT_LAY_5_X = 130
+export const OLD_MAN_POINT_LAY_5_X = 110
 export const OLD_MAN_POINT_LAY_5_Y = 1500
-export const OLD_MAN_POINT_LAY_4_X = 120
-export const OLD_MAN_POINT_LAY_4_Y = 1660
+export const OLD_MAN_POINT_LAY_4_X = 110
+export const OLD_MAN_POINT_LAY_4_Y = 1630
 
 
 
