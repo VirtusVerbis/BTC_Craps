@@ -100,9 +100,9 @@ export const OLD_MAN_POINT_5_Y = 1500
 export const OLD_MAN_POINT_4_X = 330
 export const OLD_MAN_POINT_4_Y = 1660
 
-export const OLD_MAN_POINT_LAY_10_X = 130
+export const OLD_MAN_POINT_LAY_10_X = 140
 export const OLD_MAN_POINT_LAY_10_Y = 1000
-export const OLD_MAN_POINT_LAY_9_X = 130
+export const OLD_MAN_POINT_LAY_9_X = 140
 export const OLD_MAN_POINT_LAY_9_Y = 1110
 
 export const OLD_MAN_POINT_LAY_8_X = 130

@@ -80,7 +80,31 @@ export const denominationScale = (largestDollars: number): number => {
 export const scaledFaceValues = (scale: number): Array<{ color: ChipColor; value: number }> =>
   DENOM_ORDER.map((color) => ({ color, value: CHIP_FACE_VALUE[color] * scale }))
 
-/** Largest-first. A remainder of at least half a white chip becomes one more white. */
+const CHIP_PROMOTE: ReadonlyArray<readonly [ChipColor, ChipColor, number]> = [
+  ['white', 'red', 5],
+  ['red', 'green', 5],
+  ['green', 'blue', 2],
+  ['blue', 'black', 2],
+]
+
+/** Five whites become a red, five reds a green, two greens a blue, two blues a black. */
+const colorUpChips = (chips: readonly ChipColor[]): ChipColor[] => {
+  const counts: Record<ChipColor, number> = { black: 0, blue: 0, green: 0, red: 0, white: 0 }
+  for (const color of chips) counts[color] += 1
+  for (const [from, to, rate] of CHIP_PROMOTE) {
+    const made = Math.floor(counts[from] / rate)
+    counts[from] -= made * rate
+    counts[to] += made
+  }
+  const colored: ChipColor[] = []
+  for (const color of DENOM_ORDER) {
+    const count = Math.min(counts[color], CHIP_MAX_BET_CHIPS - colored.length)
+    for (let i = 0; i < count; i += 1) colored.push(color)
+  }
+  return colored
+}
+
+/** Largest-first. A remainder of at least half a white chip becomes one more white, then the stack is colored up. */
 export const chipsForDollars = (dollars: number, scale: number): ChipColor[] => {
   if (!(dollars > 0)) return []
   const values = scaledFaceValues(scale)
@@ -92,11 +116,11 @@ export const chipsForDollars = (dollars: number, scale: number): ChipColor[] => 
     count = Math.min(count, CHIP_MAX_BET_CHIPS - out.length)
     for (let i = 0; i < count; i += 1) out.push(denom.color)
     left -= count * denom.value
-    if (out.length >= CHIP_MAX_BET_CHIPS) return out
+    if (out.length >= CHIP_MAX_BET_CHIPS) return colorUpChips(out)
   }
   const white = values[values.length - 1]
   if (white && out.length < CHIP_MAX_BET_CHIPS && left >= white.value * 0.5) out.push(white.color)
-  return out
+  return colorUpChips(out)
 }
 
 export const splitColumns = (chips: readonly ChipColor[]): ChipColor[][] => {

@@ -47,6 +47,12 @@ describe('felt bets', () => {
     expect(chipsForDollars(CHIP_FACE_VALUE.red * 2, 1)).toEqual(['red', 'red'])
   })
 
+  it('colors the extra white up into a red', () => {
+    expect(chipsForDollars(CHIP_FACE_VALUE.white * 4.6, 1)).toEqual(['red'])
+    expect(chipsForDollars(CHIP_FACE_VALUE.red * 4 + CHIP_FACE_VALUE.white * 4.6, 1)).toEqual(['green'])
+    expect(chipsForDollars(CHIP_FACE_VALUE.white * 4, 1)).toEqual(['white', 'white', 'white', 'white'])
+  })
+
   it('scales every denomination so the largest bet is 40 chips', () => {
     const huge = 50_000_000_000
     const bets = buildBets(huge, 57, 43)
