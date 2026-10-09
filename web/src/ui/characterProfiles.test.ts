@@ -179,4 +179,30 @@ describe('strategy chips', () => {
     expect(strategyChipBet(six!, 1).columns).toEqual([['red', 'white']])
     expect(strategyChipBet(field!, 1).columns).toEqual([['red']])
   })
+
+  it('colors up a place or lay past one stack before opening a second stack', () => {
+    const place = (dollars: number): ProfileBet => ({
+      id: 'cat-place-4',
+      character: 'cat',
+      role: 'place',
+      number: 4,
+      dollars,
+      fundedFrom: 'pass',
+      label: 'CAT_PLACE_4',
+      x: 0,
+      y: 0,
+    })
+    const lay = (dollars: number): ProfileBet => ({
+      ...place(dollars),
+      id: 'wolf-lay-5',
+      character: 'wolf',
+      role: 'lay',
+      number: 5,
+      fundedFrom: 'dont',
+      label: 'WOLF_LAY_5',
+    })
+    expect(strategyChipBet(place(10 * PROFILE_RED), 1).columns).toEqual([[...Array(10).fill('red')]])
+    expect(strategyChipBet(place(11 * PROFILE_RED), 1).columns).toEqual([['blue', 'red']])
+    expect(strategyChipBet(lay(6 * PROFILE_SIX), 1).columns).toEqual([['green', 'red', 'red', 'white']])
+  })
 })

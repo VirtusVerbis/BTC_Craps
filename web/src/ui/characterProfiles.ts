@@ -1,4 +1,4 @@
-import type { ChipCharacter, ChipColor, ChipSide } from './chipConstants'
+import { CHIP_MAX_STACK, type ChipCharacter, type ChipColor, type ChipSide } from './chipConstants'
 import {
   CAT_PLACE_10_X,
   CAT_PLACE_10_Y,
@@ -507,7 +507,7 @@ export const allocateProfiles = (
   return { profiles, remainder: purses, callouts: calloutsFor(previous, profiles) }
 }
 
-const literalColors = (dollars: number): ChipColor[] => {
+const unitChips = (dollars: number): ChipColor[] => {
   const sixes = dollars / PROFILE_SIX
   if (sixes >= 1 && Math.abs(sixes - Math.round(sixes)) < 1e-4) {
     const count = Math.round(sixes)
@@ -515,6 +515,14 @@ const literalColors = (dollars: number): ChipColor[] => {
   }
   const reds = Math.max(1, Math.round(dollars / PROFILE_RED))
   return Array<ChipColor>(reds).fill('red')
+}
+
+/** Keep the table units while they fit in one stack. Past that, exchange them for higher chips. */
+const literalColors = (dollars: number): ChipColor[] => {
+  const units = unitChips(dollars)
+  if (units.length <= CHIP_MAX_STACK) return units
+  const colored = chipsForDollars(dollars, 1)
+  return colored.length > 0 ? colored : units
 }
 
 export const strategyChipBet = (item: ProfileBet, scale: number): ChipBet => {
