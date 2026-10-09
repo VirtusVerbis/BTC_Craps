@@ -10,7 +10,7 @@ const base = {
 }
 
 describe('parseOpenInterest', () => {
-  it('keeps a closed-hour liquidation beside the open-interest fields', () => {
+  it('keeps a closed liquidation bar beside the open-interest fields', () => {
     const parsed = parseOpenInterest({
       ...base,
       liqBarStart: 1_700_000_000,

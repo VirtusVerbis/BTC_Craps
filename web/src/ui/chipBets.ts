@@ -166,8 +166,12 @@ export interface PlacedColumn {
   guide?: { label: string; color: string }
 }
 
-/** Second column steps sideways. Stacks near the right rail step left. */
-export const placeBets = (bets: readonly ChipBet[], seed: number, columnGap: number): PlacedColumn[] => {
+/** Second column steps sideways by `columnStep(z)`. Stacks near the right rail step left. */
+export const placeBets = (
+  bets: readonly ChipBet[],
+  seed: number,
+  columnStep: (z: number) => number,
+): PlacedColumn[] => {
   const placed: PlacedColumn[] = []
   for (const bet of bets) {
     const anchored = bet.anchor
@@ -179,13 +183,14 @@ export const placeBets = (bets: readonly ChipBet[], seed: number, columnGap: num
     const y0 = anchor.y + jy
     const sign = x0 > REFERENCE_WIDTH * 0.72 ? -1 : 1
     bet.columns.forEach((colors, index) => {
-      const x = Math.min(REFERENCE_WIDTH - 40, Math.max(40, x0 + sign * index * columnGap))
       const y = Math.min(REFERENCE_HEIGHT - 40, Math.max(40, y0))
+      const z = REFERENCE_HEIGHT - y
+      const x = Math.min(REFERENCE_WIDTH - 40, Math.max(40, x0 + sign * index * columnStep(z)))
       placed.push({
         id: `${bet.id}-${index}`,
         betId: bet.id,
         x,
-        z: REFERENCE_HEIGHT - y,
+        z,
         colors,
         pinned: anchored != null,
         guide: bet.guide,

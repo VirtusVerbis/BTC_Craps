@@ -4,6 +4,7 @@ import { puckPlacement } from './puckState'
 import { dieSize, stageMetrics, type Die, type StageMetrics } from './dicePhysics'
 import { placeBets, type ChipBet } from './chipBets'
 import {
+  CHIP_COLUMN_GAP_PX,
   CHIP_DEPTH_SCALE,
   CHIP_DIE_RESTITUTION,
   CHIP_FRICTION_PER_S,
@@ -47,6 +48,10 @@ export const chipDepthFactor = (z: number, metrics: StageMetrics = stageMetrics(
   const depth = clamp(metrics.wallZ > 0 ? z / metrics.wallZ : 0, 0, 1)
   return CHIP_DEPTH_SCALE + (1 - CHIP_DEPTH_SCALE) * (1 - depth)
 }
+
+/** Center step to the next column of the same bet. Shrinks with the chips toward the back wall. */
+export const chipColumnStep = (z: number, metrics: StageMetrics = stageMetrics()): number =>
+  (chipDiameter() + CHIP_COLUMN_GAP_PX) * chipDepthFactor(z, metrics)
 
 export interface ChipOffset {
   x: number
@@ -131,7 +136,7 @@ const fitOffsets = (offsets: readonly ChipOffset[] | undefined, count: number): 
   }))
 
 export const worldFromBets = (bets: readonly ChipBet[], seed: number): ChipWorld => ({
-  stacks: placeBets(bets, seed, chipDiameter() + 6).map((column) => ({
+  stacks: placeBets(bets, seed, chipColumnStep).map((column) => ({
     id: column.id,
     x: column.x,
     z: column.z,
@@ -574,7 +579,7 @@ export const settleColumns = (
   seed: number,
 ): ChipWorld => {
   if (world.loose.length > 0) return beginRestack(world, bets, nowMs, seed)
-  const placed = placeBets(bets, seed, chipDiameter() + 6)
+  const placed = placeBets(bets, seed, chipColumnStep)
   const byId = new Map(world.stacks.map((stack) => [stack.id, stack]))
   return {
     loose: [],

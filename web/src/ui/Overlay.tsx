@@ -6,6 +6,7 @@ import type { MarketSnapshot } from '../game/types'
 import { mobileAssetManifest } from './mobileAssetManifest'
 import { resolveMobileAssetUrl } from './mobileAssetUrls'
 import { formatElapsed, formatExchangePriceLabel, formatLiqBtc, formatLiqUsd } from './format'
+import { LiqTicker } from './LiqTicker'
 import { LIQ_LABEL_X, LIQ_LABEL_Y, OI_LABEL_FONT_REM, OI_LABEL_X, OI_LABEL_Y } from './overlayConstants'
 
 interface OverlayProps {
@@ -356,6 +357,7 @@ export const Overlay = ({ market, block, onTimeClick, status }: OverlayProps) =>
         <p>Long {openInterest ? formatAccountPct(openInterest.longPct) : '—'} (Pass)</p>
         <p>Short {openInterest ? formatAccountPct(openInterest.shortPct) : '—'} (Don't)</p>
       </div>
+      <LiqTicker snapshot={openInterest} />
       <div
         className="overlay-oi overlay-liq"
         style={{

@@ -35,7 +35,7 @@ export const formatLiqUsd = (usd: number): string => {
 
 /**
  * Whole BTC, matching the O/I figure.
- * A fraction of 1 BTC stays visible so a small hour does not read as 0 next to a dollar amount.
+ * A fraction of 1 BTC stays visible so a small bar does not read as 0 next to a dollar amount.
  */
 export const formatLiqBtc = (btc: number): string => {
   if (!Number.isFinite(btc) || btc < 0) return '—'
@@ -43,7 +43,7 @@ export const formatLiqBtc = (btc: number): string => {
   return Math.round(btc).toLocaleString('en-US')
 }
 
-/** Minutes can exceed 59 at the hour boundary (`60:00`). */
+/** `mm:ss`. Minutes can exceed 59 (`60:00`). */
 export const formatLiqCountdown = (remainingMs: number): string => {
   const totalSeconds = Math.max(0, Math.floor(remainingMs / 1000))
   const minutes = Math.floor(totalSeconds / 60)
@@ -51,5 +51,8 @@ export const formatLiqCountdown = (remainingMs: number): string => {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
-/** The closed hour stays up until the following hour ends. */
-export const liqSwapAtMs = (liqBarStartSec: number): number => (liqBarStartSec + 2 * 60 * 60) * 1000
+/** Closed liquidation bar length, in seconds. Matches the worker's 5-minute request. */
+const LIQ_BAR_SEC = 5 * 60
+
+/** The closed 5-minute bar stays up until the following bar ends. */
+export const liqSwapAtMs = (liqBarStartSec: number): number => (liqBarStartSec + 2 * LIQ_BAR_SEC) * 1000

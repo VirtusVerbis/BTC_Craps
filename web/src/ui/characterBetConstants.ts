@@ -10,7 +10,7 @@ export const WOLF_PROFILE_ON = false
 export const WOLF_LAY_ON = false
 
 /** Draw Pass and Don't Pass stacks. Off skips the felt only; those stakes still fund profiles and P/L. */
-export const LINE_STACKS_ON = false
+export const LINE_STACKS_ON = true//false
 
 /** Outlines and constant captions on strategy stacks. Turn off after positioning. */
 export const BET_STACK_GUIDES_ON = true
@@ -53,7 +53,7 @@ export const SPEECH_ANCHOR: Record<ChipCharacter, { x: number; y: number }> = {
 //CAT
 
 export const CAT_PLACE_10_X = 280
-export const CAT_PLACE_10_Y = 1025
+export const CAT_PLACE_10_Y = 1000
 export const CAT_PLACE_9_X = 280
 export const CAT_PLACE_9_Y = 1110
 
@@ -65,7 +65,7 @@ export const CAT_PLACE_6_Y = 1380
 export const CAT_PLACE_5_X = 280
 export const CAT_PLACE_5_Y = 1500
 export const CAT_PLACE_4_X = 280
-export const CAT_PLACE_4_Y = 1660
+export const CAT_PLACE_4_Y = 1630
 
 //OLD LADY
 

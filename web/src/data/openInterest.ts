@@ -8,7 +8,7 @@ export interface OpenInterestSnapshot {
   ratio: number
   longPct: number
   shortPct: number
-  /** Unix seconds when the displayed liquidation hour began. Null until the worker has a closed bar. */
+  /** Unix seconds when the displayed liquidation bar began. Null until the worker has a closed bar. */
   liqBarStart: number | null
   longLiqBtc: number | null
   shortLiqBtc: number | null
@@ -118,7 +118,7 @@ export const useOpenInterest = (): OpenInterestSnapshot | null => {
   return snapshot
 }
 
-/** Counts down to the next hour swap. The bar time comes from the worker; the tick is local. */
+/** Counts down to the next 5-minute bar swap. The bar time comes from the worker; the tick is local. */
 export const useLiqCountdown = (liqBarStart: number | null): string => {
   const [label, setLabel] = useState('—')
 

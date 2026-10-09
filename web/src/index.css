@@ -625,6 +625,52 @@ body {
   justify-content: flex-start;
 }
 
+.liq-ticker {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+
+.liq-ticker-track {
+  display: flex;
+  width: max-content;
+  visibility: hidden;
+  will-change: transform;
+}
+
+.liq-ticker-track.is-scrolling {
+  visibility: visible;
+  animation-name: liq-ticker-scroll;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+.liq-ticker-phrase {
+  white-space: nowrap;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  padding-right: 3em;
+  text-shadow:
+    0 1px 0 #000,
+    0 2px 4px #000;
+}
+
+@keyframes liq-ticker-scroll {
+  from {
+    transform: translateX(var(--liq-ticker-start));
+  }
+  to {
+    transform: translateX(var(--liq-ticker-end));
+  }
+}
+
 /* Above the histogram (2), under the dice (4) and chips (5). */
 .character-pnl-layer {
   position: absolute;

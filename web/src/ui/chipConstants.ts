@@ -7,19 +7,19 @@ export const CHIP_WIDTH_PX = Math.round(DIE_LAUNCH_SIZE_PX * DIE_DEPTH_SCALE)
 export const CHIP_HEIGHT_PX = CHIP_WIDTH_PX
 
 /** Multiplier on diameter and chip thickness. */
-export const CHIP_SIZE_SCALAR = 1.6//1.2
+export const CHIP_SIZE_SCALAR = 3.2//3.25//1.6//1.2
 
 /**
  * Draw size at the back wall, as a fraction of `chipDiameter()` at the near rail.
  * 1 keeps every chip the current size. Lower it to shrink chips farther up the felt.
  */
-export const CHIP_DEPTH_SCALE = 0.935  //1
+export const CHIP_DEPTH_SCALE = 0.45//0.935  //1
 
 /**
  * Visible height of each chip's side wall, before the size scalar.
  * The next plate sits on top of this wall, so the stack stays closed.
  */
-export const CHIP_THICKNESS_PX = 5
+export const CHIP_THICKNESS_PX = 2.5//5
 
 /**
  * Tips the discs onto the felt. 0 faces the camera. 90 lies fully flat.
@@ -64,6 +64,14 @@ export const CHIP_RAIL_RESTITUTION = 0.4
 export const CHIP_MAX_STACK = 10//20
 export const CHIP_MAX_COLUMNS = 2
 export const CHIP_MAX_BET_CHIPS = CHIP_MAX_STACK * CHIP_MAX_COLUMNS
+
+/**
+ * Extra pixels between the edges of two columns of the same bet, at the near rail.
+ * The step is the rail diameter plus this gap, then multiplied by the felt depth scale,
+ * so both the chips and the gap shrink toward the back wall.
+ * 0 sets the edges touching. Negative pulls the columns together.
+ */
+export const CHIP_COLUMN_GAP_PX = 6
 
 /**
  * Center of the bottom chip, in stage pixels (1080×1920).

@@ -1,6 +1,6 @@
 /**
  * Samples Coinalyze open interest, the long/short account ratio, and the
- * last closed hour of long/short liquidations.
+ * last closed 5-minute bar of long/short liquidations.
  * The API key stays on the worker. The page only reads the KV snapshot.
  */
 
@@ -34,6 +34,8 @@ interface LiqFields {
 }
 
 const HOUR_SEC = 60 * 60
+/** Closed liquidation bar length. The page countdown uses the same 5 minutes. */
+const LIQ_BAR_SEC = 5 * 60
 
 const SYMBOL = 'BTCUSDT_PERP.A'
 const JSON_HEADERS = {
@@ -103,7 +105,7 @@ const walkHistory = (payload: unknown, consider: (row: Record<string, unknown> |
   }
 }
 
-/** Latest hour bar that has fully closed. `t` is the bar start, in seconds. */
+/** Latest bar that has fully closed. `t` is the bar start, in seconds. */
 const readClosedLiquidation = (payload: unknown, nowSec: number): { t: number; l: number; s: number } | null => {
   let bestT = -Infinity
   let best: { t: number; l: number; s: number } | null = null
@@ -113,7 +115,7 @@ const readClosedLiquidation = (payload: unknown, nowSec: number): { t: number; l
     const l = num(row.l)
     const s = num(row.s)
     if (t == null || l == null || s == null || l < 0 || s < 0) return
-    if (t + HOUR_SEC > nowSec) return
+    if (t + LIQ_BAR_SEC > nowSec) return
     if (t >= bestT) {
       bestT = t
       best = { t, l, s }
@@ -155,15 +157,15 @@ const liqFrom = (snapshot: Snapshot | null): LiqFields | null => {
   return { liqBarStart, longLiqBtc, shortLiqBtc, longLiqUsd, shortLiqUsd }
 }
 
-/** The closed hour stays on screen until the next hour ends. */
+/** The closed bar stays on screen until the next 5-minute bar ends. */
 const liqStillCurrent = (liq: LiqFields | null, nowSec: number): liq is LiqFields =>
-  liq != null && nowSec < liq.liqBarStart + 2 * HOUR_SEC
+  liq != null && nowSec < liq.liqBarStart + 2 * LIQ_BAR_SEC
 
 const fetchLiquidation = async (key: string, nowSec: number): Promise<LiqFields | null> => {
-  const from = nowSec - 3 * HOUR_SEC
+  const from = nowSec - 3 * LIQ_BAR_SEC
   const url = (usd: boolean) =>
     `https://api.coinalyze.net/v1/liquidation-history?symbols=${SYMBOL}` +
-    `&interval=1hour&from=${from}&to=${nowSec}&convert_to_usd=${usd ? 'true' : 'false'}` +
+    `&interval=5min&from=${from}&to=${nowSec}&convert_to_usd=${usd ? 'true' : 'false'}` +
     `&api_key=${encodeURIComponent(key)}`
   const [btcRes, usdRes] = await Promise.all([
     fetch(url(false), { signal: AbortSignal.timeout(8000) }),

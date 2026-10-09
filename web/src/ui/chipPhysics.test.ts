@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
+import { REFERENCE_HEIGHT } from '../config/constants'
 import { createHoldingDice, stageMetrics, type Die } from './dicePhysics'
 import {
+  chipColumnStep,
   chipDepthFactor,
+  chipDiameter,
   chipRadius,
   chipThickness,
   chipsAHitCanLift,
@@ -16,8 +19,8 @@ import {
   type ChipWorld,
   type StandingStack,
 } from './chipPhysics'
-import { CHIP_DEPTH_SCALE, CHIP_WEIGHT } from './chipConstants'
-import { buildBets } from './chipBets'
+import { CHIP_COLUMN_GAP_PX, CHIP_DEPTH_SCALE, CHIP_WEIGHT } from './chipConstants'
+import { buildBets, placeBets } from './chipBets'
 import { PUCK_COLLISION_HEIGHT_PX, PUCK_OFF_X, PUCK_OFF_Y } from './diceConstants'
 import { puckPlacement } from './puckState'
 
@@ -233,6 +236,21 @@ describe('chip depth scale', () => {
   it('stays on the nearer cap outside the felt', () => {
     expect(chipDepthFactor(-40, metrics)).toBe(1)
     expect(chipDepthFactor(metrics.wallZ + 80, metrics)).toBe(CHIP_DEPTH_SCALE)
+  })
+
+  it('scales the column gap with felt depth', () => {
+    const bet = {
+      id: 'wolf-pass',
+      character: 'wolf' as const,
+      side: 'pass' as const,
+      dollars: 1,
+      columns: [['white' as const], ['red' as const]],
+    }
+    const near = placeBets([{ ...bet, anchor: { x: 200, y: REFERENCE_HEIGHT - 40 } }], 1, chipColumnStep)
+    const far = placeBets([{ ...bet, anchor: { x: 200, y: metrics.wallBottom } }], 1, chipColumnStep)
+    expect(near[1].x - near[0].x).toBeCloseTo((chipDiameter() + CHIP_COLUMN_GAP_PX) * chipDepthFactor(near[0].z, metrics))
+    expect(far[1].x - far[0].x).toBeCloseTo((chipDiameter() + CHIP_COLUMN_GAP_PX) * CHIP_DEPTH_SCALE)
+    expect(far[1].x - far[0].x).toBeLessThan(near[1].x - near[0].x)
   })
 
   it('stores the felt-depth scale on standing and loose discs', () => {
