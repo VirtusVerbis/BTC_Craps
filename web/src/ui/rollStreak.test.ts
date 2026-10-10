@@ -76,7 +76,8 @@ describe('roll streak', () => {
   it('starts the rainbow only after the streak exceeds the threshold', () => {
     expect(rollStreakNeedsRainbow(ROLL_STREAK_THRESHOLD)).toBe(false)
     expect(rollStreakNeedsRainbow(ROLL_STREAK_THRESHOLD + 1)).toBe(true)
-    expect(formatRollStreak(36)).toBe('Roll Streak 36')
+    expect(formatRollStreak(10, 36)).toBe('Roll Streak 10 / 36')
+    expect(formatRollStreak(0, 36)).toBe('Roll Streak 0 / 36')
   })
 
   it('lets the character on the right lead the color change', () => {

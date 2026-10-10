@@ -46,7 +46,7 @@ const RollStreakLabel = ({ view }: { view: RollStreakView }) => {
   const startedAt = useRef(0)
   const [rainbow, setRainbow] = useState(false)
   const [step, setStep] = useState(0)
-  const text = formatRollStreak(view.longest)
+  const text = formatRollStreak(view.current, view.longest)
 
   useEffect(() => {
     if (view.resetSeq !== resetSeen.current) {

@@ -198,6 +198,7 @@ export const useDiceThrow = (
   const resetSeqRef = useRef(0)
   const streakView = useCallback(
     (): RollStreakView => ({
+      current: streakRef.current.current,
       longest: streakRef.current.longest,
       rainbowSeq: rainbowSeqRef.current,
       resetSeq: resetSeqRef.current,

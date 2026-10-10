@@ -1,5 +1,6 @@
 /**
- * Longest shooter hand shown under the P/L line.
+ * Shooter hand shown under the P/L line as `Roll Streak 10 / 36`.
+ * The first number is this hand. The second is the longest hand so far.
  * A hand is every decided roll until a seven-out. Come-out rolls count.
  * Hitting the point does not end the hand. The seven-out roll does not count.
  */
@@ -30,13 +31,14 @@ export const ROLL_STREAK_COLORS = [
 const STORAGE_KEY = 'btc-craps.roll-streak'
 
 export interface RollStreak {
-  /** Best count shown on the label. */
+  /** Longest hand so far. Stays up after a seven-out. */
   longest: number
-  /** Rolls in the hand that is still going. Hidden until it beats `longest`. */
+  /** Rolls in the hand that is still going. Returns to 0 on a seven-out. */
   current: number
 }
 
 export interface RollStreakView {
+  current: number
   longest: number
   /** Increments when a roll sets a new record above the threshold. */
   rainbowSeq: number
@@ -54,7 +56,7 @@ export interface RollStreakStep {
 
 export const emptyRollStreak = (): RollStreak => ({ longest: 0, current: 0 })
 
-export const formatRollStreak = (longest: number): string => `Roll Streak ${longest}`
+export const formatRollStreak = (current: number, longest: number): string => `Roll Streak ${current} / ${longest}`
 
 export const rollStreakNeedsRainbow = (longest: number): boolean => longest > ROLL_STREAK_THRESHOLD
 
@@ -125,6 +127,7 @@ export const saveRollStreakLongest = (longest: number): void => {
 }
 
 export const emptyRollStreakView = (): RollStreakView => ({
+  current: 0,
   longest: loadRollStreakLongest(),
   rainbowSeq: 0,
   resetSeq: 0,
