@@ -1,6 +1,8 @@
 import { BONUS_ALL_PAYS } from './bonusConstants'
 import { applyBonusRoll, emptyBonusHand, type BonusHand } from './bonusCraps'
+import { BONUS_FIELD_SIZE_PX, BONUS_SMALL_X, BONUS_SMALL_Y, BONUS_TALL_X, BONUS_TALL_Y } from './bonusFieldConstants'
 import {
+  BONUS_STAKE_LABELS_ON,
   SHOOTER_ALL_X,
   SHOOTER_ALL_Y,
   SHOOTER_DONT_X,
@@ -173,6 +175,59 @@ export const shooterFigureColor = (book: ShooterBook): string => {
 export const formatShooterPnl = (book: ShooterBook): string =>
   `${formatPnlBtc(book.pnl.btc)} ${formatLiqUsd(Math.abs(book.pnl.usd))} USD`
 
-/** Stake while the bet is up. After a win the amount stays off until the next red. */
-export const formatMakeEmAll = (working: boolean): string =>
-  working ? `Make 'Em All ${formatLiqUsd(SHOOTER_RED)}` : "Make 'Em All"
+/**
+ * Stake while the bet is up. After a win the line stays off until the next red,
+ * unless `showEmpty` keeps the name on screen for a visibility check.
+ */
+export const formatMakeEmAll = (working: boolean, showEmpty = BONUS_STAKE_LABELS_ON): string | null => {
+  if (working) return `Make 'Em All ${formatLiqUsd(SHOOTER_RED)}`
+  if (showEmpty) return "Make 'Em All"
+  return null
+}
+
+export interface BonusStakes {
+  tall: number
+  small: number
+}
+
+export const emptyBonusStakes = (): BonusStakes => ({ tall: 0, small: 0 })
+
+const onBonusSquare = (bet: ChipBet, x: number, y: number): boolean => {
+  const anchor = bet.anchor
+  if (!anchor) return false
+  const reach = BONUS_FIELD_SIZE_PX / 2
+  return Math.abs(anchor.x - x) <= reach && Math.abs(anchor.y - y) <= reach
+}
+
+/** Dollars sitting on the All Tall and All Small squares. */
+export const bonusStakeDollars = (bets: readonly ChipBet[]): BonusStakes => {
+  let tall = 0
+  let small = 0
+  for (const bet of bets) {
+    const onTall = bet.side === 'tall' || onBonusSquare(bet, BONUS_TALL_X, BONUS_TALL_Y)
+    const onSmall = bet.side === 'small' || onBonusSquare(bet, BONUS_SMALL_X, BONUS_SMALL_Y)
+    if (onTall && !onSmall) tall += bet.dollars
+    else if (onSmall && !onTall) small += bet.dollars
+    else if (bet.side === 'tall') tall += bet.dollars
+    else if (bet.side === 'small') small += bet.dollars
+  }
+  return { tall, small }
+}
+
+/**
+ * The dollar amount appears only while something is bet on that square.
+ * An empty square is hidden, unless `showEmpty` keeps the name on screen.
+ */
+export const formatBonusStakeLabel = (
+  name: 'All Tall' | 'All Small',
+  dollars: number,
+  showEmpty = BONUS_STAKE_LABELS_ON,
+): string | null => {
+  if (Number.isFinite(dollars) && dollars > 0) return `${name} ${formatLiqUsd(dollars)}`
+  if (showEmpty) return name
+  return null
+}
+
+export const formatAllTall = (dollars: number): string | null => formatBonusStakeLabel('All Tall', dollars)
+
+export const formatAllSmall = (dollars: number): string | null => formatBonusStakeLabel('All Small', dollars)

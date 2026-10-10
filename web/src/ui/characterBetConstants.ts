@@ -10,6 +10,16 @@ export const WOLF_PROFILE_ON = true//false
 export const SHOOTER_ON = true
 
 /**
+ * Shows Make 'Em All, All Tall, and All Small even when nothing is bet.
+ * Set this false for normal play: a line stays hidden until that bet is up.
+ */
+export const BONUS_STAKE_LABELS_ON = false
+
+/** Draw Pass and Don't Pass stacks. Off skips the felt only; those stakes still fund profiles and P/L. */
+export const LINE_STACKS_ON = false
+
+
+/**
  * Forces the shooter's stacks to ignore dice and loose chips for the whole throw.
  * Off is the default: a die passes through at launch, then collides after it crosses mid-felt.
  */
@@ -30,8 +40,7 @@ export const SHOOTER_ALL_Y = 980
 /** Wolf's cold lays. The across bet does not need this. */
 export const WOLF_LAY_ON = false
 
-/** Draw Pass and Don't Pass stacks. Off skips the felt only; those stakes still fund profiles and P/L. */
-export const LINE_STACKS_ON = true//false
+
 
 /** Outlines and constant captions on strategy stacks. Turn off after positioning. */
 export const BET_STACK_GUIDES_ON = true
@@ -163,7 +172,7 @@ export const WOLF_ACROSS_8_Y = 1250
 export const WOLF_ACROSS_6_X = 160
 export const WOLF_ACROSS_6_Y = 1380
 
-export const WOLF_ACROSS_5_X = 150
+export const WOLF_ACROSS_5_X = 140
 export const WOLF_ACROSS_5_Y = 1500
 export const WOLF_ACROSS_4_X = 140
 export const WOLF_ACROSS_4_Y = 1630
@@ -172,40 +181,39 @@ export const WOLF_ACROSS_4_Y = 1630
 // point
 
 
-export const WOLF_POINT_10_X = 170
-export const WOLF_POINT_10_Y = 600
-export const WOLF_POINT_9_X = 170
-export const WOLF_POINT_9_Y = 600
+export const WOLF_POINT_10_X = 185
+export const WOLF_POINT_10_Y = 1000
+export const WOLF_POINT_9_X = 175
+export const WOLF_POINT_9_Y = 1110
 
+export const WOLF_POINT_8_X = 165
+export const WOLF_POINT_8_Y = 1250
+export const WOLF_POINT_6_X = 160
+export const WOLF_POINT_6_Y = 1380
 
-export const WOLF_POINT_8_X = 170
-export const WOLF_POINT_8_Y = 600
-export const WOLF_POINT_6_X = 170
-export const WOLF_POINT_6_Y = 600
-
-export const WOLF_POINT_5_X = 170
-export const WOLF_POINT_5_Y = 600
-export const WOLF_POINT_4_X = 170
-export const WOLF_POINT_4_Y = 600
+export const WOLF_POINT_5_X = 140
+export const WOLF_POINT_5_Y = 1500
+export const WOLF_POINT_4_X = 140
+export const WOLF_POINT_4_Y = 1630
 
 
 
 // LAY
 
-export const WOLF_LAY_10_X = 290
-export const WOLF_LAY_10_Y = 780
-export const WOLF_LAY_9_X = 240
-export const WOLF_LAY_9_Y = 780
+export const WOLF_LAY_10_X = 120
+export const WOLF_LAY_10_Y = 1000
+export const WOLF_LAY_9_X = 120
+export const WOLF_LAY_9_Y = 1110
 
-export const WOLF_LAY_8_X = 190
-export const WOLF_LAY_8_Y = 820
-export const WOLF_LAY_6_X = 140
-export const WOLF_LAY_6_Y = 820
+export const WOLF_LAY_8_X = 110
+export const WOLF_LAY_8_Y = 1250
+export const WOLF_LAY_6_X = 100
+export const WOLF_LAY_6_Y = 1380
 
 export const WOLF_LAY_5_X = 90
-export const WOLF_LAY_5_Y = 780
-export const WOLF_LAY_4_X = 40
-export const WOLF_LAY_4_Y = 780
+export const WOLF_LAY_5_Y = 1500
+export const WOLF_LAY_4_X = 90
+export const WOLF_LAY_4_Y = 1630
 
 
 //  point lay

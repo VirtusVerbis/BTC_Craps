@@ -12,7 +12,7 @@ import {
 import { SPEECH_SHOW_MS } from './characterBetConstants'
 import type { ProfileBet } from './characterProfiles'
 import { composeTableBets } from './characterProfiles'
-import { btcPrice } from './chipBets'
+import { btcPrice, type ChipBet } from './chipBets'
 import {
   settleColumns,
   driftLooseChips,
@@ -44,9 +44,12 @@ import { useDiceVolumeWindow } from './useDiceVolumeWindow'
 import { emptyBonusHand, type BonusHand } from './bonusCraps'
 import {
   applyShooterRoll,
+  bonusStakeDollars,
+  emptyBonusStakes,
   loadShooterBook,
   saveShooterBook,
   shooterLineBets,
+  type BonusStakes,
   type ShooterBook,
 } from './shooterProfile'
 
@@ -75,6 +78,7 @@ export interface DicePresentation {
   speech: SpeechView[]
   pnl: CharacterPnlBook
   shooter: ShooterBook
+  bonusStakes: BonusStakes
 }
 
 const toView = (die: Die, id: 'left' | 'right'): DieView => {
@@ -99,6 +103,7 @@ const present = (
   speech: readonly SpeechView[],
   pnl: CharacterPnlBook,
   shooter: ShooterBook,
+  bonusStakes: BonusStakes,
 ): DicePresentation => ({
   dice: [toView(state.dice[0], 'left'), toView(state.dice[1], 'right')],
   result: state.phase === 'result' ? state.result : null,
@@ -108,6 +113,7 @@ const present = (
   speech: speech.slice(),
   pnl,
   shooter,
+  bonusStakes,
 })
 
 const liveSpeech = (
@@ -149,11 +155,12 @@ export const useDiceThrow = (
   const worldRef = useRef<ChipWorld | null>(null)
   const pnlRef = useRef<CharacterPnlBook>(loadCharacterPnl())
   const shooterRef = useRef<ShooterBook>(loadShooterBook())
+  const betsRef = useRef<readonly ChipBet[]>([])
   const profilesRef = useRef<ProfileBet[]>([])
   const sevenOutRef = useRef(false)
   const speechRef = useRef<Partial<Record<ChipCharacter, { text: string; until: number }>>>({})
   const [presentation, setPresentation] = useState<DicePresentation>(() =>
-    present(stateRef.current, [], [], [], pnlRef.current, shooterRef.current),
+    present(stateRef.current, [], [], [], pnlRef.current, shooterRef.current, emptyBonusStakes()),
   )
 
   useEffect(() => {
@@ -162,10 +169,11 @@ export const useDiceThrow = (
     worldRef.current = null
     pnlRef.current = loadCharacterPnl()
     shooterRef.current = loadShooterBook()
+    betsRef.current = []
     profilesRef.current = []
     sevenOutRef.current = false
     speechRef.current = {}
-    setPresentation(present(stateRef.current, [], [], [], pnlRef.current, shooterRef.current))
+    setPresentation(present(stateRef.current, [], [], [], pnlRef.current, shooterRef.current, emptyBonusStakes()))
     let frame = 0
     let last = performance.now()
 
@@ -173,7 +181,10 @@ export const useDiceThrow = (
       const snap = oiRef.current
       const price = btcPrice(marketRef.current)
       const shooter = shooterLineBets(shooterRef.current.allWorking)
-      if (!snap || !(price > 0)) return shooter
+      if (!snap || !(price > 0)) {
+        betsRef.current = shooter
+        return shooter
+      }
       const table = composeTableBets(
         snap.openInterest * price,
         snap.longPct,
@@ -189,7 +200,9 @@ export const useDiceThrow = (
         const text = table.callouts[character]
         if (text) speechRef.current[character] = { text, until: now + SPEECH_SHOW_MS }
       }
-      return [...table.bets, ...shooter]
+      const bets = [...table.bets, ...shooter]
+      betsRef.current = bets
+      return bets
     }
 
     const poseHook: DicePoseHook = (dice, dt, metrics) => {
@@ -250,7 +263,7 @@ export const useDiceThrow = (
       if (worldRef.current?.restack) worldRef.current = tickRestack(worldRef.current, now)
       const chips = worldRef.current ? presentChips(worldRef.current, now, metrics) : []
       const guides = worldRef.current ? guideFrames(worldRef.current, metrics) : []
-      setPresentation(present(stateRef.current, chips, guides, liveSpeech(speechRef.current, now), pnlRef.current, shooterRef.current))
+      setPresentation(present(stateRef.current, chips, guides, liveSpeech(speechRef.current, now), pnlRef.current, shooterRef.current, bonusStakeDollars(betsRef.current)))
       frame = window.requestAnimationFrame(loop)
     }
     frame = window.requestAnimationFrame(loop)

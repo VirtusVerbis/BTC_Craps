@@ -4,7 +4,7 @@ import { fetchBinanceBtc1mKlines, type Candle } from './data/candles'
 import { BlockHeightService, type BlockState } from './data/blockHeight'
 import { MarketDataService, type MarketFeedUpdate } from './data/marketData'
 import { emptyCharacterPnl } from './ui/characterPnl'
-import { loadShooterBook } from './ui/shooterProfile'
+import { emptyBonusStakes, loadShooterBook } from './ui/shooterProfile'
 import { CrapsScene } from './ui/CrapsScene'
 import { Overlay } from './ui/Overlay'
 import { SplashSequence } from './ui/SplashSequence'
@@ -224,6 +224,7 @@ function App() {
               block={blockState}
               onTimeClick={() => {}}
               shooter={dice?.shooter ?? loadShooterBook()}
+              bonusStakes={dice?.bonusStakes ?? emptyBonusStakes()}
               status={feed.status}
             />
             {videoOverlay.active ? (

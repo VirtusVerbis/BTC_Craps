@@ -9,10 +9,15 @@ import {
   SHOOTER_PASS_Y,
 } from './characterBetConstants'
 import { BONUS_ALL_PAYS } from './bonusConstants'
+import { BONUS_SMALL_X, BONUS_SMALL_Y, BONUS_TALL_X, BONUS_TALL_Y } from './bonusFieldConstants'
 import {
   SHOOTER_RED,
   applyShooterRoll,
+  bonusStakeDollars,
   emptyShooterBook,
+  formatAllSmall,
+  formatAllTall,
+  formatBonusStakeLabel,
   formatMakeEmAll,
   formatShooterPnl,
   loadShooterBook,
@@ -20,6 +25,7 @@ import {
   shooterFigureColor,
   shooterLineBets,
 } from './shooterProfile'
+import type { ChipBet } from './chipBets'
 import { PL_LOSS_COLOR, PL_PROFIT_COLOR } from './characterPnlConstants'
 
 const PRICE = 100_000
@@ -103,6 +109,7 @@ describe('shooter profile', () => {
     expect(next.pnl.btc).toBeCloseTo((SHOOTER_RED * BONUS_ALL_PAYS) / PRICE)
     expect(next.allWorking).toBe(false)
     expect(formatMakeEmAll(false)).toBe("Make 'Em All")
+    expect(formatMakeEmAll(false, false)).toBeNull()
   })
 
   it('does not charge the ending 7 after Make \'Em All has paid', () => {
@@ -114,6 +121,39 @@ describe('shooter profile', () => {
     expect(next.pnl.btc).toBe(won.pnl.btc)
     expect(next.allWorking).toBe(true)
     expect(formatMakeEmAll(true)).toBe(`Make 'Em All $2.5M`)
+  })
+
+  it('shows All Tall and All Small with the same stake wording', () => {
+    expect(formatAllTall(0)).toBe('All Tall')
+    expect(formatAllSmall(0)).toBe('All Small')
+    expect(formatAllTall(SHOOTER_RED)).toBe('All Tall $2.5M')
+    expect(formatAllSmall(5_000_000)).toBe('All Small $5M')
+    expect(formatBonusStakeLabel('All Tall', 0, false)).toBeNull()
+    expect(formatBonusStakeLabel('All Small', 0, false)).toBeNull()
+    expect(formatBonusStakeLabel('All Tall', SHOOTER_RED, false)).toBe('All Tall $2.5M')
+    expect(formatBonusStakeLabel('All Small', 5_000_000, false)).toBe('All Small $5M')
+  })
+
+  it('sums chips on the All Tall and All Small squares', () => {
+    const chip = (id: string, side: ChipBet['side'], dollars: number, x: number, y: number): ChipBet => ({
+      id,
+      character: 'shooter',
+      side,
+      dollars,
+      columns: [['red']],
+      anchor: { x, y },
+    })
+    const stakes = bonusStakeDollars([
+      chip('tall', 'pass', 2_500_000, BONUS_TALL_X, BONUS_TALL_Y),
+      chip('small', 'small', 1_000_000, 10, 10),
+      chip('all', 'all', SHOOTER_RED, 990, 980),
+      chip('pass', 'pass', 500_000, 500, 1895),
+    ])
+    expect(stakes).toEqual({ tall: 2_500_000, small: 1_000_000 })
+    expect(bonusStakeDollars([chip('small-square', 'pass', 3_000_000, BONUS_SMALL_X, BONUS_SMALL_Y)])).toEqual({
+      tall: 0,
+      small: 3_000_000,
+    })
   })
 
   it('does not pay Small or Tall alone', () => {

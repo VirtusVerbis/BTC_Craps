@@ -10,9 +10,12 @@ import { LiqTicker } from './LiqTicker'
 import { LIQ_LABEL_X, LIQ_LABEL_Y, OI_LABEL_FONT_REM, OI_LABEL_X, OI_LABEL_Y } from './overlayConstants'
 import { SHOOTER_ON } from './characterBetConstants'
 import {
+  formatAllSmall,
+  formatAllTall,
   formatMakeEmAll,
   formatShooterPnl,
   shooterFigureColor,
+  type BonusStakes,
   type ShooterBook,
 } from './shooterProfile'
 
@@ -21,6 +24,7 @@ interface OverlayProps {
   block: BlockState
   onTimeClick: () => void
   shooter: ShooterBook
+  bonusStakes: BonusStakes
   status: {
     binance: FeedStatus
     coinbase: FeedStatus
@@ -116,7 +120,10 @@ const formatOpenInterest = (value: number): string => Math.round(value).toLocale
 
 const formatAccountPct = (value: number): string => `${Math.round(value)}%`
 
-export const Overlay = ({ market, block, onTimeClick, shooter, status }: OverlayProps) => {
+export const Overlay = ({ market, block, onTimeClick, shooter, bonusStakes, status }: OverlayProps) => {
+  const makeEmAll = SHOOTER_ON ? formatMakeEmAll(shooter.allWorking) : null
+  const allTall = formatAllTall(bonusStakes.tall)
+  const allSmall = formatAllSmall(bonusStakes.small)
   const openInterest = useOpenInterest()
   const liqCountdown = useLiqCountdown(openInterest?.liqBarStart ?? null)
   const longLiqBtc = openInterest?.longLiqBtc
@@ -357,9 +364,19 @@ export const Overlay = ({ market, block, onTimeClick, shooter, status }: Overlay
             alignEnd
             animate={cbPulse}
           />
-          {SHOOTER_ON ? (
+          {makeEmAll ? (
             <p className="shooter-hud shooter-hud-end" style={{ fontSize: `${OI_LABEL_FONT_REM}rem` }}>
-              {formatMakeEmAll(shooter.allWorking)}
+              {makeEmAll}
+            </p>
+          ) : null}
+          {allTall ? (
+            <p className="shooter-hud shooter-hud-end" style={{ fontSize: `${OI_LABEL_FONT_REM}rem` }}>
+              {allTall}
+            </p>
+          ) : null}
+          {allSmall ? (
+            <p className="shooter-hud shooter-hud-end" style={{ fontSize: `${OI_LABEL_FONT_REM}rem` }}>
+              {allSmall}
             </p>
           ) : null}
         </div>
