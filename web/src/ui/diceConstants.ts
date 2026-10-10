@@ -1,6 +1,12 @@
 /** Both dice use this size at the bottom edge of the stage. */
 export const DIE_LAUNCH_SIZE_PX = 40//57//45
 
+/**
+ * Extra stage pixels kept between either die and a Pass or Don't Pass stack
+ * when the shooter picks a launch spot. 0 is a grazing miss.
+ */
+export const DIE_LAUNCH_STACK_MARGIN_PX = 18
+
 /** Size at the back wall, relative to `DIE_LAUNCH_SIZE_PX`. */
 export const DIE_DEPTH_SCALE = 0.6//0.6//0.50
 

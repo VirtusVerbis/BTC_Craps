@@ -25,6 +25,7 @@ import {
 import { applyRoll, puckPlacement } from './puckState'
 import {
   advanceThrow,
+  clearSharedX,
   createHoldingDice,
   createThrowState,
   dieScreenCenter,
@@ -228,6 +229,40 @@ const travel = (binanceBuy: number, coinbaseBuy: number) => {
 
 const speeds = (binanceBuy: number, coinbaseBuy: number) =>
   launchSpeeds({ binanceBuy, coinbaseBuy, binanceSell: 0, coinbaseSell: 0 }, metrics)
+
+describe('clear launch lane', () => {
+  const roll = (value: number) => () => value
+
+  it('keeps both dice off a stack in the middle of the rail', () => {
+    const obstacle = { x: 540, clearance: 56 }
+    const half = DIE_LAUNCH_SIZE_PX / 2
+    for (let i = 0; i < 30; i += 1) {
+      const sharedX = clearSharedX([obstacle], Math.random)
+      expect(Math.abs(sharedX - half - obstacle.x)).toBeGreaterThanOrEqual(obstacle.clearance)
+      expect(Math.abs(sharedX + half - obstacle.x)).toBeGreaterThanOrEqual(obstacle.clearance)
+    }
+  })
+
+  it('starts in the first open lane', () => {
+    expect(clearSharedX([{ x: 540, clearance: 56 }], roll(0))).toBe(DIE_LAUNCH_SIZE_PX)
+  })
+
+  it('skips a crack between stacks when a wider lane is open', () => {
+    const sharedX = clearSharedX(
+      [
+        { x: 120, clearance: 50 },
+        { x: 220, clearance: 30 },
+      ],
+      roll(0),
+    )
+    expect(sharedX).toBe(270)
+  })
+
+  it('uses the rail edge when the stacks cover every lane', () => {
+    const sharedX = clearSharedX([{ x: 540, clearance: 2000 }], roll(0))
+    expect(sharedX).toBe(DIE_LAUNCH_SIZE_PX)
+  })
+})
 
 describe('launch axes', () => {
   it('sends a full buy sample to the back wall on the full-strength pair', () => {

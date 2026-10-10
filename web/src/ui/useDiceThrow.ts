@@ -19,6 +19,7 @@ import {
   driftLooseChips,
   emptyChipWorld,
   guideFrames,
+  lineLaunchObstacles,
   presentChips,
   puckObstacle,
   resolveDiceChips,
@@ -31,6 +32,8 @@ import {
 import { DIE_RESULT_HOLD_MS } from './diceConstants'
 import {
   advanceThrow,
+  clearSharedX,
+  createHoldingDice,
   createThrowState,
   dieScreenCenter,
   quatToCssMatrix,
@@ -116,6 +119,23 @@ const present = (
   shooter,
   bonusStakes,
 })
+
+const laneKey = (world: ChipWorld): string =>
+  lineLaunchObstacles(world)
+    .map((obstacle) => `${obstacle.x.toFixed(1)}:${obstacle.clearance.toFixed(1)}`)
+    .join('|')
+
+/** Move a held pair into an open lane. The same stacks leave the dice where they are. */
+const aimClearLane = (state: ThrowState, world: ChipWorld, aimedKey: string): { state: ThrowState; aimedKey: string } => {
+  if (state.phase !== 'holding') return { state, aimedKey }
+  const key = laneKey(world)
+  if (key === '' || key === aimedKey) return { state, aimedKey }
+  const sharedX = clearSharedX(lineLaunchObstacles(world))
+  return {
+    aimedKey: key,
+    state: { ...state, sharedX, dice: createHoldingDice(sharedX) },
+  }
+}
 
 const liveSpeech = (
   speech: Partial<Record<ChipCharacter, { text: string; until: number }>>,
@@ -222,6 +242,18 @@ export const useDiceThrow = (
       return resolveDiceChips(world, dice, dt, metrics, puckObstacle(stateRef.current.point))
     }
 
+    let aimedKey = ''
+    const holdLane = () => {
+      const world = worldRef.current
+      if (!world || stateRef.current.phase !== 'holding') {
+        if (stateRef.current.phase !== 'holding') aimedKey = ''
+        return
+      }
+      const aimed = aimClearLane(stateRef.current, world, aimedKey)
+      aimedKey = aimed.aimedKey
+      stateRef.current = aimed.state
+    }
+
     const loop = (now: number) => {
       const dt = Math.min(0.05, (now - last) / 1000)
       last = now
@@ -230,6 +262,7 @@ export const useDiceThrow = (
         const bets = betsNow(now)
         if (bets.length > 0) worldRef.current = worldFromBets(bets, Math.floor(now))
       }
+      holdLane()
       const phaseBefore = stateRef.current.phase
       const pointBefore = stateRef.current.point
       stateRef.current = advanceThrow(stateRef.current, dt, now, volumeRef.current, metrics, poseHook)
@@ -273,6 +306,8 @@ export const useDiceThrow = (
       if (phaseBefore !== 'holding' && stateRef.current.phase === 'holding') {
         const bets = betsNow(now)
         worldRef.current = settleColumns(worldRef.current ?? emptyChipWorld(), bets, now, Math.floor(now))
+        aimedKey = ''
+        holdLane()
       } else if (stateRef.current.phase === 'result' && worldRef.current) {
         worldRef.current = driftLooseChips(worldRef.current, dt, metrics, puckObstacle(stateRef.current.point))
       }

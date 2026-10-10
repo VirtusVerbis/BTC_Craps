@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { REFERENCE_HEIGHT } from '../config/constants'
-import { createHoldingDice, stageMetrics, type Die } from './dicePhysics'
+import { createHoldingDice, dieSize, stageMetrics, type Die } from './dicePhysics'
 import {
   chipColumnStep,
   chipDepthFactor,
@@ -11,6 +11,7 @@ import {
   driftLooseChips,
   emptyChipWorld,
   guideFrames,
+  lineLaunchObstacles,
   presentChips,
   puckObstacle,
   resolveDiceChips,
@@ -23,7 +24,7 @@ import {
 } from './chipPhysics'
 import { CHIP_COLUMN_GAP_PX, CHIP_DEPTH_SCALE, CHIP_RESTACK_MS, CHIP_WEIGHT } from './chipConstants'
 import { buildBets, placeBets } from './chipBets'
-import { PUCK_COLLISION_HEIGHT_PX, PUCK_OFF_X, PUCK_OFF_Y } from './diceConstants'
+import { DIE_LAUNCH_STACK_MARGIN_PX, PUCK_COLLISION_HEIGHT_PX, PUCK_OFF_X, PUCK_OFF_Y } from './diceConstants'
 import { puckPlacement } from './puckState'
 
 const metrics = stageMetrics()
@@ -50,6 +51,27 @@ const stackOf = (count: number, x: number, z: number): StandingStack => ({
 })
 
 const worldWith = (stacks: StandingStack[]): ChipWorld => ({ stacks, loose: [], restack: null })
+
+describe('launch lanes', () => {
+  it('blocks pass and dont columns and leaves the other bets alone', () => {
+    const world = worldWith([
+      { ...stackOf(2, 170, 1000), id: 'wolf-pass-0' },
+      { ...stackOf(1, 195, 980), id: 'wolf-dont-1' },
+      { ...stackOf(1, 280, 700), id: 'cat-place-6-0' },
+      { ...stackOf(1, 990, 900), id: 'shooter-all-0' },
+    ])
+    const obstacles = lineLaunchObstacles(world, metrics)
+    expect(obstacles.map((obstacle) => obstacle.x)).toEqual([170, 195])
+    expect(obstacles[0]?.clearance).toBeCloseTo(dieSize(1000, metrics) / 2 + chipRadius() + DIE_LAUNCH_STACK_MARGIN_PX)
+  })
+
+  it('counts a pass stack that is still restacking', () => {
+    const landing = { ...stackOf(1, 430, 900), id: 'oldLady-pass-0' }
+    const world = worldWith([])
+    world.restack = { startedMs: 0, chips: [], nextStacks: [landing] }
+    expect(lineLaunchObstacles(world, metrics).map((obstacle) => obstacle.x)).toEqual([430])
+  })
+})
 
 describe('chip topples', () => {
   it('peels fewer chips as weight goes up', () => {

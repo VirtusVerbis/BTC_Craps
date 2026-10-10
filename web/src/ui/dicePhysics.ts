@@ -140,6 +140,106 @@ export const randomSharedX = (random: () => number = Math.random): number => {
   return min + random() * (max - min)
 }
 
+/** A Pass or Don't Pass column the shooter should not launch into. */
+export interface LaunchObstacle {
+  x: number
+  /** How far a die center must stay from `x` to miss the stack. */
+  clearance: number
+}
+
+const sharedXRange = (): [number, number] => [DIE_LAUNCH_SIZE_PX, REFERENCE_WIDTH - DIE_LAUNCH_SIZE_PX]
+
+/** Signed room between the closer die and the nearest obstacle. Negative means a hit. */
+const pairGap = (sharedX: number, obstacles: readonly LaunchObstacle[]): number => {
+  const half = DIE_LAUNCH_SIZE_PX / 2
+  let gap = Number.POSITIVE_INFINITY
+  for (const obstacle of obstacles) {
+    if (!Number.isFinite(obstacle.x) || !(obstacle.clearance >= 0)) continue
+    const left = Math.abs(sharedX - half - obstacle.x) - obstacle.clearance
+    const right = Math.abs(sharedX + half - obstacle.x) - obstacle.clearance
+    gap = Math.min(gap, left, right)
+  }
+  return gap
+}
+
+const sampleSpan = (lanes: readonly [number, number][], random: () => number): number => {
+  const weight = lanes.reduce((sum, [start, end]) => sum + (end - start), 0)
+  if (!(weight > 0)) return lanes[0]?.[0] ?? DIE_LAUNCH_SIZE_PX
+  let pick = Math.min(Math.max(random(), 0), 0.999999) * weight
+  for (const [start, end] of lanes) {
+    const width = end - start
+    if (pick <= width) return start + pick
+    pick -= width
+  }
+  return lanes[lanes.length - 1][1]
+}
+
+const leastBadSharedX = (
+  min: number,
+  max: number,
+  obstacles: readonly LaunchObstacle[],
+  random: () => number,
+): number => {
+  const picks: number[] = []
+  let best = Number.NEGATIVE_INFINITY
+  const consider = (x: number) => {
+    const score = pairGap(x, obstacles)
+    if (score > best + 0.01) {
+      best = score
+      picks.length = 0
+      picks.push(x)
+    } else if (Math.abs(score - best) <= 0.01) {
+      picks.push(x)
+    }
+  }
+  for (let x = min; x < max; x += 4) consider(x)
+  consider(max)
+  const index = Math.min(picks.length - 1, Math.floor(Math.max(0, random()) * picks.length))
+  return picks[index] ?? (min + max) / 2
+}
+
+/**
+ * Launch center for both dice. Open lanes between Pass and Don't Pass stacks
+ * are chosen in proportion to their width. A lane thinner than one die is
+ * skipped while a wider lane remains. If the stacks cover the rail, the spot
+ * with the most room is used.
+ */
+export const clearSharedX = (
+  obstacles: readonly LaunchObstacle[],
+  random: () => number = Math.random,
+): number => {
+  const [min, max] = sharedXRange()
+  if (!(max > min)) return min
+  const half = DIE_LAUNCH_SIZE_PX / 2
+  const blocked: Array<[number, number]> = []
+  for (const obstacle of obstacles) {
+    if (!Number.isFinite(obstacle.x) || !(obstacle.clearance >= 0)) continue
+    const pad = obstacle.clearance + half
+    const start = Math.max(min, obstacle.x - pad)
+    const end = Math.min(max, obstacle.x + pad)
+    if (end > start) blocked.push([start, end])
+  }
+  blocked.sort((a, b) => a[0] - b[0] || a[1] - b[1])
+  const merged: Array<[number, number]> = []
+  for (const interval of blocked) {
+    const last = merged[merged.length - 1]
+    if (!last || interval[0] > last[1]) merged.push([interval[0], interval[1]])
+    else last[1] = Math.max(last[1], interval[1])
+  }
+  const free: Array<[number, number]> = []
+  let cursor = min
+  for (const [start, end] of merged) {
+    if (start > cursor) free.push([cursor, start])
+    cursor = Math.max(cursor, end)
+  }
+  if (max > cursor) free.push([cursor, max])
+  const open = free.filter(([start, end]) => end > start)
+  const roomy = open.filter(([start, end]) => end - start >= DIE_LAUNCH_SIZE_PX)
+  const lanes = roomy.length > 0 ? roomy : open
+  if (lanes.length > 0) return sampleSpan(lanes, random)
+  return leastBadSharedX(min, max, obstacles, random)
+}
+
 export const createHoldingDice = (sharedX: number, random: () => number = Math.random): [Die, Die] => {
   const half = DIE_LAUNCH_SIZE_PX / 2
   return [makeDie(sharedX - half, random), makeDie(sharedX + half, random)]

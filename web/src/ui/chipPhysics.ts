@@ -1,7 +1,7 @@
 import { REFERENCE_HEIGHT } from '../config/constants'
-import { DIE_GRAVITY_PX_PER_S2, PUCK_COLLISION_HEIGHT_PX, PUCK_IMAGE_WIDTH_PX } from './diceConstants'
+import { DIE_GRAVITY_PX_PER_S2, DIE_LAUNCH_STACK_MARGIN_PX, PUCK_COLLISION_HEIGHT_PX, PUCK_IMAGE_WIDTH_PX } from './diceConstants'
 import { puckPlacement } from './puckState'
-import { dieSize, stageMetrics, type Die, type StageMetrics } from './dicePhysics'
+import { dieSize, stageMetrics, type Die, type LaunchObstacle, type StageMetrics } from './dicePhysics'
 import { SHOOTER_STACK_COLLISION_OFF } from './characterBetConstants'
 import { placeBets, type ChipBet, type PlacedColumn } from './chipBets'
 import {
@@ -236,6 +236,26 @@ const nudgeStack = (stack: StandingStack, dirX: number, dirZ: number) => {
 }
 
 const isShooterStack = (stack: StandingStack): boolean => stack.id.startsWith('shooter-')
+
+const isPassDontStack = (id: string): boolean => {
+  const parts = id.split('-')
+  return parts.includes('pass') || parts.includes('dont')
+}
+
+/** Pass and Don't Pass columns currently on the felt, in launch-lane coordinates. */
+export const lineLaunchObstacles = (world: ChipWorld, metrics: StageMetrics = stageMetrics()): LaunchObstacle[] => {
+  const radius = chipRadius()
+  const obstacles: LaunchObstacle[] = []
+  const stacks = [...world.stacks, ...(world.restack?.nextStacks ?? [])]
+  for (const stack of stacks) {
+    if (stack.colors.length === 0 || !isPassDontStack(stack.id)) continue
+    obstacles.push({
+      x: stack.x,
+      clearance: dieSize(stack.z, metrics) / 2 + radius + DIE_LAUNCH_STACK_MARGIN_PX,
+    })
+  }
+  return obstacles
+}
 
 /** A die remembers the crossing, so the trip back to the rail still hits the stacks. */
 const markFeltMid = (die: Die, metrics: StageMetrics) => {
