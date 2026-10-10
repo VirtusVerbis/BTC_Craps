@@ -548,13 +548,14 @@ const fitKept = (kept: readonly ProfileBet[], purses: CharacterPurses, switches:
 
 const trimAmount = (text: string): string => text.replace(/\.0$/, '')
 
-/** Compact stake for a callout. 13500000 becomes 13.5M. */
+/** Compact stake for a callout. 13500000 becomes $13.5M. Under $1,000 there is no K, M, or B. */
 export const formatCompactDollars = (dollars: number): string => {
   const abs = Math.abs(dollars)
-  if (abs >= 1_000_000_000) return `${trimAmount((abs / 1_000_000_000).toFixed(1))}B`
-  if (abs >= 1_000_000) return `${trimAmount((abs / 1_000_000).toFixed(1))}M`
-  if (abs >= 1_000) return `${trimAmount((abs / 1_000).toFixed(1))}K`
-  return `${Math.round(abs)}`
+  const scaled = (amount: number, unit: 'B' | 'M' | 'K'): string => `$${trimAmount(amount.toFixed(1))}${unit}`
+  if (abs >= 1_000_000_000) return scaled(abs / 1_000_000_000, 'B')
+  if (abs >= 1_000_000) return scaled(abs / 1_000_000, 'M')
+  if (abs >= 1_000) return scaled(abs / 1_000, 'K')
+  return `$${Math.round(abs)}`
 }
 
 const addedPortion = (previous: readonly ProfileBet[], next: readonly ProfileBet[]): ProfileBet[] => {

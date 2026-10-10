@@ -5,6 +5,7 @@ import { BlockHeightService, type BlockState } from './data/blockHeight'
 import { MarketDataService, type MarketFeedUpdate } from './data/marketData'
 import { emptyCharacterPnl } from './ui/characterPnl'
 import { emptyBonusStakes, loadShooterBook } from './ui/shooterProfile'
+import { emptyRollStreakView } from './ui/rollStreak'
 import { CrapsScene } from './ui/CrapsScene'
 import { Overlay } from './ui/Overlay'
 import { SplashSequence } from './ui/SplashSequence'
@@ -225,6 +226,7 @@ function App() {
               onTimeClick={() => {}}
               shooter={dice?.shooter ?? loadShooterBook()}
               bonusStakes={dice?.bonusStakes ?? emptyBonusStakes()}
+              rollStreak={dice?.rollStreak ?? emptyRollStreakView()}
               status={feed.status}
             />
             {videoOverlay.active ? (

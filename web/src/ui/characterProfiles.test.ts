@@ -4,6 +4,7 @@ import {
   PROFILE_SIX,
   allocateProfiles,
   calloutText,
+  formatCompactDollars,
   catExtraNumbers,
   strategyChipBet,
   wolfLayNumbers,
@@ -145,7 +146,7 @@ describe('old lady hard ways', () => {
     expect(dollars(first.profiles, 'oldLady-hard-6')).toBe(PROFILE_RED)
     expect(dollars(first.profiles, 'oldLady-hard-8')).toBe(PROFILE_RED)
     expect(dollars(first.profiles, 'oldLady-inside-6')).toBe(PROFILE_SIX)
-    expect(first.callouts.oldLady).toBe('Inside for 11M\nHard 6 for 2.5M\nHard 8 for 2.5M')
+    expect(first.callouts.oldLady).toBe('Inside for $11M\nHard 6 for $2.5M\nHard 8 for $2.5M')
 
     const pressed = allocateProfiles(purses(stake), [], 4, first.profiles, false, lady, {
       continued: true,
@@ -156,7 +157,7 @@ describe('old lady hard ways', () => {
     expect(dollars(pressed.profiles, 'oldLady-hard-6')).toBe(PROFILE_RED * 2)
     expect(dollars(pressed.profiles, 'oldLady-hard-8')).toBe(PROFILE_RED)
     expect(dollarsOf(pressed.profiles, 'oldLady', 'pass') + pressed.remainder.oldLady.pass).toBe(stake)
-    expect(pressed.callouts.oldLady).toBe('Inside for 3M\nHard 6 for 2.5M')
+    expect(pressed.callouts.oldLady).toBe('Inside for $3M\nHard 6 for $2.5M')
   })
 
   it('keeps a place press into the next point and restarts hardways at one red', () => {
@@ -194,9 +195,9 @@ describe('callouts', () => {
   it('groups equal place prices and totals a new across bet', () => {
     const stakes = purses(500_000_000)
     const cat = allocateProfiles(stakes, [], 9, [], false, { ...on, oldLady: false, oldMan: false, wolf: false, wolfLay: false })
-    expect(cat.callouts.cat).toBe(`Place 6, 8 for ${PROFILE_SIX / 1_000_000}M`)
+    expect(cat.callouts.cat).toBe(`Place 6, 8 for $${PROFILE_SIX / 1_000_000}M`)
     const wolf = allocateProfiles(stakes, [], 4, [], false, { ...on, cat: false, oldLady: false, oldMan: false, wolfLay: false })
-    expect(wolf.callouts.wolf).toContain('Across for 13.5M')
+    expect(wolf.callouts.wolf).toContain('Across for $13.5M')
   })
 
   it('lists a different place price on its own line', () => {
@@ -212,7 +213,7 @@ describe('callouts', () => {
       y: 0,
     })
     expect(calloutText([place(6, PROFILE_SIX), place(8, PROFILE_SIX), place(10, PROFILE_RED)]))
-      .toBe('Place 6, 8 for 3M\nPlace 10 for 2.5M')
+      .toBe('Place 6, 8 for $3M\nPlace 10 for $2.5M')
   })
 
   it('builds a lay line from the added stake on each number', () => {
@@ -228,7 +229,14 @@ describe('callouts', () => {
       y: 0,
     } satisfies ProfileBet
     const other = { ...lay, id: 'wolf-lay-10', number: 10, label: 'WOLF_LAY_10' }
-    expect(calloutText([lay, other])).toBe('Lay 4, 10 for 2.5M')
+    expect(calloutText([lay, other])).toBe('Lay 4, 10 for $2.5M')
+  })
+
+  it('prints a dollar sign, and a unit only from $1K up', () => {
+    expect(formatCompactDollars(90)).toBe('$90')
+    expect(formatCompactDollars(2_400)).toBe('$2.4K')
+    expect(formatCompactDollars(13_500_000)).toBe('$13.5M')
+    expect(formatCompactDollars(1_200_000_000)).toBe('$1.2B')
   })
 })
 

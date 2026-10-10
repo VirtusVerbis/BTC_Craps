@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import type { MarketSnapshot } from '../game/types'
 import { useOpenInterest } from '../data/openInterest'
 import {
@@ -56,6 +56,14 @@ import {
   type BonusStakes,
   type ShooterBook,
 } from './shooterProfile'
+import {
+  applyRollStreak,
+  loadRollStreakLongest,
+  rollStreakNeedsRainbow,
+  saveRollStreakLongest,
+  type RollStreak,
+  type RollStreakView,
+} from './rollStreak'
 
 export interface DieView {
   id: 'left' | 'right'
@@ -83,6 +91,7 @@ export interface DicePresentation {
   pnl: CharacterPnlBook
   shooter: ShooterBook
   bonusStakes: BonusStakes
+  rollStreak: RollStreakView
 }
 
 const toView = (die: Die, id: 'left' | 'right'): DieView => {
@@ -108,6 +117,7 @@ const present = (
   pnl: CharacterPnlBook,
   shooter: ShooterBook,
   bonusStakes: BonusStakes,
+  rollStreak: RollStreakView,
 ): DicePresentation => ({
   dice: [toView(state.dice[0], 'left'), toView(state.dice[1], 'right')],
   result: state.phase === 'result' ? state.result : null,
@@ -118,6 +128,7 @@ const present = (
   pnl,
   shooter,
   bonusStakes,
+  rollStreak,
 })
 
 const laneKey = (world: ChipWorld): string =>
@@ -182,8 +193,19 @@ export const useDiceThrow = (
   const pressRollRef = useRef<number | null>(null)
   const sevenOutRef = useRef(false)
   const speechRef = useRef<Partial<Record<ChipCharacter, { text: string; until: number }>>>({})
+  const streakRef = useRef<RollStreak>({ longest: loadRollStreakLongest(), current: 0 })
+  const rainbowSeqRef = useRef(0)
+  const resetSeqRef = useRef(0)
+  const streakView = useCallback(
+    (): RollStreakView => ({
+      longest: streakRef.current.longest,
+      rainbowSeq: rainbowSeqRef.current,
+      resetSeq: resetSeqRef.current,
+    }),
+    [],
+  )
   const [presentation, setPresentation] = useState<DicePresentation>(() =>
-    present(stateRef.current, [], [], [], pnlRef.current, shooterRef.current, emptyBonusStakes()),
+    present(stateRef.current, [], [], [], pnlRef.current, shooterRef.current, emptyBonusStakes(), streakView()),
   )
 
   useEffect(() => {
@@ -198,7 +220,8 @@ export const useDiceThrow = (
     pressRollRef.current = null
     sevenOutRef.current = false
     speechRef.current = {}
-    setPresentation(present(stateRef.current, [], [], [], pnlRef.current, shooterRef.current, emptyBonusStakes()))
+    streakRef.current = { longest: loadRollStreakLongest(), current: 0 }
+    setPresentation(present(stateRef.current, [], [], [], pnlRef.current, shooterRef.current, emptyBonusStakes(), streakView()))
     let frame = 0
     let last = performance.now()
 
@@ -298,6 +321,11 @@ export const useDiceThrow = (
             shooterRef.current = nextShooter
             saveShooterBook(nextShooter)
           }
+          const step = applyRollStreak(streakRef.current, pointBefore != null, result.total)
+          streakRef.current = step.streak
+          if (step.record && rollStreakNeedsRainbow(step.streak.longest)) rainbowSeqRef.current += 1
+          if (step.sevenOut) resetSeqRef.current += 1
+          if (step.record) saveRollStreakLongest(step.streak.longest)
         }
         const raw = result ? onCountedRollRef.current?.(result) : 0
         const extra = typeof raw === 'number' ? raw : 0
@@ -314,12 +342,12 @@ export const useDiceThrow = (
       if (worldRef.current?.restack) worldRef.current = tickRestack(worldRef.current, now)
       const chips = worldRef.current ? presentChips(worldRef.current, now, metrics) : []
       const guides = worldRef.current ? guideFrames(worldRef.current, metrics) : []
-      setPresentation(present(stateRef.current, chips, guides, liveSpeech(speechRef.current, now), pnlRef.current, shooterRef.current, bonusStakeDollars(betsRef.current)))
+      setPresentation(present(stateRef.current, chips, guides, liveSpeech(speechRef.current, now), pnlRef.current, shooterRef.current, bonusStakeDollars(betsRef.current), streakView()))
       frame = window.requestAnimationFrame(loop)
     }
     frame = window.requestAnimationFrame(loop)
     return () => window.cancelAnimationFrame(frame)
-  }, [enabled])
+  }, [enabled, streakView])
 
   if (!enabled) return null
   return presentation

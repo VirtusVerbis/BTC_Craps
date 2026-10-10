@@ -692,6 +692,10 @@ body {
   text-align: right;
 }
 
+.roll-streak-char {
+  text-shadow: inherit;
+}
+
 .liq-ticker {
   position: absolute;
   left: 0;

@@ -18,6 +18,14 @@ import {
   type BonusStakes,
   type ShooterBook,
 } from './shooterProfile'
+import {
+  ROLL_STREAK_COLORS,
+  ROLL_STREAK_RAINBOW_MS,
+  formatRollStreak,
+  rollStreakColorIndex,
+  rollStreakColorStep,
+  type RollStreakView,
+} from './rollStreak'
 
 interface OverlayProps {
   market: MarketSnapshot
@@ -25,10 +33,71 @@ interface OverlayProps {
   onTimeClick: () => void
   shooter: ShooterBook
   bonusStakes: BonusStakes
+  rollStreak: RollStreakView
   status: {
     binance: FeedStatus
     coinbase: FeedStatus
   }
+}
+
+const RollStreakLabel = ({ view }: { view: RollStreakView }) => {
+  const rainbowSeen = useRef(view.rainbowSeq)
+  const resetSeen = useRef(view.resetSeq)
+  const startedAt = useRef(0)
+  const [rainbow, setRainbow] = useState(false)
+  const [step, setStep] = useState(0)
+  const text = formatRollStreak(view.longest)
+
+  useEffect(() => {
+    if (view.resetSeq !== resetSeen.current) {
+      resetSeen.current = view.resetSeq
+      setRainbow(false)
+    }
+    if (view.rainbowSeq > rainbowSeen.current) {
+      rainbowSeen.current = view.rainbowSeq
+      startedAt.current = performance.now()
+      setStep(0)
+      setRainbow(true)
+    }
+  }, [view.rainbowSeq, view.resetSeq])
+
+  useEffect(() => {
+    if (!rainbow) return undefined
+    let frame = 0
+    const tick = (now: number) => {
+      const elapsed = now - startedAt.current
+      if (elapsed >= ROLL_STREAK_RAINBOW_MS) {
+        setRainbow(false)
+        return
+      }
+      const next = rollStreakColorStep(elapsed)
+      setStep((current) => (current === next ? current : next))
+      frame = window.requestAnimationFrame(tick)
+    }
+    frame = window.requestAnimationFrame(tick)
+    return () => window.cancelAnimationFrame(frame)
+  }, [rainbow, view.rainbowSeq])
+
+  return (
+    <p
+      className={rainbow ? 'shooter-hud shooter-hud-pnl roll-streak' : 'shooter-hud roll-streak'}
+      style={{ fontSize: `${OI_LABEL_FONT_REM}rem` }}
+    >
+      {text.split('').map((char, index) => (
+        <span
+          key={`${text.length}-${index}`}
+          className="roll-streak-char"
+          style={
+            rainbow
+              ? { color: ROLL_STREAK_COLORS[rollStreakColorIndex(index, step, ROLL_STREAK_COLORS.length)] }
+              : undefined
+          }
+        >
+          {char}
+        </span>
+      ))}
+    </p>
+  )
 }
 
 const exchangeMaxVolume = (buyVolume: number, sellVolume: number): number =>
@@ -120,7 +189,7 @@ const formatOpenInterest = (value: number): string => Math.round(value).toLocale
 
 const formatAccountPct = (value: number): string => `${Math.round(value)}%`
 
-export const Overlay = ({ market, block, onTimeClick, shooter, bonusStakes, status }: OverlayProps) => {
+export const Overlay = ({ market, block, onTimeClick, shooter, bonusStakes, rollStreak, status }: OverlayProps) => {
   const makeEmAll = SHOOTER_ON ? formatMakeEmAll(shooter.allWorking) : null
   const allTall = formatAllTall(bonusStakes.tall)
   const allSmall = formatAllSmall(bonusStakes.small)
@@ -335,6 +404,7 @@ export const Overlay = ({ market, block, onTimeClick, shooter, bonusStakes, stat
               <span style={{ color: shooterFigureColor(shooter) }}>{formatShooterPnl(shooter)}</span>
             </p>
           ) : null}
+          {SHOOTER_ON ? <RollStreakLabel view={rollStreak} /> : null}
         </div>
         <button className="time-button" type="button" onClick={onTimeClick}>
           <span className="overlay-label time-label">Time</span>
