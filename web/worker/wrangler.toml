@@ -30,7 +30,8 @@ id = "df79e6905ae040a5999acf32683f9ce9"
 directory = "../dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
-# Every response gets the security headers, and plain HTTP is redirected.
+# Every response gets the security headers. www and plain HTTP
+# redirect to https://bitcoinmidnight.com.
 run_worker_first = true
 
 [[env.production.routes]]

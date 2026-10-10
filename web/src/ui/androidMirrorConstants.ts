@@ -77,7 +77,7 @@ export const BG2_ARROW_UP_DISPLAY_MS = 10_000
 export const BG2_ARROW_UP_PRICE_INCREASE_PERCENT = 0.1
 export const BG2_ARROW_UP_PRICE_INCREASE_PERCENT_MAX = 0.9999
 /** Align with candle chart band top (`BG2_CHART_TOP_OFFSET_FRACTION`); tall aspect fills downward. */
-export const BG2_ARROW_UP_TOP_OFFSET_FRACTION = -0.17//0.06//0.13
+export const BG2_ARROW_UP_TOP_OFFSET_FRACTION = -0.11//-0.17//0.06//0.13
 export const BG2_ARROW_UP_ASPECT_HEIGHT_PER_WIDTH = 1 //3.5
 
 export const BG2_ARROW_DOWN_DISPLAY_MS = 10_000

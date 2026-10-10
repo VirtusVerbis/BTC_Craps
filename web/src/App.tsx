@@ -260,6 +260,8 @@ function App() {
             Released on 2026-Oct-10
             <br />
             Bitcoin was $82k.
+            <br />
+            Website is work in progress...
           </p>
         </aside>
       </div>

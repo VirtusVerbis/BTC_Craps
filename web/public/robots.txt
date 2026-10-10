@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /oi
+
+Sitemap: https://bitcoinmidnight.com/sitemap.xml

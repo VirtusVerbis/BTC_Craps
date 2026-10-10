@@ -74,11 +74,16 @@ const SECURITY_HEADERS: Record<string, string> = {
   ].join('; '),
 }
 
-const PROD_HOSTS = new Set(['bitcoinmidnight.com', 'www.bitcoinmidnight.com'])
+const CANONICAL_HOST = 'bitcoinmidnight.com'
+const PROD_HOSTS = new Set([CANONICAL_HOST, 'www.bitcoinmidnight.com'])
 
-const withSecurityHeaders = (response: Response): Response => {
+const withSecurityHeaders = (response: Response, request?: Request): Response => {
   const headers = new Headers(response.headers)
   for (const [name, value] of Object.entries(SECURITY_HEADERS)) headers.set(name, value)
+  if (request) {
+    const host = new URL(request.url).hostname
+    if (host !== CANONICAL_HOST) headers.set('x-robots-tag', 'noindex')
+  }
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
@@ -86,14 +91,18 @@ const withSecurityHeaders = (response: Response): Response => {
   })
 }
 
-/** Port 80 stays open at the edge unless this answers with a redirect. */
-const httpsRedirect = (request: Request): Response | null => {
+/**
+ * One hop to https://bitcoinmidnight.com. Covers plain HTTP on either
+ * public host, and https://www.bitcoinmidnight.com.
+ */
+const canonicalRedirect = (request: Request): Response | null => {
   const url = new URL(request.url)
   if (!PROD_HOSTS.has(url.hostname)) return null
   const forwarded = request.headers.get('x-forwarded-proto')
   const proto = forwarded ?? url.protocol.replace(':', '')
-  if (proto !== 'http') return null
+  if (proto !== 'http' && url.hostname === CANONICAL_HOST) return null
   url.protocol = 'https:'
+  url.hostname = CANONICAL_HOST
   const headers = new Headers(SECURITY_HEADERS)
   headers.set('location', url.toString())
   return new Response(null, { status: 301, headers })
@@ -290,7 +299,7 @@ const sample = async (env: Env): Promise<void> => {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    const redirect = httpsRedirect(request)
+    const redirect = canonicalRedirect(request)
     if (redirect) return redirect
     const url = new URL(request.url)
     // Local wrangler has no site assets, so `/` is the snapshot. Production
@@ -298,14 +307,14 @@ export default {
     const snapshotPath = url.pathname === '/oi' || (url.pathname === '/' && !env.ASSETS)
     if (snapshotPath) {
       if (request.method !== 'GET' && request.method !== 'HEAD') {
-        return withSecurityHeaders(new Response('not found', { status: 404 }))
+        return withSecurityHeaders(new Response('not found', { status: 404 }), request)
       }
       const raw = await env.OI_SNAPSHOT.get('latest')
       const body = request.method === 'HEAD' ? null : (raw ?? 'null')
-      return withSecurityHeaders(new Response(body, { headers: JSON_HEADERS }))
+      return withSecurityHeaders(new Response(body, { headers: JSON_HEADERS }), request)
     }
-    if (env.ASSETS) return withSecurityHeaders(await env.ASSETS.fetch(request))
-    return withSecurityHeaders(new Response('not found', { status: 404 }))
+    if (env.ASSETS) return withSecurityHeaders(await env.ASSETS.fetch(request), request)
+    return withSecurityHeaders(new Response('not found', { status: 404 }), request)
   },
 
   async scheduled(_event: unknown, env: Env): Promise<void> {
