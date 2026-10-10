@@ -228,7 +228,7 @@ describe('callouts', () => {
       x: 0,
       y: 0,
     } satisfies ProfileBet
-    const other = { ...lay, id: 'wolf-lay-10', number: 10, label: 'WOLF_LAY_10' }
+    const other = { ...lay, id: 'wolf-lay-10', number: 10 as const, label: 'WOLF_LAY_10' } satisfies ProfileBet
     expect(calloutText([lay, other])).toBe('Lay 4, 10 for $2.5M')
   })
 

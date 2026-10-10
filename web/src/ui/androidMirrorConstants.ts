@@ -1,3 +1,5 @@
+import { REFERENCE_HEIGHT, REFERENCE_WIDTH } from '../config/constants'
+
 /** Timings and tuning mirrored from Android `MainActivity.kt` (VirtusVerbis/BTC_Punch_Up). */
 
 export const SPLASH_DISPLAY_MS = 2500
@@ -57,6 +59,20 @@ export const BG2_FR_PRICE_DROP_PERCENT_MAX = 2.0
 export const BG2_FR_TOP_OFFSET_FRACTION = 0.065
 export const BG2_FR_ASPECT_HEIGHT_PER_WIDTH = 1.0
 
+/**
+ * Known, and must be accounted for on every arrow y change:
+ * `arrow_up_0.png` and `arrow_down_0.png` are both 345×240, but the drawing
+ * is not on the same rows. Green has 11px empty at the top. Red has that 11px
+ * empty at the bottom, so the red art sits higher in the file. Punch Up ships
+ * the same PNGs and one shared offset, so this mismatch is in the source art.
+ * The square meme box uses `object-fit: contain`, which letterboxes both the
+ * same and does not cancel the 11px. Keep the green offset as the visual
+ * target. The red offset stays lower by 11/345 of stage width, as a fraction
+ * of stage height.
+ */
+const BG2_ARROW_PNG_WIDTH_PX = 345
+const BG2_ARROW_RED_ART_HIGHER_PX = 11
+
 export const BG2_ARROW_UP_DISPLAY_MS = 10_000
 export const BG2_ARROW_UP_PRICE_INCREASE_PERCENT = 0.1
 export const BG2_ARROW_UP_PRICE_INCREASE_PERCENT_MAX = 0.9999
@@ -67,8 +83,10 @@ export const BG2_ARROW_UP_ASPECT_HEIGHT_PER_WIDTH = 1 //3.5
 export const BG2_ARROW_DOWN_DISPLAY_MS = 10_000
 export const BG2_ARROW_DOWN_PRICE_DROP_PERCENT = 0.1
 export const BG2_ARROW_DOWN_PRICE_DROP_PERCENT_MAX = 0.9999
-/** Same vertical anchor as arrow up + chart band. */
-export const BG2_ARROW_DOWN_TOP_OFFSET_FRACTION = -0.17//0.06//0.13
+/** Green offset, plus the 11px red-file shift. See the note above. */
+export const BG2_ARROW_DOWN_TOP_OFFSET_FRACTION =
+  BG2_ARROW_UP_TOP_OFFSET_FRACTION +
+  (BG2_ARROW_RED_ART_HIGHER_PX / BG2_ARROW_PNG_WIDTH_PX) * (REFERENCE_WIDTH / REFERENCE_HEIGHT)
 export const BG2_ARROW_DOWN_ASPECT_HEIGHT_PER_WIDTH = 1 //3.5
 
 export const BG4_SIGN_FRAME_DELAY_MS = 600

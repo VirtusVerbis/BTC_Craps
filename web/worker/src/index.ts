@@ -10,6 +10,10 @@ interface Env {
     put(key: string, value: string): Promise<void>
   }
   COINALYZE_API_KEY?: string
+  /** Present on the production worker, which also serves the built site. */
+  ASSETS?: {
+    fetch(request: Request): Promise<Response>
+  }
 }
 
 interface Snapshot {
@@ -41,6 +45,58 @@ const SYMBOL = 'BTCUSDT_PERP.A'
 const JSON_HEADERS = {
   'content-type': 'application/json; charset=utf-8',
   'cache-control': 'no-store',
+}
+
+/**
+ * Browser limits for the public site. YouTube stays allowed because the
+ * overlay loads the IFrame Player API. Inline styles stay allowed because
+ * the scene sets element style attributes.
+ */
+const SECURITY_HEADERS: Record<string, string> = {
+  'strict-transport-security': 'max-age=31536000; includeSubDomains',
+  'x-content-type-options': 'nosniff',
+  'x-frame-options': 'DENY',
+  'referrer-policy': 'strict-origin-when-cross-origin',
+  'content-security-policy': [
+    "default-src 'self'",
+    "base-uri 'self'",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    "form-action 'self'",
+    "script-src 'self' https://www.youtube.com https://s.ytimg.com",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: https://i.ytimg.com https://img.youtube.com",
+    "font-src 'self'",
+    "media-src 'self' blob: https://www.youtube.com",
+    "frame-src https://www.youtube.com https://www.youtube-nocookie.com",
+    "connect-src 'self' https://api.binance.com wss://stream.binance.com:9443 https://api.exchange.coinbase.com wss://ws-feed.exchange.coinbase.com https://mempool.space https://www.youtube.com https://s.ytimg.com",
+    'upgrade-insecure-requests',
+  ].join('; '),
+}
+
+const PROD_HOSTS = new Set(['bitcoinmidnight.com', 'www.bitcoinmidnight.com'])
+
+const withSecurityHeaders = (response: Response): Response => {
+  const headers = new Headers(response.headers)
+  for (const [name, value] of Object.entries(SECURITY_HEADERS)) headers.set(name, value)
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  })
+}
+
+/** Port 80 stays open at the edge unless this answers with a redirect. */
+const httpsRedirect = (request: Request): Response | null => {
+  const url = new URL(request.url)
+  if (!PROD_HOSTS.has(url.hostname)) return null
+  const forwarded = request.headers.get('x-forwarded-proto')
+  const proto = forwarded ?? url.protocol.replace(':', '')
+  if (proto !== 'http') return null
+  url.protocol = 'https:'
+  const headers = new Headers(SECURITY_HEADERS)
+  headers.set('location', url.toString())
+  return new Response(null, { status: 301, headers })
 }
 
 const asRecord = (value: unknown): Record<string, unknown> | null => {
@@ -234,12 +290,22 @@ const sample = async (env: Env): Promise<void> => {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    const redirect = httpsRedirect(request)
+    if (redirect) return redirect
     const url = new URL(request.url)
-    if (request.method !== 'GET' || (url.pathname !== '/' && url.pathname !== '/oi')) {
-      return new Response('not found', { status: 404 })
+    // Local wrangler has no site assets, so `/` is the snapshot. Production
+    // serves the site itself and only this worker answers `/oi`.
+    const snapshotPath = url.pathname === '/oi' || (url.pathname === '/' && !env.ASSETS)
+    if (snapshotPath) {
+      if (request.method !== 'GET' && request.method !== 'HEAD') {
+        return withSecurityHeaders(new Response('not found', { status: 404 }))
+      }
+      const raw = await env.OI_SNAPSHOT.get('latest')
+      const body = request.method === 'HEAD' ? null : (raw ?? 'null')
+      return withSecurityHeaders(new Response(body, { headers: JSON_HEADERS }))
     }
-    const raw = await env.OI_SNAPSHOT.get('latest')
-    return new Response(raw ?? 'null', { headers: JSON_HEADERS })
+    if (env.ASSETS) return withSecurityHeaders(await env.ASSETS.fetch(request))
+    return withSecurityHeaders(new Response('not found', { status: 404 }))
   },
 
   async scheduled(_event: unknown, env: Env): Promise<void> {

@@ -1,6 +1,7 @@
 name = "btc-craps-oi"
 main = "src/index.ts"
 compatibility_date = "2024-11-01"
+account_id = "44da5f636cb61d0f6bf7329fc9a478be"
 
 # Once a minute after deploy. Locally, `npm run oi:dev` (from web/) starts
 # Wrangler and requests /cdn-cgi/local/scheduled on the same schedule.
@@ -11,3 +12,31 @@ crons = ["* * * * *"]
 [[kv_namespaces]]
 binding = "OI_SNAPSHOT"
 id = "oi_snapshot_local"
+
+# Site + /oi on bitcoinmidnight.com.
+# From web/: npx wrangler deploy --env production --config worker/wrangler.toml
+[env.production]
+name = "bitcoinmidnight"
+workers_dev = true
+
+[env.production.triggers]
+crons = ["* * * * *"]
+
+[[env.production.kv_namespaces]]
+binding = "OI_SNAPSHOT"
+id = "df79e6905ae040a5999acf32683f9ce9"
+
+[env.production.assets]
+directory = "../dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+# Every response gets the security headers, and plain HTTP is redirected.
+run_worker_first = true
+
+[[env.production.routes]]
+pattern = "bitcoinmidnight.com"
+custom_domain = true
+
+[[env.production.routes]]
+pattern = "www.bitcoinmidnight.com"
+custom_domain = true

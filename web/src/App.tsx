@@ -244,49 +244,22 @@ function App() {
         </div>
 
         <aside className="repo-links-panel" aria-label="Source repositories">
-          <a
-            className="repo-link repo-link-playstore"
-            href="https://play.google.com/store/apps/details?id=com.vv.btcpunchup&pcampaignid=web_share"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="BTC Punch Up on Google Play"
-          >
-            <img className="playstore-badge" src="/playstore-badge.png" alt="Get it on Google Play" draggable={false} />
-          </a>
-          <a
-            className="repo-link repo-link-zapstore"
-            href="https://zapstore.dev/apps/com.vv.btcpunchup"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="BTC Punch Up on Zapstore"
-          >
-            <img className="zapstore-badge" src="/zapstore_badge.png" alt="Get it on Zapstore" draggable={false} />
-          </a>
           <div className="repo-link-lnurl" aria-label="LNURL address">
             <img className="lnurl-badge" src="/mobile/lnurl_address.jpg.jpeg" alt="LNURL address" draggable={false} />
           </div>
           <a
             className="repo-link"
-            href="https://github.com/VirtusVerbis/BTC_Punch_Up_Web_Port"
+            href="https://github.com/VirtusVerbis/BTC_Craps"
             target="_blank"
             rel="noopener noreferrer"
           >
             <GitHubMark />
-            <span>Web Port Repo</span>
-          </a>
-          <a
-            className="repo-link"
-            href="https://github.com/VirtusVerbis/BTC_Punch_Up"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <GitHubMark />
-            <span>Android Repo</span>
+            <span>GitHub Repo</span>
           </a>
           <p className="repo-release-note">
-            Released on 2026-Apr-26
+            Released on 2026-Oct-10
             <br />
-            Bitcoin was $79k.
+            Bitcoin was $82k.
           </p>
         </aside>
       </div>
