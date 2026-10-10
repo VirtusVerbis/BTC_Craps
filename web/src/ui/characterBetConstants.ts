@@ -23,6 +23,10 @@ export const SHOOTER_PASS_Y = 1895
 export const SHOOTER_DONT_X = 500
 export const SHOOTER_DONT_Y = 1840
 
+/** One red on Make 'Em All. Starts at the center of that square. Stage pixels (1080×1920). */
+export const SHOOTER_ALL_X = 990
+export const SHOOTER_ALL_Y = 980
+
 /** Wolf's cold lays. The across bet does not need this. */
 export const WOLF_LAY_ON = false
 

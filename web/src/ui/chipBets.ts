@@ -38,7 +38,8 @@ export interface ChipBet {
   id: string
   /** Shooter is a fixed one-red bettor, not an open-interest character. */
   character: ChipCharacter | 'shooter'
-  side: ChipSide
+  /** `all` is the shooter's Make 'Em All red. Open-interest bets stay on pass or don't. */
+  side: ChipSide | 'all'
   dollars: number
   /** Bottom to top. At most two columns, each at most 20 high. */
   columns: ChipColor[][]

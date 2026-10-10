@@ -1,6 +1,14 @@
 import { BONUS_ALL_PAYS } from './bonusConstants'
 import { applyBonusRoll, emptyBonusHand, type BonusHand } from './bonusCraps'
-import { SHOOTER_DONT_X, SHOOTER_DONT_Y, SHOOTER_ON, SHOOTER_PASS_X, SHOOTER_PASS_Y } from './characterBetConstants'
+import {
+  SHOOTER_ALL_X,
+  SHOOTER_ALL_Y,
+  SHOOTER_DONT_X,
+  SHOOTER_DONT_Y,
+  SHOOTER_ON,
+  SHOOTER_PASS_X,
+  SHOOTER_PASS_Y,
+} from './characterBetConstants'
 import { PROFILE_RED } from './characterProfiles'
 import { PL_LOSS_COLOR, PL_PROFIT_COLOR } from './characterPnlConstants'
 import type { ChipBet } from './chipBets'
@@ -90,7 +98,7 @@ export const saveShooterBook = (book: ShooterBook): void => {
   }
 }
 
-const redChip = (id: string, side: 'pass' | 'dont', x: number, y: number, label: string): ChipBet => ({
+const redChip = (id: string, side: 'pass' | 'dont' | 'all', x: number, y: number, label: string): ChipBet => ({
   id,
   character: 'shooter',
   side,
@@ -100,13 +108,18 @@ const redChip = (id: string, side: 'pass' | 'dont', x: number, y: number, label:
   guide: { label, color: '#ffffff' },
 })
 
-/** Pass and Don't Pass stay up. Each stack is one red, pinned to its constant. */
-export const shooterLineBets = (): ChipBet[] => {
+/**
+ * Pass and Don't Pass stay up. Make 'Em All is one red on its square while the bet is working,
+ * and comes off the felt after it pays.
+ */
+export const shooterLineBets = (allWorking = true): ChipBet[] => {
   if (!SHOOTER_ON) return []
-  return [
+  const lines = [
     redChip('shooter-pass', 'pass', SHOOTER_PASS_X, SHOOTER_PASS_Y, 'SHOOTER_PASS'),
     redChip('shooter-dont', 'dont', SHOOTER_DONT_X, SHOOTER_DONT_Y, 'SHOOTER_DONT'),
   ]
+  if (allWorking) lines.push(redChip('shooter-all', 'all', SHOOTER_ALL_X, SHOOTER_ALL_Y, 'SHOOTER_ALL'))
+  return lines
 }
 
 /**

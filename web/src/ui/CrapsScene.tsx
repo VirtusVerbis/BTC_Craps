@@ -14,6 +14,7 @@ import {
   BG2_NEO_ASPECT_HEIGHT_PER_WIDTH,
   BG2_NEO_TOP_OFFSET_FRACTION,
 } from './androidMirrorConstants'
+import { BonusFields } from './BonusFields'
 import { BtcCandleChart } from './BtcCandleChart'
 import { formatPnlBtc, formatPnlUsd, pnlColor, PL_CHARACTERS, type CharacterPnlBook } from './characterPnl'
 import { PL_LABEL_ANCHOR, PL_LABEL_FONT_PX } from './characterPnlConstants'
@@ -160,6 +161,7 @@ export const CrapsScene = ({
         className="scene-layer scene-craps"
         draggable={false}
       />
+      <BonusFields />
       <RollHistogram
         rolls={rolls}
         reveal={histogramReveal}

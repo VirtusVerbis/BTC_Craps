@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { applyBonusRoll, emptyBonusHand } from './bonusCraps'
-import { SHOOTER_DONT_X, SHOOTER_DONT_Y, SHOOTER_PASS_X, SHOOTER_PASS_Y } from './characterBetConstants'
+import {
+  SHOOTER_ALL_X,
+  SHOOTER_ALL_Y,
+  SHOOTER_DONT_X,
+  SHOOTER_DONT_Y,
+  SHOOTER_PASS_X,
+  SHOOTER_PASS_Y,
+} from './characterBetConstants'
 import { BONUS_ALL_PAYS } from './bonusConstants'
 import {
   SHOOTER_RED,
@@ -29,7 +36,7 @@ describe('shooter profile', () => {
     vi.unstubAllGlobals()
   })
 
-  it('places one red on Pass and one red on Don\'t Pass', () => {
+  it('places one red on Pass, Don\'t Pass, and Make \'Em All', () => {
     const bets = shooterLineBets()
     expect(bets).toEqual([
       expect.objectContaining({
@@ -48,7 +55,20 @@ describe('shooter profile', () => {
         columns: [['red']],
         anchor: { x: SHOOTER_DONT_X, y: SHOOTER_DONT_Y },
       }),
+      expect.objectContaining({
+        id: 'shooter-all',
+        character: 'shooter',
+        side: 'all',
+        dollars: SHOOTER_RED,
+        columns: [['red']],
+        anchor: { x: SHOOTER_ALL_X, y: SHOOTER_ALL_Y },
+      }),
     ])
+  })
+
+  it('takes the Make \'Em All chip down after it pays', () => {
+    const bets = shooterLineBets(false)
+    expect(bets.map((bet) => bet.id)).toEqual(['shooter-pass', 'shooter-dont'])
   })
 
   it('loses Make \'Em All on a come-out 7 and refills it', () => {

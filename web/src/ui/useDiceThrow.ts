@@ -172,7 +172,7 @@ export const useDiceThrow = (
     const betsNow = (now: number) => {
       const snap = oiRef.current
       const price = btcPrice(marketRef.current)
-      const shooter = shooterLineBets()
+      const shooter = shooterLineBets(shooterRef.current.allWorking)
       if (!snap || !(price > 0)) return shooter
       const table = composeTableBets(
         snap.openInterest * price,

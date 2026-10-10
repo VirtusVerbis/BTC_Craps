@@ -131,7 +131,40 @@ body {
   pointer-events: none;
 }
 
-/* Above the table (1), under the P/L labels (3), dice (4), chips (5), meme (6), and candle chart (7). */
+/*
+ * Above the table (1). Shares z-index 2 with the histogram and is drawn first,
+ * so the plate covers these squares where they overlap. Chips (5) paint on top.
+ */
+.bonus-fields {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.bonus-field {
+  position: absolute;
+  box-sizing: border-box;
+  transform-origin: center center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 5.25px solid #fff;
+  background: transparent;
+  color: #fff;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  pointer-events: none;
+}
+
+.bonus-field span {
+  display: block;
+  white-space: nowrap;
+}
+
+/* Above the table (1) and the bonus fields, under the P/L labels (3), dice (4), chips (5), meme (6), and candle chart (7). */
 .roll-histogram {
   position: absolute;
   z-index: 2;
