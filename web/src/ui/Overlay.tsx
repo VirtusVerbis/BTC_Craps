@@ -6,6 +6,7 @@ import type { MarketSnapshot } from '../game/types'
 import { mobileAssetManifest } from './mobileAssetManifest'
 import { resolveMobileAssetUrl } from './mobileAssetUrls'
 import { formatElapsed, formatExchangePriceLabel, formatLiqBtc, formatLiqUsd } from './format'
+import { HotShooterTicker } from './HotShooterTicker'
 import { LiqTicker } from './LiqTicker'
 import { LIQ_LABEL_X, LIQ_LABEL_Y, OI_LABEL_FONT_REM, OI_LABEL_X, OI_LABEL_Y } from './overlayConstants'
 import { SHOOTER_ON } from './characterBetConstants'
@@ -20,10 +21,10 @@ import {
 } from './shooterProfile'
 import {
   ROLL_STREAK_COLORS,
-  ROLL_STREAK_RAINBOW_MS,
   formatRollStreak,
   rollStreakColorIndex,
   rollStreakColorStep,
+  rollStreakNeedsRainbow,
   type RollStreakView,
 } from './rollStreak'
 
@@ -41,42 +42,23 @@ interface OverlayProps {
 }
 
 const RollStreakLabel = ({ view }: { view: RollStreakView }) => {
-  const rainbowSeen = useRef(view.rainbowSeq)
-  const resetSeen = useRef(view.resetSeq)
-  const startedAt = useRef(0)
-  const [rainbow, setRainbow] = useState(false)
+  const rainbow = rollStreakNeedsRainbow(view.current)
   const [step, setStep] = useState(0)
   const text = formatRollStreak(view.current, view.longest)
 
   useEffect(() => {
-    if (view.resetSeq !== resetSeen.current) {
-      resetSeen.current = view.resetSeq
-      setRainbow(false)
-    }
-    if (view.rainbowSeq > rainbowSeen.current) {
-      rainbowSeen.current = view.rainbowSeq
-      startedAt.current = performance.now()
-      setStep(0)
-      setRainbow(true)
-    }
-  }, [view.rainbowSeq, view.resetSeq])
-
-  useEffect(() => {
     if (!rainbow) return undefined
+    const startedAt = performance.now()
     let frame = 0
     const tick = (now: number) => {
-      const elapsed = now - startedAt.current
-      if (elapsed >= ROLL_STREAK_RAINBOW_MS) {
-        setRainbow(false)
-        return
-      }
-      const next = rollStreakColorStep(elapsed)
+      const next = rollStreakColorStep(now - startedAt)
       setStep((current) => (current === next ? current : next))
       frame = window.requestAnimationFrame(tick)
     }
+    setStep(0)
     frame = window.requestAnimationFrame(tick)
     return () => window.cancelAnimationFrame(frame)
-  }, [rainbow, view.rainbowSeq])
+  }, [rainbow])
 
   return (
     <p
@@ -463,6 +445,7 @@ export const Overlay = ({ market, block, onTimeClick, shooter, bonusStakes, roll
         <p>Long {openInterest ? formatAccountPct(openInterest.longPct) : '—'} (Pass)</p>
         <p>Short {openInterest ? formatAccountPct(openInterest.shortPct) : '—'} (Don't)</p>
       </div>
+      {SHOOTER_ON ? <HotShooterTicker current={rollStreak.current} /> : null}
       <LiqTicker snapshot={openInterest} />
       <div
         className="overlay-oi overlay-liq"

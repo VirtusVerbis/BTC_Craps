@@ -19,6 +19,9 @@ export const LIQ_NOTABLE_USD = 10_000_000
 /** Half of the 96px "No Roll!" label. */
 export const LIQ_TICKER_FONT_PX = 48
 
+/** Vertical size of a ticker bar. Type size plus the bar padding. */
+export const LIQ_TICKER_HEIGHT_PX = LIQ_TICKER_FONT_PX + 16
+
 /** How fast the ticker words move, in stage pixels per second. */
 export const LIQ_TICKER_SPEED_PX_PER_SEC = 90
 

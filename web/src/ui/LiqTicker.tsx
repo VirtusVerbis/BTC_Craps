@@ -6,20 +6,14 @@ import {
   LIQ_NOTABLE_USD,
   LIQ_TICKER_COLOR,
   LIQ_TICKER_FONT_PX,
+  LIQ_TICKER_HEIGHT_PX,
   LIQ_TICKER_MS,
   LIQ_TICKER_SPEED_PX_PER_SEC,
 } from './overlayConstants'
+import { tickerPass, type TickerPass } from './tickerPass'
 
 /** Empty bar shows before the words start moving. */
 const BOX_FIRST_MS = 400
-
-const TICKER_HEIGHT_PX = LIQ_TICKER_FONT_PX + 16
-
-interface Pass {
-  start: number
-  end: number
-  passMs: number
-}
 
 export const LiqTicker = ({ snapshot }: { snapshot: OpenInterestSnapshot | null }) => {
   const barStart = snapshot?.liqBarStart ?? null
@@ -29,7 +23,7 @@ export const LiqTicker = ({ snapshot }: { snapshot: OpenInterestSnapshot | null 
   const [queue, setQueue] = useState<string[]>([])
   const [index, setIndex] = useState(0)
   const [scrolling, setScrolling] = useState(false)
-  const [pass, setPass] = useState<Pass | null>(null)
+  const [pass, setPass] = useState<TickerPass | null>(null)
   const finishAfterPass = useRef(false)
   const boxRef = useRef<HTMLDivElement>(null)
   const phraseRef = useRef<HTMLSpanElement>(null)
@@ -52,11 +46,7 @@ export const LiqTicker = ({ snapshot }: { snapshot: OpenInterestSnapshot | null 
     const phraseWidth = phrase.offsetWidth
     const boxWidth = box.clientWidth
     if (!(phraseWidth > 0) || !(boxWidth > 0)) return
-    setPass({
-      start: boxWidth,
-      end: boxWidth - phraseWidth,
-      passMs: (phraseWidth / LIQ_TICKER_SPEED_PX_PER_SEC) * 1000,
-    })
+    setPass(tickerPass(boxWidth, phraseWidth, LIQ_TICKER_SPEED_PX_PER_SEC))
   }, [text])
 
   useEffect(() => {
@@ -88,8 +78,8 @@ export const LiqTicker = ({ snapshot }: { snapshot: OpenInterestSnapshot | null 
       ref={boxRef}
       className="liq-ticker"
       style={{
-        top: LIQ_LABEL_Y - TICKER_HEIGHT_PX,
-        height: TICKER_HEIGHT_PX,
+        top: LIQ_LABEL_Y - LIQ_TICKER_HEIGHT_PX,
+        height: LIQ_TICKER_HEIGHT_PX,
         fontSize: LIQ_TICKER_FONT_PX,
         color: LIQ_TICKER_COLOR,
       }}
@@ -104,9 +94,6 @@ export const LiqTicker = ({ snapshot }: { snapshot: OpenInterestSnapshot | null 
         onAnimationIteration={advance}
       >
         <span ref={phraseRef} className="liq-ticker-phrase">
-          {text}
-        </span>
-        <span className="liq-ticker-phrase" aria-hidden="true">
           {text}
         </span>
       </div>

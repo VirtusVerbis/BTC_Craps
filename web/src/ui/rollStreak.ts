@@ -5,11 +5,8 @@
  * Hitting the point does not end the hand. The seven-out roll does not count.
  */
 
-/** Rainbow starts once the longest streak is greater than this. */
+/** Current hand stays rainbow once it is greater than this. */
 export const ROLL_STREAK_THRESHOLD = 10
-
-/** How long the rainbow stays on after a new record above the threshold. */
-export const ROLL_STREAK_RAINBOW_MS = 5_000
 
 /**
  * How long one character keeps a color before stepping to the next.
@@ -40,10 +37,6 @@ export interface RollStreak {
 export interface RollStreakView {
   current: number
   longest: number
-  /** Increments when a roll sets a new record above the threshold. */
-  rainbowSeq: number
-  /** Increments on seven-out so the label returns to the plain style. */
-  resetSeq: number
 }
 
 export interface RollStreakStep {
@@ -58,7 +51,7 @@ export const emptyRollStreak = (): RollStreak => ({ longest: 0, current: 0 })
 
 export const formatRollStreak = (current: number, longest: number): string => `Roll Streak ${current} / ${longest}`
 
-export const rollStreakNeedsRainbow = (longest: number): boolean => longest > ROLL_STREAK_THRESHOLD
+export const rollStreakNeedsRainbow = (current: number): boolean => current > ROLL_STREAK_THRESHOLD
 
 /** Color slot for one character. `step` advances with `ROLL_STREAK_COLOR_STEP_MS`. */
 export const rollStreakColorIndex = (indexFromLeft: number, step: number, colorCount: number): number => {
@@ -129,6 +122,4 @@ export const saveRollStreakLongest = (longest: number): void => {
 export const emptyRollStreakView = (): RollStreakView => ({
   current: 0,
   longest: loadRollStreakLongest(),
-  rainbowSeq: 0,
-  resetSeq: 0,
 })

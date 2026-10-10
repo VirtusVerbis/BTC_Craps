@@ -73,9 +73,10 @@ describe('roll streak', () => {
     expect(step.streak).toEqual({ longest: 1, current: 1 })
   })
 
-  it('starts the rainbow only after the streak exceeds the threshold', () => {
+  it('rainbows the current hand once it passes the threshold, whether or not it is the longest', () => {
     expect(rollStreakNeedsRainbow(ROLL_STREAK_THRESHOLD)).toBe(false)
     expect(rollStreakNeedsRainbow(ROLL_STREAK_THRESHOLD + 1)).toBe(true)
+    expect(rollStreakNeedsRainbow(0)).toBe(false)
     expect(formatRollStreak(10, 36)).toBe('Roll Streak 10 / 36')
     expect(formatRollStreak(0, 36)).toBe('Roll Streak 0 / 36')
   })

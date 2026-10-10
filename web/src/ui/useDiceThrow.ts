@@ -59,7 +59,6 @@ import {
 import {
   applyRollStreak,
   loadRollStreakLongest,
-  rollStreakNeedsRainbow,
   saveRollStreakLongest,
   type RollStreak,
   type RollStreakView,
@@ -194,14 +193,10 @@ export const useDiceThrow = (
   const sevenOutRef = useRef(false)
   const speechRef = useRef<Partial<Record<ChipCharacter, { text: string; until: number }>>>({})
   const streakRef = useRef<RollStreak>({ longest: loadRollStreakLongest(), current: 0 })
-  const rainbowSeqRef = useRef(0)
-  const resetSeqRef = useRef(0)
   const streakView = useCallback(
     (): RollStreakView => ({
       current: streakRef.current.current,
       longest: streakRef.current.longest,
-      rainbowSeq: rainbowSeqRef.current,
-      resetSeq: resetSeqRef.current,
     }),
     [],
   )
@@ -324,8 +319,6 @@ export const useDiceThrow = (
           }
           const step = applyRollStreak(streakRef.current, pointBefore != null, result.total)
           streakRef.current = step.streak
-          if (step.record && rollStreakNeedsRainbow(step.streak.longest)) rainbowSeqRef.current += 1
-          if (step.sevenOut) resetSeqRef.current += 1
           if (step.record) saveRollStreakLongest(step.streak.longest)
         }
         const raw = result ? onCountedRollRef.current?.(result) : 0
