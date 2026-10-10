@@ -10,16 +10,18 @@ import {
   chipsAHitCanLift,
   driftLooseChips,
   emptyChipWorld,
+  guideFrames,
   presentChips,
   puckObstacle,
   resolveDiceChips,
   settleColumns,
+  tickRestack,
   worldFromBets,
   zeroOffsets,
   type ChipWorld,
   type StandingStack,
 } from './chipPhysics'
-import { CHIP_COLUMN_GAP_PX, CHIP_DEPTH_SCALE, CHIP_WEIGHT } from './chipConstants'
+import { CHIP_COLUMN_GAP_PX, CHIP_DEPTH_SCALE, CHIP_RESTACK_MS, CHIP_WEIGHT } from './chipConstants'
 import { buildBets, placeBets } from './chipBets'
 import { PUCK_COLLISION_HEIGHT_PX, PUCK_OFF_X, PUCK_OFF_Y } from './diceConstants'
 import { puckPlacement } from './puckState'
@@ -77,6 +79,7 @@ describe('chip topples', () => {
     expect(lifted).toBeLessThan(3)
     expect(world.loose).toHaveLength(lifted)
     expect(world.stacks[0]?.colors.length).toBeGreaterThanOrEqual(7)
+    expect(world.loose.every((chip) => chip.homeX === stack.x && chip.homeZ === stack.z)).toBe(true)
   })
 
   it('lets a launching die pass through a shooter stack before mid-felt', () => {
@@ -150,6 +153,104 @@ describe('chip topples', () => {
     expect(rebuilt.restack).not.toBeNull()
     const crooked = rebuilt.restack?.nextStacks.some((stack) => stack.offsets.some((offset) => offset.x !== 0 || offset.z !== 0))
     expect(crooked).toBe(false)
+  })
+
+  it('rebuilds only the column a loose chip came from', () => {
+    const bets = buildBets(10_000_000_000, 50, 50)
+    const world = worldFromBets(bets, 1)
+    const fallen = world.stacks[0]
+    const leaned = world.stacks[1]
+    expect(fallen && leaned && fallen.id !== leaned.id).toBeTruthy()
+    leaned.offsets[leaned.offsets.length - 1] = { x: 4, z: 1 }
+    world.stacks = world.stacks.filter((stack) => stack.id !== fallen.id)
+    world.loose.push({
+      id: `${fallen.id}-loose-0-1`,
+      color: fallen.colors[0] ?? 'white',
+      x: fallen.x + 40,
+      z: fallen.z + 10,
+      h: 0,
+      vx: 0,
+      vz: 0,
+      vh: 0,
+      spin: 0,
+      homeX: fallen.x,
+      homeZ: fallen.z,
+    })
+    const rebuilt = settleColumns(world, bets, 0, 99)
+    expect(rebuilt.restack?.nextStacks.map((stack) => stack.id)).toEqual([fallen.id])
+    const straight = rebuilt.restack?.nextStacks[0]
+    expect(straight?.offsets.every((offset) => offset.x === 0 && offset.z === 0)).toBe(true)
+    expect(straight?.x).toBe(fallen.x)
+    expect(straight?.z).toBe(fallen.z)
+    const kept = rebuilt.stacks.find((stack) => stack.id === leaned.id)
+    expect(kept?.offsets[kept.offsets.length - 1]).toEqual({ x: 4, z: 1 })
+    expect(rebuilt.stacks.some((stack) => stack.id === fallen.id)).toBe(false)
+
+    const discs = presentChips(rebuilt, 0, metrics)
+    expect(discs.some((disc) => disc.key.startsWith(`${leaned.id}-`))).toBe(true)
+    expect(discs.some((disc) => disc.key.startsWith('restack-'))).toBe(true)
+    expect(tickRestack(rebuilt, CHIP_RESTACK_MS - 1).restack).not.toBeNull()
+
+    const done = tickRestack(rebuilt, CHIP_RESTACK_MS)
+    expect(done.restack).toBeNull()
+    const survivor = done.stacks.find((stack) => stack.id === leaned.id)
+    expect(survivor?.offsets[survivor.offsets.length - 1]).toEqual({ x: 4, z: 1 })
+    const rebuiltColumn = done.stacks.find((stack) => stack.id === fallen.id)
+    expect(rebuiltColumn?.offsets.every((offset) => offset.x === 0 && offset.z === 0)).toBe(true)
+  })
+
+  it('rebuilds only the column nearest an untagged loose chip', () => {
+    const bets = buildBets(10_000_000_000, 50, 50)
+    const world = worldFromBets(bets, 1)
+    const nearest = world.stacks[0]
+    const leaned = world.stacks[1]
+    expect(nearest && leaned && nearest.id !== leaned.id).toBeTruthy()
+    leaned.offsets[leaned.offsets.length - 1] = { x: 4, z: 1 }
+    world.loose.push({
+      id: 'fell',
+      color: 'white',
+      x: nearest.x,
+      z: nearest.z,
+      h: 0,
+      vx: 0,
+      vz: 0,
+      vh: 0,
+      spin: 0,
+    })
+    const rebuilt = settleColumns(world, bets, 0, 99)
+    expect(rebuilt.restack?.nextStacks.map((stack) => stack.id)).toEqual([nearest.id])
+    const kept = rebuilt.stacks.find((stack) => stack.id === leaned.id)
+    expect(kept?.offsets[kept.offsets.length - 1]).toEqual({ x: 4, z: 1 })
+  })
+
+  it('keeps a flying column inside its strategy outline', () => {
+    const world: ChipWorld = {
+      stacks: [{
+        id: 'stay',
+        x: 100,
+        z: 200,
+        colors: ['white'],
+        offsets: zeroOffsets(1),
+        guide: { label: 'pass', color: '#fff' },
+      }],
+      loose: [],
+      restack: {
+        startedMs: 0,
+        chips: [],
+        nextStacks: [{
+          id: 'fly',
+          x: 400,
+          z: 200,
+          colors: ['red'],
+          offsets: zeroOffsets(1),
+          guide: { label: 'pass', color: '#fff' },
+        }],
+      },
+    }
+    const frames = guideFrames(world, metrics)
+    expect(frames).toHaveLength(1)
+    expect(frames[0]?.left).toBeLessThan(100)
+    expect((frames[0]?.left ?? 0) + (frames[0]?.width ?? 0)).toBeGreaterThan(400)
   })
 
   it('topples a neighbor only while the chip is still moving', () => {

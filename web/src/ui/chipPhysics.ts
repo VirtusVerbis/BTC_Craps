@@ -3,7 +3,7 @@ import { DIE_GRAVITY_PX_PER_S2, PUCK_COLLISION_HEIGHT_PX, PUCK_IMAGE_WIDTH_PX } 
 import { puckPlacement } from './puckState'
 import { dieSize, stageMetrics, type Die, type StageMetrics } from './dicePhysics'
 import { SHOOTER_STACK_COLLISION_OFF } from './characterBetConstants'
-import { placeBets, type ChipBet } from './chipBets'
+import { placeBets, type ChipBet, type PlacedColumn } from './chipBets'
 import {
   CHIP_COLUMN_GAP_PX,
   CHIP_DEPTH_SCALE,
@@ -80,6 +80,9 @@ export interface LooseChip {
   vz: number
   vh: number
   spin: number
+  /** Column spot at the moment this plate was sheared. */
+  homeX?: number
+  homeZ?: number
 }
 
 export interface RestackChip {
@@ -206,6 +209,8 @@ const shearStack = (
       vz: (dirZ * speed * kick) / mass,
       vh: (70 * kick) / mass,
       spin: chipRotationDeg(index),
+      homeX: stack.x,
+      homeZ: stack.z,
     }
   })
 }
@@ -551,49 +556,104 @@ export const driftLooseChips = (
   return next
 }
 
-interface ChipSource {
+interface ChipPlate {
   color: ChipColor
   x: number
   z: number
   h: number
   spin: number
+  stackId: string | null
 }
 
-const collectSources = (world: ChipWorld): ChipSource[] => {
-  const thickness = chipThickness()
-  const stacked = world.stacks.flatMap((stack) =>
-    stack.colors.map((color, index) => ({
-      color,
-      x: stack.x + (stack.offsets[index]?.x ?? 0),
-      z: stack.z + (stack.offsets[index]?.z ?? 0),
-      h: index * thickness,
-      spin: chipRotationDeg(index),
-    })),
-  )
-  const loose = world.loose.map((chip) => ({
-    color: chip.color,
-    x: chip.x,
-    z: chip.z,
-    h: chip.h,
-    spin: chip.spin,
-  }))
-  return [...stacked, ...loose]
+interface RestackSlot {
+  color: ChipColor
+  x: number
+  z: number
+  h: number
+  spin: number
+  from: ChipPlate | null
 }
 
-const collectTargets = (stacks: readonly StandingStack[]): ChipSource[] => {
-  const thickness = chipThickness()
-  return stacks.flatMap((stack) =>
-    stack.colors.map((color, index) => ({
-      color,
-      x: stack.x,
-      z: stack.z,
-      h: index * thickness,
-      spin: chipRotationDeg(index),
-    })),
-  )
+const LOOSE_ID_MARKER = '-loose-'
+
+/** Stack id encoded by `shearStack`. Untagged chips return null. */
+const stackIdFromLoose = (id: string): string | null => {
+  const at = id.indexOf(LOOSE_ID_MARKER)
+  if (at <= 0) return null
+  return id.slice(0, at)
 }
 
-/** Restack only after a chip has left a column. Otherwise keep the lean and swap colors in place. */
+const nearestStackId = (x: number, z: number, stacks: readonly StandingStack[]): string | null => {
+  let bestId: string | null = null
+  let bestDist = Number.POSITIVE_INFINITY
+  for (const stack of stacks) {
+    const dist = Math.hypot(x - stack.x, z - stack.z)
+    if (dist < bestDist) {
+      bestDist = dist
+      bestId = stack.id
+    }
+  }
+  return bestId
+}
+
+const columnPose = (
+  column: PlacedColumn,
+  existing: StandingStack | undefined,
+  loose: readonly LooseChip[],
+  useHome: boolean,
+): { x: number; z: number } => {
+  if (column.pinned) return { x: column.x, z: column.z }
+  if (existing) return { x: existing.x, z: existing.z }
+  if (useHome) {
+    const home = loose.find((chip) => stackIdFromLoose(chip.id) === column.id && chip.homeX != null && chip.homeZ != null)
+    if (home?.homeX != null && home.homeZ != null) return { x: home.homeX, z: home.homeZ }
+  }
+  return { x: column.x, z: column.z }
+}
+
+/** Pinned columns snap to the anchor. Others keep their spot and, unless rebuilt, their lean. */
+const settleStack = (
+  column: PlacedColumn,
+  existing: StandingStack | undefined,
+  loose: readonly LooseChip[],
+  rebuild: boolean,
+): StandingStack => {
+  const pose = columnPose(column, existing, loose, rebuild)
+  return {
+    id: column.id,
+    x: pose.x,
+    z: pose.z,
+    colors: column.colors.slice(),
+    offsets: rebuild || !existing ? zeroOffsets(column.colors.length) : fitOffsets(existing.offsets, column.colors.length),
+    pinned: column.pinned,
+    guide: column.guide,
+  }
+}
+
+const impactedStackIds = (world: ChipWorld): Set<string> => {
+  const impacted = new Set<string>()
+  for (const chip of world.loose) {
+    const parsed = stackIdFromLoose(chip.id)
+    if (parsed) {
+      impacted.add(parsed)
+      continue
+    }
+    const nearest = nearestStackId(chip.x, chip.z, world.stacks)
+    if (nearest) impacted.add(nearest)
+  }
+  return impacted
+}
+
+const looseOwner = (chip: LooseChip, stacks: readonly StandingStack[]): string | null => {
+  const parsed = stackIdFromLoose(chip.id)
+  if (parsed) return parsed
+  return nearestStackId(chip.x, chip.z, stacks)
+}
+
+/**
+ * Restack only columns that lost a chip. Untouched columns keep their lean and swap colors in place.
+ * With no loose chips, every column takes the in-place path.
+ */
 export const settleColumns = (
   world: ChipWorld,
   bets: readonly ChipBet[],
@@ -606,66 +666,127 @@ export const settleColumns = (
   return {
     loose: [],
     restack: null,
-    stacks: placed.map((column) => {
-      const existing = byId.get(column.id)
-      if (!existing) {
-        return {
-          id: column.id,
-          x: column.x,
-          z: column.z,
-          colors: column.colors.slice(),
-          offsets: zeroOffsets(column.colors.length),
-          pinned: column.pinned,
-          guide: column.guide,
-        }
-      }
-      return {
-        id: existing.id,
-        x: column.pinned ? column.x : existing.x,
-        z: column.pinned ? column.z : existing.z,
-        colors: column.colors.slice(),
-        offsets: fitOffsets(existing.offsets, column.colors.length),
-        pinned: column.pinned,
-        guide: column.guide,
-      }
-    }),
+    stacks: placed.map((column) => settleStack(column, byId.get(column.id), world.loose, false)),
   }
 }
 
 export const beginRestack = (world: ChipWorld, bets: readonly ChipBet[], nowMs: number, seed: number): ChipWorld => {
-  const next = worldFromBets(bets, seed)
-  const sources = collectSources(world)
-  const targets = collectTargets(next.stacks)
-  if (sources.length === 0) return next
-  const count = Math.max(sources.length, targets.length)
-  const fallback = targets[0] ?? sources[0]
+  const placed = placeBets(bets, seed, chipColumnStep)
+  const byId = new Map(world.stacks.map((stack) => [stack.id, stack]))
+  const impacted = impactedStackIds(world)
+  const survivors: StandingStack[] = []
+  const nextStacks: StandingStack[] = []
+  for (const column of placed) {
+    const existing = byId.get(column.id)
+    if (impacted.has(column.id)) nextStacks.push(settleStack(column, existing, world.loose, true))
+    else survivors.push(settleStack(column, existing, world.loose, false))
+  }
+
+  const thickness = chipThickness()
+  const sources: ChipPlate[] = []
+  for (const stack of world.stacks) {
+    if (!impacted.has(stack.id)) continue
+    stack.colors.forEach((color, index) => {
+      sources.push({
+        color,
+        x: stack.x + (stack.offsets[index]?.x ?? 0),
+        z: stack.z + (stack.offsets[index]?.z ?? 0),
+        h: index * thickness,
+        spin: chipRotationDeg(index),
+        stackId: stack.id,
+      })
+    })
+  }
+  for (const chip of world.loose) {
+    sources.push({
+      color: chip.color,
+      x: chip.x,
+      z: chip.z,
+      h: chip.h,
+      spin: chip.spin,
+      stackId: looseOwner(chip, world.stacks),
+    })
+  }
+
+  if (sources.length === 0 || nextStacks.length === 0) {
+    return { stacks: [...survivors, ...nextStacks], loose: [], restack: null }
+  }
+
+  const slots = new Map<string, RestackSlot[]>()
+  for (const stack of nextStacks) {
+    slots.set(
+      stack.id,
+      stack.colors.map((color, index) => ({
+        color,
+        x: stack.x,
+        z: stack.z,
+        h: index * thickness,
+        spin: chipRotationDeg(index),
+        from: null,
+      })),
+    )
+  }
+
+  const extras: ChipPlate[] = []
+  for (const source of sources) {
+    const columnSlots = source.stackId ? slots.get(source.stackId) : undefined
+    const open = columnSlots?.find((slot) => slot.from == null)
+    if (open) open.from = source
+    else extras.push(source)
+  }
+  for (const stack of nextStacks) {
+    for (const slot of slots.get(stack.id) ?? []) {
+      if (slot.from) continue
+      const source = extras.shift()
+      if (!source) break
+      slot.from = source
+    }
+  }
+
   const chips: RestackChip[] = []
-  for (let i = 0; i < count; i += 1) {
-    const from = sources[i] ?? targets[i] ?? fallback
-    const to = targets[i] ?? targets[targets.length - 1] ?? from
+  const ordered = nextStacks.flatMap((stack) => slots.get(stack.id) ?? [])
+  for (const slot of ordered) {
+    const from = slot.from ?? slot
     chips.push({
-      id: `restack-${i}`,
-      color: to.color,
+      id: `restack-${chips.length}`,
+      color: slot.color,
       fromX: from.x,
       fromZ: from.z,
       fromH: from.h,
-      toX: to.x,
-      toZ: to.z,
-      toH: to.h,
+      toX: slot.x,
+      toZ: slot.z,
+      toH: slot.h,
       spin: from.spin,
     })
   }
+  const last = ordered[ordered.length - 1]
+  if (last) {
+    for (const extra of extras) {
+      chips.push({
+        id: `restack-${chips.length}`,
+        color: last.color,
+        fromX: extra.x,
+        fromZ: extra.z,
+        fromH: extra.h,
+        toX: last.x,
+        toZ: last.z,
+        toH: last.h,
+        spin: extra.spin,
+      })
+    }
+  }
+
   return {
-    stacks: [],
+    stacks: survivors,
     loose: [],
-    restack: { startedMs: nowMs, chips, nextStacks: next.stacks },
+    restack: { startedMs: nowMs, chips, nextStacks },
   }
 }
 
 export const tickRestack = (world: ChipWorld, nowMs: number): ChipWorld => {
   if (!world.restack) return world
   if (nowMs - world.restack.startedMs < CHIP_RESTACK_MS) return world
-  return { stacks: world.restack.nextStacks, loose: [], restack: null }
+  return { stacks: [...world.stacks, ...world.restack.nextStacks], loose: [], restack: null }
 }
 
 const lerp = (a: number, b: number, t: number): number => a + (b - a) * t
@@ -732,7 +853,8 @@ const standingDiscs = (stack: StandingStack, metrics: StageMetrics): ChipDisc[] 
 export const presentChips = (world: ChipWorld, nowMs: number, metrics: StageMetrics = stageMetrics()): ChipDisc[] => {
   if (world.restack) {
     const t = smooth(Math.min(1, Math.max(0, (nowMs - world.restack.startedMs) / CHIP_RESTACK_MS)))
-    return world.restack.chips.flatMap((chip, index) =>
+    const standing = world.stacks.flatMap((stack) => standingDiscs(stack, metrics))
+    const flying = world.restack.chips.flatMap((chip, index) =>
       plateDiscs(
         chip.id,
         chip.color,
@@ -744,6 +866,7 @@ export const presentChips = (world: ChipWorld, nowMs: number, metrics: StageMetr
         metrics,
       ),
     )
+    return [...standing, ...flying]
   }
   const standing = world.stacks.flatMap((stack) => standingDiscs(stack, metrics))
   const loose = world.loose.flatMap((chip, index) =>
@@ -769,7 +892,7 @@ export interface StackGuideView {
 
 /** One box around every column that shares a strategy label, after the current lean. */
 export const guideFrames = (world: ChipWorld, metrics: StageMetrics = stageMetrics()): StackGuideView[] => {
-  const stacks = world.stacks.length > 0 ? world.stacks : (world.restack?.nextStacks ?? [])
+  const stacks = [...world.stacks, ...(world.restack?.nextStacks ?? [])]
   const groups = new Map<string, StandingStack[]>()
   for (const stack of stacks) {
     if (!stack.guide) continue

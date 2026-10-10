@@ -4,7 +4,7 @@ import type { ChipCharacter } from './chipConstants'
 export const CAT_PROFILE_ON = true//false
 export const OLD_LADY_PROFILE_ON = true//false
 export const OLD_MAN_PROFILE_ON = true//false
-export const WOLF_PROFILE_ON = false
+export const WOLF_PROFILE_ON = true//false
 
 /** Fixed one-red Pass, Don't Pass, and Make 'Em All. Off hides the chips and both labels. */
 export const SHOOTER_ON = true
@@ -150,54 +150,80 @@ export const OLD_MAN_FIELD_Y = 920
 
 //WOLF
 
-export const WOLF_ACROSS_4_X = 40
-export const WOLF_ACROSS_4_Y = 700
-export const WOLF_ACROSS_5_X = 90
-export const WOLF_ACROSS_5_Y = 700
-export const WOLF_ACROSS_6_X = 140
-export const WOLF_ACROSS_6_Y = 660
-export const WOLF_ACROSS_8_X = 190
-export const WOLF_ACROSS_8_Y = 660
-export const WOLF_ACROSS_9_X = 240
-export const WOLF_ACROSS_9_Y = 700
-export const WOLF_ACROSS_10_X = 290
-export const WOLF_ACROSS_10_Y = 700
 
-export const WOLF_LAY_4_X = 40
-export const WOLF_LAY_4_Y = 780
-export const WOLF_LAY_5_X = 90
-export const WOLF_LAY_5_Y = 780
-export const WOLF_LAY_6_X = 140
-export const WOLF_LAY_6_Y = 820
-export const WOLF_LAY_8_X = 190
-export const WOLF_LAY_8_Y = 820
-export const WOLF_LAY_9_X = 240
-export const WOLF_LAY_9_Y = 780
-export const WOLF_LAY_10_X = 290
-export const WOLF_LAY_10_Y = 780
+//across
 
-export const WOLF_POINT_4_X = 170
-export const WOLF_POINT_4_Y = 600
-export const WOLF_POINT_5_X = 170
-export const WOLF_POINT_5_Y = 600
-export const WOLF_POINT_6_X = 170
-export const WOLF_POINT_6_Y = 600
-export const WOLF_POINT_8_X = 170
-export const WOLF_POINT_8_Y = 600
-export const WOLF_POINT_9_X = 170
-export const WOLF_POINT_9_Y = 600
+export const WOLF_ACROSS_10_X = 185
+export const WOLF_ACROSS_10_Y = 1000
+export const WOLF_ACROSS_9_X = 175
+export const WOLF_ACROSS_9_Y = 1110
+
+export const WOLF_ACROSS_8_X = 165
+export const WOLF_ACROSS_8_Y = 1250
+export const WOLF_ACROSS_6_X = 160
+export const WOLF_ACROSS_6_Y = 1380
+
+export const WOLF_ACROSS_5_X = 150
+export const WOLF_ACROSS_5_Y = 1500
+export const WOLF_ACROSS_4_X = 140
+export const WOLF_ACROSS_4_Y = 1630
+
+
+// point
+
+
 export const WOLF_POINT_10_X = 170
 export const WOLF_POINT_10_Y = 600
+export const WOLF_POINT_9_X = 170
+export const WOLF_POINT_9_Y = 600
 
-export const WOLF_POINT_LAY_4_X = 170
-export const WOLF_POINT_LAY_4_Y = 600
-export const WOLF_POINT_LAY_5_X = 170
-export const WOLF_POINT_LAY_5_Y = 600
-export const WOLF_POINT_LAY_6_X = 170
-export const WOLF_POINT_LAY_6_Y = 600
-export const WOLF_POINT_LAY_8_X = 170
-export const WOLF_POINT_LAY_8_Y = 600
-export const WOLF_POINT_LAY_9_X = 170
-export const WOLF_POINT_LAY_9_Y = 600
+
+export const WOLF_POINT_8_X = 170
+export const WOLF_POINT_8_Y = 600
+export const WOLF_POINT_6_X = 170
+export const WOLF_POINT_6_Y = 600
+
+export const WOLF_POINT_5_X = 170
+export const WOLF_POINT_5_Y = 600
+export const WOLF_POINT_4_X = 170
+export const WOLF_POINT_4_Y = 600
+
+
+
+// LAY
+
+export const WOLF_LAY_10_X = 290
+export const WOLF_LAY_10_Y = 780
+export const WOLF_LAY_9_X = 240
+export const WOLF_LAY_9_Y = 780
+
+export const WOLF_LAY_8_X = 190
+export const WOLF_LAY_8_Y = 820
+export const WOLF_LAY_6_X = 140
+export const WOLF_LAY_6_Y = 820
+
+export const WOLF_LAY_5_X = 90
+export const WOLF_LAY_5_Y = 780
+export const WOLF_LAY_4_X = 40
+export const WOLF_LAY_4_Y = 780
+
+
+//  point lay
+
 export const WOLF_POINT_LAY_10_X = 170
 export const WOLF_POINT_LAY_10_Y = 600
+export const WOLF_POINT_LAY_9_X = 170
+export const WOLF_POINT_LAY_9_Y = 600
+
+export const WOLF_POINT_LAY_8_X = 170
+export const WOLF_POINT_LAY_8_Y = 600
+export const WOLF_POINT_LAY_6_X = 170
+export const WOLF_POINT_LAY_6_Y = 600
+
+export const WOLF_POINT_LAY_5_X = 170
+export const WOLF_POINT_LAY_5_Y = 600
+export const WOLF_POINT_LAY_4_X = 170
+export const WOLF_POINT_LAY_4_Y = 600
+
+
+
