@@ -11,7 +11,8 @@ import {
 } from './characterPnl'
 import { SPEECH_SHOW_MS } from './characterBetConstants'
 import type { ProfileBet } from './characterProfiles'
-import { composeTableBets } from './characterProfiles'
+import { composeTableBets, type PointHand } from './characterProfiles'
+import { isHardRoll } from './crapsPayouts'
 import { btcPrice, type ChipBet } from './chipBets'
 import {
   settleColumns,
@@ -157,6 +158,8 @@ export const useDiceThrow = (
   const shooterRef = useRef<ShooterBook>(loadShooterBook())
   const betsRef = useRef<readonly ChipBet[]>([])
   const profilesRef = useRef<ProfileBet[]>([])
+  const profilePointRef = useRef<number | null>(null)
+  const pressRollRef = useRef<number | null>(null)
   const sevenOutRef = useRef(false)
   const speechRef = useRef<Partial<Record<ChipCharacter, { text: string; until: number }>>>({})
   const [presentation, setPresentation] = useState<DicePresentation>(() =>
@@ -171,6 +174,8 @@ export const useDiceThrow = (
     shooterRef.current = loadShooterBook()
     betsRef.current = []
     profilesRef.current = []
+    profilePointRef.current = null
+    pressRollRef.current = null
     sevenOutRef.current = false
     speechRef.current = {}
     setPresentation(present(stateRef.current, [], [], [], pnlRef.current, shooterRef.current, emptyBonusStakes()))
@@ -185,16 +190,22 @@ export const useDiceThrow = (
         betsRef.current = shooter
         return shooter
       }
+      const point = stateRef.current.point
+      const continued = point != null && point === profilePointRef.current
+      const hand: PointHand = { continued, pressRoll: continued ? pressRollRef.current : null }
       const table = composeTableBets(
         snap.openInterest * price,
         snap.longPct,
         snap.shortPct,
         rollsRef.current,
-        stateRef.current.point,
+        point,
         profilesRef.current,
         sevenOutRef.current,
+        hand,
       )
       sevenOutRef.current = false
+      pressRollRef.current = null
+      profilePointRef.current = point
       profilesRef.current = table.profiles
       for (const character of PL_CHARACTERS) {
         const text = table.callouts[character]
@@ -227,6 +238,8 @@ export const useDiceThrow = (
         if (result && 'total' in result) {
           const snap = oiRef.current
           const price = btcPrice(marketRef.current)
+          const faces = stateRef.current.dice
+          const hard = isHardRoll(faces[0].topFace, faces[1].topFace)
           if (snap && price > 0 && snap.openInterest > 0) {
             pnlRef.current = applyCharacterPnl(
               pnlRef.current,
@@ -234,10 +247,13 @@ export const useDiceThrow = (
               result.total,
               characterStakes(snap.openInterest, price, snap.longPct, snap.shortPct),
               profilesRef.current,
+              hard,
             )
             saveCharacterPnl(pnlRef.current)
           }
           if (pointBefore != null && result.total === 7) sevenOutRef.current = true
+          const samePoint = pointBefore != null && stateRef.current.point === pointBefore
+          pressRollRef.current = samePoint && (result.total === 6 || result.total === 8) ? result.total : null
           const nextShooter = applyShooterRoll(
             shooterRef.current,
             pointBefore,

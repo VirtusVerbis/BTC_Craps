@@ -2,7 +2,7 @@
 export const DIE_LAUNCH_SIZE_PX = 40//57//45
 
 /** Size at the back wall, relative to `DIE_LAUNCH_SIZE_PX`. */
-export const DIE_DEPTH_SCALE = 0.4//0.5//0.6//0.50
+export const DIE_DEPTH_SCALE = 0.6//0.6//0.50
 
 /** Red face opacity. Pips stay opaque. */
 export const DIE_FACE_ALPHA = 0.65//0.55

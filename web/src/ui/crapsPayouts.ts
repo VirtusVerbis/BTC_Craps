@@ -189,6 +189,43 @@ export const settleDontPassOdds = (
   oddsStake: number,
 ): BetSettlement => settleOdds(point, total, lineStake, oddsStake, LAY_ODDS_PAY, total === 7, total === point)
 
+/** Hard 4 and 10 pay 7:1. Hard 6 and 8 pay 9:1. */
+export const HARD_NUMBERS = [4, 6, 8, 10] as const
+
+export type HardNumber = (typeof HARD_NUMBERS)[number]
+
+export const HARD_PAY: Record<HardNumber, WholeDollarPay> = {
+  4: { unit: 1, profit: 7 },
+  10: { unit: 1, profit: 7 },
+  6: { unit: 1, profit: 9 },
+  8: { unit: 1, profit: 9 },
+}
+
+export const isHardNumber = (value: number): value is HardNumber =>
+  (HARD_NUMBERS as readonly number[]).includes(value)
+
+/** Both dice show the same face. Hard 6 is 3 and 3, hard 8 is 4 and 4. */
+export const isHardRoll = (dieA: number | null, dieB: number | null): boolean =>
+  dieA != null && dieB != null && dieA === dieB && dieA >= 1 && dieA <= 6
+
+/**
+ * Hard ways win only on the pair and stay up. The easy way of that number loses, and any 7 loses.
+ * Any other roll is no action. Off on the come-out.
+ */
+export const settleHard = (
+  point: number | null,
+  total: number,
+  number: number,
+  stake: number,
+  hard: boolean,
+): BetSettlement => {
+  if (!isHardNumber(number)) return noBet(stake)
+  const { booked, unbooked } = bookDollars(stake, HARD_PAY[number].unit)
+  if (point == null || !isPointNumber(point)) return resting(booked, unbooked)
+  const hit = total === number
+  return settleBooked(booked, unbooked, hit && hard, total === 7 || (hit && !hard), false, true, HARD_PAY[number])
+}
+
 /**
  * Place bets are off on the come-out. After a point, the number pays if it rolls before a 7.
  * A winner stays on that number.

@@ -53,8 +53,14 @@ describe('profile allocation', () => {
   it('abstains from a whole strategy that the pass stake cannot cover', () => {
     const result = allocateProfiles(purses(5_000_000), [], 9, [], false, on)
     expect(result.profiles.filter((bet) => bet.character === 'cat')).toEqual([])
-    expect(result.profiles.filter((bet) => bet.character === 'oldLady')).toEqual([])
+    expect(result.profiles.filter((bet) => bet.character === 'oldLady').map((bet) => bet.id).sort()).toEqual([
+      'oldLady-hard-6',
+      'oldLady-hard-8',
+    ])
     expect(result.remainder.cat.pass).toBe(5_000_000)
+    expect(result.remainder.oldLady.pass).toBe(0)
+    const shorter = allocateProfiles(purses(2_000_000), [], 9, [], false, on)
+    expect(shorter.profiles.filter((bet) => bet.character === 'oldLady')).toEqual([])
   })
 
   it('keeps the line plus the strategy equal to the original stake', () => {
@@ -68,9 +74,13 @@ describe('profile allocation', () => {
 
   it('leaves the point number off the strategy', () => {
     const result = allocateProfiles(purses(500_000_000), [], 6, [], false, on)
-    const numbers = result.profiles.filter((bet) => bet.role !== 'point-place' && bet.role !== 'point-lay').map((bet) => bet.number)
+    const numbers = result.profiles
+      .filter((bet) => bet.role !== 'point-place' && bet.role !== 'point-lay' && bet.role !== 'hard')
+      .map((bet) => bet.number)
     expect(numbers).not.toContain(6)
     expect(result.profiles.some((bet) => bet.character === 'cat' && bet.number === 8)).toBe(true)
+    expect(result.profiles.some((bet) => bet.id === 'oldLady-hard-6')).toBe(true)
+    expect(result.profiles.some((bet) => bet.id === 'oldLady-hard-8')).toBe(true)
   })
 
   it('does not press a second across unit when the bet is already up', () => {
@@ -117,8 +127,66 @@ describe('profile allocation', () => {
     const comeOut = allocateProfiles(purses(500_000_000), [], null, up.profiles, false, { ...on, wolfLay: false })
     expect(comeOut.profiles.some((bet) => bet.role === 'across')).toBe(true)
     expect(comeOut.profiles.some((bet) => bet.role === 'field')).toBe(false)
+    expect(up.profiles.some((bet) => bet.role === 'hard')).toBe(true)
+    expect(comeOut.profiles.some((bet) => bet.role === 'hard')).toBe(false)
     const cleared = allocateProfiles(purses(500_000_000), [], null, up.profiles, true, on)
     expect(cleared.profiles).toEqual([])
+  })
+})
+
+describe('old lady hard ways', () => {
+  const lady: ProfileSwitches = { ...on, cat: false, oldMan: false, wolf: false, wolfLay: false }
+  const stake = 500_000_000
+
+  const dollars = (bets: readonly ProfileBet[], id: string) => bets.find((bet) => bet.id === id)?.dollars
+
+  it('opens hard 6 and 8 at one red and presses the number that rolled', () => {
+    const first = allocateProfiles(purses(stake), [], 4, [], false, lady)
+    expect(dollars(first.profiles, 'oldLady-hard-6')).toBe(PROFILE_RED)
+    expect(dollars(first.profiles, 'oldLady-hard-8')).toBe(PROFILE_RED)
+    expect(dollars(first.profiles, 'oldLady-inside-6')).toBe(PROFILE_SIX)
+    expect(first.callouts.oldLady).toBe('Inside for 11M\nHard 6 for 2.5M\nHard 8 for 2.5M')
+
+    const pressed = allocateProfiles(purses(stake), [], 4, first.profiles, false, lady, {
+      continued: true,
+      pressRoll: 6,
+    })
+    expect(dollars(pressed.profiles, 'oldLady-inside-6')).toBe(PROFILE_SIX * 2)
+    expect(dollars(pressed.profiles, 'oldLady-inside-8')).toBe(PROFILE_SIX)
+    expect(dollars(pressed.profiles, 'oldLady-hard-6')).toBe(PROFILE_RED * 2)
+    expect(dollars(pressed.profiles, 'oldLady-hard-8')).toBe(PROFILE_RED)
+    expect(dollarsOf(pressed.profiles, 'oldLady', 'pass') + pressed.remainder.oldLady.pass).toBe(stake)
+    expect(pressed.callouts.oldLady).toBe('Inside for 3M\nHard 6 for 2.5M')
+  })
+
+  it('keeps a place press into the next point and restarts hardways at one red', () => {
+    const first = allocateProfiles(purses(stake), [], 4, [], false, lady)
+    const pressed = allocateProfiles(purses(stake), [], 4, first.profiles, false, lady, {
+      continued: true,
+      pressRoll: 8,
+    })
+    const comeOut = allocateProfiles(purses(stake), [], null, pressed.profiles, false, lady)
+    expect(comeOut.profiles.some((bet) => bet.role === 'hard')).toBe(false)
+    expect(dollars(comeOut.profiles, 'oldLady-inside-8')).toBe(PROFILE_SIX * 2)
+
+    const next = allocateProfiles(purses(stake), [], 5, comeOut.profiles, false, lady)
+    expect(dollars(next.profiles, 'oldLady-hard-6')).toBe(PROFILE_RED)
+    expect(dollars(next.profiles, 'oldLady-hard-8')).toBe(PROFILE_RED)
+    expect(dollars(next.profiles, 'oldLady-inside-8')).toBe(PROFILE_SIX * 2)
+    expect(next.profiles.some((bet) => bet.number === 5 && bet.role === 'inside')).toBe(false)
+  })
+
+  it('leaves the bet alone when the pass stake cannot fund the press', () => {
+    const tight = 16_000_000
+    const first = allocateProfiles(purses(tight), [], 4, [], false, lady)
+    const held = allocateProfiles(purses(tight), [], 4, first.profiles, false, lady, {
+      continued: true,
+      pressRoll: 6,
+    })
+    expect(dollars(held.profiles, 'oldLady-hard-6')).toBe(PROFILE_RED)
+    expect(dollars(held.profiles, 'oldLady-inside-6')).toBe(PROFILE_SIX)
+    expect(dollarsOf(held.profiles, 'oldLady', 'pass') + held.remainder.oldLady.pass).toBe(tight)
+    expect(held.callouts.oldLady).toBeUndefined()
   })
 })
 

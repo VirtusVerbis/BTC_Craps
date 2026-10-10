@@ -22,6 +22,10 @@ import {
   OLD_LADY_INSIDE_8_Y,
   OLD_LADY_INSIDE_9_X,
   OLD_LADY_INSIDE_9_Y,
+  OLD_LADY_HARD_6_X,
+  OLD_LADY_HARD_6_Y,
+  OLD_LADY_HARD_8_X,
+  OLD_LADY_HARD_8_Y,
   OLD_LADY_PROFILE_ON,
   OLD_MAN_FIELD_X,
   OLD_MAN_FIELD_Y,
@@ -121,7 +125,16 @@ const MIN_HISTOGRAM_ROLLS = 3
 const PLACE_NUMBERS: readonly PointNumber[] = [4, 5, 6, 8, 9, 10]
 const CHARACTERS: readonly ChipCharacter[] = ['wolf', 'oldLady', 'cat', 'oldMan']
 
-export type ProfileRole = 'place' | 'inside' | 'iron' | 'field' | 'across' | 'lay' | 'point-place' | 'point-lay'
+export type ProfileRole = 'place' | 'inside' | 'iron' | 'field' | 'across' | 'lay' | 'point-place' | 'point-lay' | 'hard'
+
+/** Same point still up. Hardways restart at one red when a new point is set. */
+export interface PointHand {
+  continued: boolean
+  /** 6 or 8 when that total just rolled and the point stayed up. Otherwise null. */
+  pressRoll: number | null
+}
+
+const NO_HAND: PointHand = { continued: false, pressRoll: null }
 
 export interface ProfileBet {
   id: string
@@ -168,6 +181,11 @@ const insideSpot: Record<5 | 6 | 8 | 9, Spot> = {
   6: { x: OLD_LADY_INSIDE_6_X, y: OLD_LADY_INSIDE_6_Y, label: 'OLD_LADY_INSIDE_6' },
   8: { x: OLD_LADY_INSIDE_8_X, y: OLD_LADY_INSIDE_8_Y, label: 'OLD_LADY_INSIDE_8' },
   9: { x: OLD_LADY_INSIDE_9_X, y: OLD_LADY_INSIDE_9_Y, label: 'OLD_LADY_INSIDE_9' },
+}
+
+const hardSpot: Record<6 | 8, Spot> = {
+  6: { x: OLD_LADY_HARD_6_X, y: OLD_LADY_HARD_6_Y, label: 'OLD_LADY_HARD_6' },
+  8: { x: OLD_LADY_HARD_8_X, y: OLD_LADY_HARD_8_Y, label: 'OLD_LADY_HARD_8' },
 }
 
 const ironSpot: Record<5 | 6 | 8, Spot> = {
@@ -324,11 +342,33 @@ const enabled = (item: ProfileBet, switches: ProfileSwitches): boolean => {
 
 const workingPoint = (point: number | null): PointNumber | null => (point != null && isPointNumber(point) ? point : null)
 
+const previousDollars = (
+  previous: readonly ProfileBet[],
+  character: ChipCharacter,
+  role: ProfileRole,
+  number: PointNumber,
+): number | null => {
+  const found = previous.find((item) => item.character === character && item.role === role && item.number === number)
+  return found != null && found.dollars > 0 ? found.dollars : null
+}
+
+const firstAffordable = (purse: LinePurse, side: ChipSide, quotes: readonly number[]): number | null => {
+  const seen = new Set<number>()
+  for (const amount of quotes) {
+    if (seen.has(amount) || !(amount > 0)) continue
+    seen.add(amount)
+    if (canAfford(purse, side, amount)) return amount
+  }
+  return null
+}
+
 const freshWhilePoint = (
   point: PointNumber,
   rolls: readonly number[],
   purses: CharacterPurses,
   switches: ProfileSwitches,
+  previous: readonly ProfileBet[],
+  hand: PointHand,
 ): ProfileBet[] => {
   const placed: ProfileBet[] = []
 
@@ -355,12 +395,53 @@ const freshWhilePoint = (
   if (switches.oldLady) {
     const purse = purses.oldLady
     const numbers = exceptPoint(point, [5, 6, 8, 9])
-    const cost = numbers.reduce((sum, number) => sum + placeUnit(number), 0)
-    if (numbers.length > 0 && canAfford(purse, 'pass', cost)) {
+    const insideAmount = (number: PointNumber, carry: boolean): number => {
+      if (!carry || (number !== 6 && number !== 8)) return placeUnit(number)
+      return previousDollars(previous, 'oldLady', 'inside', number) ?? placeUnit(number)
+    }
+    for (const carry of [true, false]) {
+      const cost = numbers.reduce((sum, number) => sum + insideAmount(number, carry), 0)
+      if (numbers.length === 0 || !canAfford(purse, 'pass', cost)) continue
       charge(purse, 'pass', cost)
       for (const number of numbers) {
         const spot = insideSpot[number as 5 | 6 | 8 | 9]
-        placed.push(bet('oldLady', 'inside', number, placeUnit(number), 'pass', spot))
+        placed.push(bet('oldLady', 'inside', number, insideAmount(number, carry), 'pass', spot))
+      }
+      break
+    }
+
+    const hardNumbers = [6, 8] as const
+    if (!hand.continued) {
+      const cost = PROFILE_RED * hardNumbers.length
+      if (canAfford(purse, 'pass', cost)) {
+        charge(purse, 'pass', cost)
+        for (const number of hardNumbers) {
+          placed.push(bet('oldLady', 'hard', number, PROFILE_RED, 'pass', hardSpot[number]))
+        }
+      }
+    } else {
+      for (const number of hardNumbers) {
+        const carried = previousDollars(previous, 'oldLady', 'hard', number) ?? PROFILE_RED
+        const amount = firstAffordable(purse, 'pass', [carried, PROFILE_RED])
+        if (amount == null) continue
+        charge(purse, 'pass', amount)
+        placed.push(bet('oldLady', 'hard', number, amount, 'pass', hardSpot[number]))
+      }
+    }
+
+    const pressNumber = hand.pressRoll
+    if (pressNumber === 6 || pressNumber === 8) {
+      const insideBet = placed.find((item) => item.id === `oldLady-inside-${pressNumber}`)
+      const hadInside = previousDollars(previous, 'oldLady', 'inside', pressNumber) != null
+      if (insideBet && hadInside && canAfford(purse, 'pass', PROFILE_SIX)) {
+        charge(purse, 'pass', PROFILE_SIX)
+        insideBet.dollars += PROFILE_SIX
+      }
+      const hardBet = placed.find((item) => item.id === `oldLady-hard-${pressNumber}`)
+      const hadHard = previousDollars(previous, 'oldLady', 'hard', pressNumber) != null
+      if (hardBet && hadHard && canAfford(purse, 'pass', PROFILE_RED)) {
+        charge(purse, 'pass', PROFILE_RED)
+        hardBet.dollars += PROFILE_RED
       }
     }
   }
@@ -505,6 +586,13 @@ export const calloutText = (added: readonly ProfileBet[]): string => {
   if (across > 0) lines.push(`Across for ${formatCompactDollars(across)}`)
   const inside = total('inside')
   if (inside > 0) lines.push(`Inside for ${formatCompactDollars(inside)}`)
+  const hard = added
+    .filter((item) => item.role === 'hard' && item.number != null)
+    .slice()
+    .sort((left, right) => (left.number ?? 0) - (right.number ?? 0))
+  for (const item of hard) {
+    lines.push(`Hard ${item.number} for ${formatCompactDollars(item.dollars)}`)
+  }
   const iron = total('iron')
   if (iron > 0) lines.push(`Iron cross for ${formatCompactDollars(iron)}`)
   for (const item of added.filter((entry) => entry.role === 'field')) {
@@ -541,12 +629,13 @@ export const allocateProfiles = (
   previous: readonly ProfileBet[],
   sevenOut: boolean,
   switches: ProfileSwitches = profileSwitches(),
+  hand: PointHand = NO_HAND,
 ): ProfileAllocation => {
   const purses = emptyPurses(stakes)
   const established = workingPoint(point)
   const profiles = sevenOut || established == null
     ? (sevenOut ? [] : fitKept(previous, purses, switches))
-    : freshWhilePoint(established, rolls, purses, switches)
+    : freshWhilePoint(established, rolls, purses, switches, previous, hand)
   return { profiles, remainder: purses, callouts: calloutsFor(previous, profiles) }
 }
 
@@ -598,6 +687,7 @@ export const composeTableBets = (
   point: number | null,
   previous: readonly ProfileBet[],
   sevenOut: boolean,
+  hand: PointHand = NO_HAND,
 ): TableBets => {
   const stakes = {} as CharacterPurses
   const drafts: Array<{ character: ChipCharacter; side: ChipSide; dollars: number }> = []
@@ -608,7 +698,7 @@ export const composeTableBets = (
     drafts.push({ character, side: 'pass', dollars: pass }, { character, side: 'dont', dollars: dont })
   }
   const largest = drafts.reduce((max, item) => Math.max(max, item.dollars), 0)
-  const allocated = allocateProfiles(stakes, rolls, point, previous, sevenOut)
+  const allocated = allocateProfiles(stakes, rolls, point, previous, sevenOut, profileSwitches(), hand)
   const scale = denominationScale(largest)
   const line = drafts.flatMap((item) => {
     const dollars = allocated.remainder[item.character][item.side]

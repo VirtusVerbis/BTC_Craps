@@ -7,7 +7,10 @@ import {
   maxOddsDollars,
   settleDontPass,
   settleDontPassOdds,
+  HARD_PAY,
+  isHardRoll,
   settleField,
+  settleHard,
   settleLay,
   settlePassLine,
   settlePassOdds,
@@ -193,6 +196,26 @@ describe('odds', () => {
       unbooked: 1_000,
     })
     expect(settleDontPassOdds(null, 7, 10, 20)).toMatchObject({ outcome: 'none', booked: 0, profit: 0 })
+  })
+
+  it('pays a hard way only on the pair', () => {
+    expect(HARD_PAY[4]).toEqual({ unit: 1, profit: 7 })
+    expect(HARD_PAY[10]).toEqual({ unit: 1, profit: 7 })
+    expect(HARD_PAY[6]).toEqual({ unit: 1, profit: 9 })
+    expect(HARD_PAY[8]).toEqual({ unit: 1, profit: 9 })
+    expect(isHardRoll(3, 3)).toBe(true)
+    expect(isHardRoll(4, 2)).toBe(false)
+    expect(isHardRoll(null, 3)).toBe(false)
+
+    expect(settleHard(5, 6, 6, 5, true)).toMatchObject({ outcome: 'win', profit: 45, staysUp: true, booked: 5 })
+    expect(settleHard(5, 8, 8, 5, true)).toMatchObject({ outcome: 'win', profit: 45, staysUp: true })
+    expect(settleHard(5, 4, 4, 5, true)).toMatchObject({ outcome: 'win', profit: 35, staysUp: true })
+    expect(settleHard(5, 10, 10, 5, true)).toMatchObject({ outcome: 'win', profit: 35, staysUp: true })
+    expect(settleHard(5, 6, 6, 5, false)).toMatchObject({ outcome: 'lose', profit: -5, staysUp: false })
+    expect(settleHard(5, 7, 6, 5, false)).toMatchObject({ outcome: 'lose', profit: -5, staysUp: false })
+    expect(settleHard(5, 8, 6, 5, true)).toMatchObject({ outcome: 'none', profit: 0, staysUp: true, booked: 5 })
+    expect(settleHard(null, 6, 6, 5, true)).toMatchObject({ outcome: 'none', profit: 0, staysUp: true, booked: 5 })
+    expect(settleHard(5, 6, 5, 5, true)).toMatchObject({ outcome: 'none', booked: 0, profit: 0, staysUp: false })
   })
 
   it('books at most 100x the line and only a legal odds multiple', () => {

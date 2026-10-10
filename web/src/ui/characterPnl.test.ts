@@ -12,6 +12,7 @@ import {
   writeStoredPnl,
 } from './characterPnl'
 import { PL_LOSS_COLOR, PL_PROFIT_COLOR } from './characterPnlConstants'
+import { PROFILE_RED } from './characterProfiles'
 import type { ProfileBet } from './characterProfiles'
 
 describe('line decision', () => {
@@ -101,6 +102,28 @@ describe('character stakes and running total', () => {
 
     const out = applyCharacterPnl(emptyCharacterPnl(), 8, 7, stakes, [place])
     expect(out.cat.btc).toBeCloseTo(-150)
+  })
+
+  it('pays hard 6 at 9 to 1 and loses it the easy way', () => {
+    const hard: ProfileBet = {
+      id: 'oldLady-hard-6',
+      character: 'oldLady',
+      role: 'hard',
+      number: 6,
+      dollars: PROFILE_RED,
+      fundedFrom: 'pass',
+      label: 'OLD_LADY_HARD_6',
+      x: 0,
+      y: 0,
+    }
+    const won = applyCharacterPnl(emptyCharacterPnl(), 9, 6, stakes, [hard], true)
+    expect(won.oldLady.btc).toBeCloseTo(375)
+    expect(won.oldLady.usd).toBeCloseTo(22_500_000)
+
+    const easy = applyCharacterPnl(emptyCharacterPnl(), 9, 6, stakes, [hard], false)
+    expect(easy.oldLady.btc).toBeCloseTo(-PROFILE_RED / 60_000)
+    const comeOut = emptyCharacterPnl()
+    expect(applyCharacterPnl(comeOut, null, 6, stakes, [hard], true)).toBe(comeOut)
   })
 })
 

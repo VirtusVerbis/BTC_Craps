@@ -2,7 +2,7 @@ import { betDollars } from './chipBets'
 import type { ChipCharacter } from './chipConstants'
 import type { ProfileBet } from './characterProfiles'
 import { PL_FLAT_COLOR, PL_LOSS_COLOR, PL_PROFIT_COLOR } from './characterPnlConstants'
-import { settleDontPass, settleField, settleLay, settlePassLine, settlePlace } from './crapsPayouts'
+import { settleDontPass, settleField, settleHard, settleLay, settlePassLine, settlePlace } from './crapsPayouts'
 
 /** Left to right along the rack. */
 export const PL_CHARACTERS: readonly ChipCharacter[] = ['wolf', 'oldLady', 'cat', 'oldMan']
@@ -156,10 +156,11 @@ const stakePrice = (stake: CharacterStakePair): number => {
   return 0
 }
 
-const profileProfit = (point: number | null, total: number, bet: ProfileBet): number => {
+const profileProfit = (point: number | null, total: number, bet: ProfileBet, hard: boolean): number => {
   if (bet.role === 'field') return settleField(point, total, bet.dollars).profit
   if (bet.number == null) return 0
   if (bet.role === 'lay' || bet.role === 'point-lay') return settleLay(point, total, bet.number, bet.dollars).profit
+  if (bet.role === 'hard') return settleHard(point, total, bet.number, bet.dollars, hard).profit
   return settlePlace(point, total, bet.number, bet.dollars).profit
 }
 
@@ -174,6 +175,7 @@ export const applyCharacterPnl = (
   total: number,
   stakes: CharacterStakes,
   profiles: readonly ProfileBet[] = [],
+  hard = false,
 ): CharacterPnlBook => {
   let changed = false
   const next: CharacterPnlBook = { ...book }
@@ -185,7 +187,7 @@ export const applyCharacterPnl = (
     const dontUsd = mine.filter((bet) => bet.fundedFrom === 'dont').reduce((sum, bet) => sum + bet.dollars, 0)
     const passBtc = price > 0 ? Math.max(0, stake.btc.pass - passUsd / price) : stake.btc.pass
     const dontBtc = price > 0 ? Math.max(0, stake.btc.dont - dontUsd / price) : stake.btc.dont
-    const profileBtc = price > 0 ? mine.reduce((sum, bet) => sum + profileProfit(point, total, bet), 0) / price : 0
+    const profileBtc = price > 0 ? mine.reduce((sum, bet) => sum + profileProfit(point, total, bet, hard), 0) / price : 0
     const btc = lineDecisionPnl(point, total, passBtc, dontBtc) + profileBtc
     if (btc === 0) continue
     changed = true

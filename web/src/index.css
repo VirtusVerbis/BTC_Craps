@@ -133,7 +133,7 @@ body {
 
 /*
  * Above the table (1). Shares z-index 2 with the histogram and is drawn first,
- * so the plate covers these squares where they overlap. Chips (5) paint on top.
+ * so the plate covers these squares where they overlap. Chips (4) and the dice (5) paint on top.
  */
 .bonus-fields {
   position: absolute;
@@ -167,7 +167,7 @@ body {
   white-space: nowrap;
 }
 
-/* Above the table (1) and the bonus fields, under the P/L labels (3), dice (4), chips (5), meme (6), and candle chart (7). */
+/* Above the table (1) and the bonus fields, under the P/L labels (3), chips (4), dice (5), meme (6), and candle chart (7). */
 .roll-histogram {
   position: absolute;
   z-index: 2;
@@ -271,15 +271,16 @@ body {
   }
 }
 
-/* Above the P/L labels (3), under the chips (5), speech (6), meme (7), and candle chart (8). */
-.dice-layer {
+/* Above the P/L labels (3), under the dice (5), speech (6), meme (7), and candle chart (8). */
+.chip-stack {
   position: absolute;
   inset: 0;
   z-index: 4;
   pointer-events: none;
 }
 
-.chip-stack {
+/* Above the chips (4) and the P/L labels (3), under the speech (6), meme (7), and candle chart (8). */
+.dice-layer {
   position: absolute;
   inset: 0;
   z-index: 5;
@@ -737,7 +738,7 @@ body {
   }
 }
 
-/* Above the histogram (2), under the dice (4) and chips (5). */
+/* Above the histogram (2), under the chips (4) and dice (5). */
 .character-pnl-layer {
   position: absolute;
   inset: 0;

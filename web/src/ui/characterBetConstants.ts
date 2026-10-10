@@ -16,7 +16,7 @@ export const SHOOTER_ON = true
 export const BONUS_STAKE_LABELS_ON = false
 
 /** Draw Pass and Don't Pass stacks. Off skips the felt only; those stakes still fund profiles and P/L. */
-export const LINE_STACKS_ON = false
+export const LINE_STACKS_ON = true//false
 
 
 /**
@@ -111,6 +111,12 @@ export const OLD_LADY_INSIDE_6_Y = 1380
 export const OLD_LADY_INSIDE_5_X = 220
 export const OLD_LADY_INSIDE_5_Y = 1500
 
+/** Player-side hard 6 (3-3, 9:1) and hard 8 (4-4, 9:1) in the center grid. */
+export const OLD_LADY_HARD_6_X = 560
+export const OLD_LADY_HARD_6_Y = 1370 
+export const OLD_LADY_HARD_8_X = 660
+export const OLD_LADY_HARD_8_Y = 1370
+
 // OLD MAN
 // If his Don't Pass stake is still larger, he places the point. The bubble says "Place 6 for …".
 //If his Pass stake is still larger, he lays the point. The bubble says "Lay 6 for …".
@@ -142,7 +148,7 @@ export const OLD_MAN_POINT_LAY_6_Y = 1380
 
 export const OLD_MAN_POINT_LAY_5_X = 110
 export const OLD_MAN_POINT_LAY_5_Y = 1500
-export const OLD_MAN_POINT_LAY_4_X = 110
+export const OLD_MAN_POINT_LAY_4_X = 100
 export const OLD_MAN_POINT_LAY_4_Y = 1630
 
 
@@ -172,7 +178,7 @@ export const WOLF_ACROSS_8_Y = 1250
 export const WOLF_ACROSS_6_X = 160
 export const WOLF_ACROSS_6_Y = 1380
 
-export const WOLF_ACROSS_5_X = 140
+export const WOLF_ACROSS_5_X = 145
 export const WOLF_ACROSS_5_Y = 1500
 export const WOLF_ACROSS_4_X = 140
 export const WOLF_ACROSS_4_Y = 1630
@@ -191,7 +197,7 @@ export const WOLF_POINT_8_Y = 1250
 export const WOLF_POINT_6_X = 160
 export const WOLF_POINT_6_Y = 1380
 
-export const WOLF_POINT_5_X = 140
+export const WOLF_POINT_5_X = 145
 export const WOLF_POINT_5_Y = 1500
 export const WOLF_POINT_4_X = 140
 export const WOLF_POINT_4_Y = 1630
@@ -218,20 +224,20 @@ export const WOLF_LAY_4_Y = 1630
 
 //  point lay
 
-export const WOLF_POINT_LAY_10_X = 170
-export const WOLF_POINT_LAY_10_Y = 600
-export const WOLF_POINT_LAY_9_X = 170
-export const WOLF_POINT_LAY_9_Y = 600
+export const WOLF_POINT_LAY_10_X = 120
+export const WOLF_POINT_LAY_10_Y = 1000
+export const WOLF_POINT_LAY_9_X = 120
+export const WOLF_POINT_LAY_9_Y = 1110
 
-export const WOLF_POINT_LAY_8_X = 170
-export const WOLF_POINT_LAY_8_Y = 600
-export const WOLF_POINT_LAY_6_X = 170
-export const WOLF_POINT_LAY_6_Y = 600
+export const WOLF_POINT_LAY_8_X = 110
+export const WOLF_POINT_LAY_8_Y = 1250
+export const WOLF_POINT_LAY_6_X = 100
+export const WOLF_POINT_LAY_6_Y = 1380
 
-export const WOLF_POINT_LAY_5_X = 170
-export const WOLF_POINT_LAY_5_Y = 600
-export const WOLF_POINT_LAY_4_X = 170
-export const WOLF_POINT_LAY_4_Y = 600
+export const WOLF_POINT_LAY_5_X = 90
+export const WOLF_POINT_LAY_5_Y = 1500
+export const WOLF_POINT_LAY_4_X = 90
+export const WOLF_POINT_LAY_4_Y = 1630
 
 
 
