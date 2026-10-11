@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DIE_RAINBOW_STEP_MS } from './diceConstants'
-import { DIE_COLOR_ORDER, dieRainbowStep, loadDieColor, nextDieColor, saveDieColor } from './diceColor'
+import { DIE_COLOR_ORDER, dieRainbowStep, loadDieColor, nextDieColor, saveDieColor, type DieColorId } from './diceColor'
 import { ROLL_STREAK_COLOR_STEP_MS } from './rollStreak'
 
 describe('die color', () => {
@@ -9,8 +9,8 @@ describe('die color', () => {
   })
 
   it('starts on Bitcoin orange and walks the list back to orange', () => {
-    let color = DIE_COLOR_ORDER[0]
-    const seen = [color]
+    let color: DieColorId = DIE_COLOR_ORDER[0]
+    const seen: DieColorId[] = [color]
     for (let i = 0; i < DIE_COLOR_ORDER.length; i += 1) {
       color = nextDieColor(color)
       seen.push(color)
