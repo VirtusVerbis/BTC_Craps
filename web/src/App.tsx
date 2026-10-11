@@ -20,6 +20,7 @@ import { bonusTestHand, isBonusTestSeed, type BonusTestSeed } from './ui/bonusTe
 import type { ThrowResult } from './ui/dicePhysics'
 import { loadHistogramRolls, pushRoll, saveHistogramRolls } from './ui/histogramModel'
 import { useDiceThrow, type ShooterControls } from './ui/useDiceThrow'
+import { ShooterScrollNote } from './ui/ShooterScrollNote'
 import { useShooterGesture, useShooterPageLock } from './ui/useShooterGesture'
 import { useHistogramVisibility } from './ui/useHistogramVisibility'
 import { useFg3CatState } from './ui/useFg3CatState'
@@ -178,9 +179,8 @@ function App() {
   const histogram = useHistogramVisibility(splashDone, histogramBoost)
   const dice = useDiceThrow(feed.market, splashDone, rolls, onCountedRoll, bonusHandRef, manualShooter, shooterControlsRef)
   const gestureReady = manualShooter && dice?.phase === 'holding'
-  const pageLocked = manualShooter && (dice?.phase === 'holding' || dice?.phase === 'flying')
   useShooterGesture(gestureReady, stageRef, shooterControlsRef)
-  useShooterPageLock(pageLocked)
+  useShooterPageLock(manualShooter)
   const onShooterMode = useCallback(() => {
     setManualShooter((current) => {
       if (current) shooterControlsRef.current?.launchAutoNow()
@@ -274,15 +274,18 @@ function App() {
         </div>
 
         <div className="table-side">
-          <button
-            className={manualShooter ? 'shooter-mode-button is-manual' : 'shooter-mode-button is-auto'}
-            type="button"
-            style={{ width: Math.max(120, displayWidthPx / 3) }}
-            aria-pressed={manualShooter}
-            onClick={onShooterMode}
-          >
-            {manualShooter ? 'Auto' : 'Shooter'}
-          </button>
+          <div className="shooter-mode-row">
+            <button
+              className={manualShooter ? 'shooter-mode-button is-manual' : 'shooter-mode-button is-auto'}
+              type="button"
+              style={{ width: Math.max(120, displayWidthPx / 3) }}
+              aria-pressed={manualShooter}
+              onClick={onShooterMode}
+            >
+              {manualShooter ? 'Auto' : 'Shooter'}
+            </button>
+            <ShooterScrollNote active={manualShooter} />
+          </div>
           <aside className="repo-links-panel" aria-label="Source repositories">
           <div className="repo-link-lnurl" aria-label="LNURL address">
             <img className="lnurl-badge" src="/mobile/lnurl_address.jpg.jpeg" alt="LNURL address" draggable={false} />
