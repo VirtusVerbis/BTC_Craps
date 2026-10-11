@@ -1,7 +1,8 @@
 /**
  * Local stand-in for the Cloudflare cron. Wrangler does not fire schedules
  * in `wrangler dev`, so this starts the worker and requests the scheduled
- * route once a minute. The key stays in worker/.dev.vars.
+ * route once a minute. The worker stores two of every three minutes.
+ * The key stays in worker/.dev.vars.
  */
 import { spawn } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'

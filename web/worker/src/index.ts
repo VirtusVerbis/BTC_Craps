@@ -2,7 +2,11 @@
  * Samples Coinalyze open interest, the long/short account ratio, and the
  * last closed 5-minute bar of long/short liquidations.
  * The API key stays on the worker. The page only reads the KV snapshot.
+ * The cron fires every minute. The snapshot is stored on two of every three
+ * UTC minutes so a full day stays under the free-tier KV put cap.
  */
+
+import { shouldStoreSnapshot } from './kvBudget'
 
 interface Env {
   OI_SNAPSHOT: {
@@ -260,7 +264,8 @@ const readStored = (raw: string | null): Snapshot | null => {
   }
 }
 
-const sample = async (env: Env): Promise<void> => {
+const sample = async (env: Env, scheduledAtMs: number): Promise<void> => {
+  if (!shouldStoreSnapshot(scheduledAtMs)) return
   const key = env.COINALYZE_API_KEY
   if (!key) return
   const nowSec = Math.floor(Date.now() / 1000)
@@ -317,7 +322,7 @@ export default {
     return withSecurityHeaders(new Response('not found', { status: 404 }), request)
   },
 
-  async scheduled(_event: unknown, env: Env): Promise<void> {
-    await sample(env)
+  async scheduled(event: { scheduledTime?: number }, env: Env): Promise<void> {
+    await sample(env, event.scheduledTime ?? Date.now())
   },
 }

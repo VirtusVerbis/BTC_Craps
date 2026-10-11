@@ -3,8 +3,11 @@ main = "src/index.ts"
 compatibility_date = "2024-11-01"
 account_id = "44da5f636cb61d0f6bf7329fc9a478be"
 
-# Once a minute after deploy. Locally, `npm run oi:dev` (from web/) starts
-# Wrangler and requests /cdn-cgi/local/scheduled on the same schedule.
+# Fires every minute. The worker stores the snapshot on two of every three
+# UTC minutes (960 puts/day), leaving headroom under the free-tier KV cap
+# of 1,000 puts, which resets at 00:00 UTC.
+# Locally, `npm run oi:dev` (from web/) starts Wrangler and requests
+# /cdn-cgi/local/scheduled on the same schedule.
 # The free key is read from worker/.dev.vars.
 [triggers]
 crons = ["* * * * *"]
