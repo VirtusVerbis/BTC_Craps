@@ -1,6 +1,7 @@
 import { REFERENCE_HEIGHT } from '../config/constants'
 import { DIE_GRAVITY_PX_PER_S2, DIE_LAUNCH_STACK_MARGIN_PX, PUCK_COLLISION_HEIGHT_PX, PUCK_IMAGE_WIDTH_PX } from './diceConstants'
 import { puckPlacement } from './puckState'
+import { backRailContact } from './backWall'
 import { dieSize, stageMetrics, type Die, type LaunchObstacle, type StageMetrics } from './dicePhysics'
 import { SHOOTER_STACK_COLLISION_OFF } from './characterBetConstants'
 import { placeBets, type ChipBet, type PlacedColumn } from './chipBets'
@@ -337,21 +338,30 @@ const constrainLoose = (chip: LooseChip, metrics: StageMetrics, dt: number): Loo
   const next = { ...chip }
   const radius = chipRadius()
   const bounce = CHIP_RAIL_RESTITUTION
-  if (next.x < radius) {
-    next.x = radius
-    if (next.vx < 0) next.vx = Math.abs(next.vx) * bounce
-  } else if (next.x > metrics.width - radius) {
-    next.x = metrics.width - radius
-    if (next.vx > 0) next.vx = -Math.abs(next.vx) * bounce
+  let rail = backRailContact(next.x, next.z, radius)
+  const filletOwns = !rail.flat && rail.penetration > 0
+  if (!filletOwns) {
+    if (next.x < radius) {
+      next.x = radius
+      if (next.vx < 0) next.vx = Math.abs(next.vx) * bounce
+    } else if (next.x > metrics.width - radius) {
+      next.x = metrics.width - radius
+      if (next.vx > 0) next.vx = -Math.abs(next.vx) * bounce
+    }
+    rail = backRailContact(next.x, next.z, radius)
   }
   if (next.z < radius) {
     next.z = radius
     if (next.vz < 0) next.vz = Math.abs(next.vz) * bounce
   }
-  const wall = metrics.wallZ - radius
-  if (next.z > wall) {
-    next.z = wall
-    if (next.vz > 0) next.vz = -Math.abs(next.vz) * bounce
+  if (rail.penetration > 0) {
+    const into = next.vx * rail.nx + next.vz * rail.nz
+    next.x -= rail.nx * rail.penetration
+    next.z -= rail.nz * rail.penetration
+    if (into > 0) {
+      next.vx -= (1 + bounce) * into * rail.nx
+      next.vz -= (1 + bounce) * into * rail.nz
+    }
   }
   if (next.h <= 0) {
     next.h = 0

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { REFERENCE_HEIGHT } from '../config/constants'
+import { backEdgeZ, backRailContact } from './backWall'
 import { createHoldingDice, dieSize, stageMetrics, type Die } from './dicePhysics'
 import {
   chipColumnStep,
@@ -325,6 +326,33 @@ describe('chip topples', () => {
     expect(left && left.vx).toBeGreaterThan(0)
     expect(back && back.z).toBeLessThanOrEqual(metrics.wallZ - radius + 0.01)
     expect(back && back.vz).toBeLessThan(0)
+  })
+
+  it('bounces loose chips off both curved corners and keeps a high chip in play', () => {
+    const world = emptyChipWorld()
+    const radius = chipRadius()
+    const leftX = 48
+    const rightX = metrics.width - 48
+    world.loose.push(
+      { id: 'left', color: 'red', x: leftX, z: backEdgeZ(leftX) + 30, h: 0, vx: 0, vz: 400, vh: 0, spin: 0 },
+      { id: 'right', color: 'blue', x: rightX, z: backEdgeZ(rightX) + 30, h: 80, vx: 0, vz: 400, vh: 0, spin: 0 },
+    )
+    const next = driftLooseChips(world, 1 / 60, metrics)
+    const left = next.loose.find((chip) => chip.id === 'left')
+    const right = next.loose.find((chip) => chip.id === 'right')
+    const leftRail = left ? backRailContact(left.x, left.z, radius) : null
+    const rightRail = right ? backRailContact(right.x, right.z, radius) : null
+    expect(left).toBeTruthy()
+    expect(right).toBeTruthy()
+    expect(left && left.z).toBeLessThan(metrics.wallZ - radius)
+    expect(left && left.vx).toBeGreaterThan(0)
+    expect(left && leftRail && left.vx * leftRail.nx + left.vz * leftRail.nz).toBeLessThan(0)
+    expect(leftRail && leftRail.flat).toBe(false)
+    expect(right && right.h).toBeGreaterThan(0)
+    expect(right && right.z).toBeLessThan(metrics.wallZ - radius)
+    expect(right && right.vx).toBeLessThan(0)
+    expect(right && rightRail && right.vx * rightRail.nx + right.vz * rightRail.nz).toBeLessThan(0)
+    expect(rightRail && rightRail.flat).toBe(false)
   })
 })
 

@@ -41,6 +41,7 @@ import {
   DIE_WALL_SPIN_RAD,
   DIE_WALL_TOP_FRACTION,
 } from './diceConstants'
+import { backRailContact } from './backWall'
 import { clampLaunchX, type GestureStroke } from './gestureThrow'
 
 export interface Vec3 {
@@ -453,7 +454,10 @@ export const advanceThrow = (
       return { ...state, dice, flightMs, reachZ }
     }
     const line = metrics.wallZ * DIE_MIN_REACH_FRACTION
-    const short = !state.requireWallContact && tracking && dice.some((die, index) => die.alive && reachZ[index] < line)
+    const short =
+      !state.requireWallContact &&
+      tracking &&
+      dice.some((die, index) => die.alive && !die.hitBackWall && reachZ[index] < line)
     const missedWall = state.requireWallContact && dice.some((die) => die.alive && !die.hitBackWall)
     const noRoll = dice.some((die) => !die.alive) || short || missedWall
     const total = (dice[0].topFace ?? 0) + (dice[1].topFace ?? 0)
@@ -658,13 +662,18 @@ const constrain = (die: Die, metrics: StageMetrics, dt: number, random: () => nu
   if (!die.alive || die.resting || die.leaving) return die
   const next = cloneDie(die)
   const radius = dieSize(next.z, metrics) / 2
+  let rail = backRailContact(next.x, next.z, radius)
+  const filletOwns = !rail.flat && rail.penetration > 0
 
-  if (next.x < radius) {
-    next.x = radius
-    if (next.vx < 0) bounceRail(next, 'x', 1, random)
-  } else if (next.x > metrics.width - radius) {
-    next.x = metrics.width - radius
-    if (next.vx > 0) bounceRail(next, 'x', -1, random)
+  if (!filletOwns) {
+    if (next.x < radius) {
+      next.x = radius
+      if (next.vx < 0) bounceRail(next, 'x', 1, random)
+    } else if (next.x > metrics.width - radius) {
+      next.x = metrics.width - radius
+      if (next.vx > 0) bounceRail(next, 'x', -1, random)
+    }
+    rail = backRailContact(next.x, next.z, radius)
   }
 
   if (next.z < 0) {
@@ -672,7 +681,7 @@ const constrain = (die: Die, metrics: StageMetrics, dt: number, random: () => nu
     if (next.vz < 0) bounceRail(next, 'z', 1, random)
   }
 
-  if (next.z >= metrics.wallZ && next.h > metrics.wallHeight) {
+  if (rail.centerSigned >= 0 && next.h > metrics.wallHeight) {
     const screen = dieScreenCenter(next, metrics)
     if (screen.y + screen.size / 2 < 0) {
       next.alive = false
@@ -690,11 +699,13 @@ const constrain = (die: Die, metrics: StageMetrics, dt: number, random: () => nu
     return next
   }
 
-  const front = next.z + radius
-  if (front >= metrics.wallZ && next.vz > 0 && next.h <= metrics.wallHeight) {
-    next.z = Math.max(0, metrics.wallZ - radius)
+  const intoRail = next.vx * rail.nx + next.vz * rail.nz
+  if (rail.penetration > 0 && next.h <= metrics.wallHeight && intoRail > 0) {
+    next.x -= rail.nx * rail.penetration
+    next.z -= rail.nz * rail.penetration
     next.hitBackWall = true
-    bounceRail(next, 'z', -1, random)
+    if (rail.flat) bounceRail(next, 'z', -1, random)
+    else bounceAlongNormal(next, rail.nx, rail.nz, random)
   }
 
   if (next.h <= 0) {
@@ -774,8 +785,7 @@ const reflectAxis = (die: Die, axis: 'x' | 'z', outwardSign: number) => {
   dampSpin(die)
 }
 
-const bounceRail = (die: Die, axis: 'x' | 'z', outwardSign: number, random: () => number) => {
-  reflectAxis(die, axis, outwardSign)
+const scatterRail = (die: Die, random: () => number) => {
   const speed = Math.hypot(die.vx, die.vz)
   if (speed > 0) {
     const yaw = Math.atan2(die.vz, die.vx) + (random() * 2 - 1) * DIE_WALL_SCATTER_RAD
@@ -784,6 +794,27 @@ const bounceRail = (die: Die, axis: 'x' | 'z', outwardSign: number, random: () =
   }
   const kick = () => (random() * 2 - 1) * DIE_WALL_SPIN_RAD
   die.w = { x: die.w.x + kick(), y: die.w.y + kick(), z: die.w.z + kick() }
+}
+
+const bounceRail = (die: Die, axis: 'x' | 'z', outwardSign: number, random: () => number) => {
+  reflectAxis(die, axis, outwardSign)
+  scatterRail(die, random)
+}
+
+/** Fillet hit. Reflects on the rail normal, then uses the same scatter as a flat rail. */
+const bounceAlongNormal = (die: Die, nx: number, nz: number, random: () => number) => {
+  const into = die.vx * nx + die.vz * nz
+  if (into > 0) {
+    die.vx -= (1 + DIE_WALL_RESTITUTION) * into * nx
+    die.vz -= (1 + DIE_WALL_RESTITUTION) * into * nz
+  }
+  dampSpin(die)
+  scatterRail(die, random)
+  const still = die.vx * nx + die.vz * nz
+  if (still > 0) {
+    die.vx -= 2 * still * nx
+    die.vz -= 2 * still * nz
+  }
 }
 
 const forceRest = (die: Die): Die => {

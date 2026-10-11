@@ -28,6 +28,7 @@ import {
   DIE_WALL_RESTITUTION,
   DIE_WALL_SPIN_RAD,
 } from './diceConstants'
+import { backEdgeZ } from './backWall'
 import { applyRoll, puckPlacement } from './puckState'
 import {
   advanceArcDisplay,
@@ -196,10 +197,11 @@ describe('bounces', () => {
   })
 
   it('bounces off the side and the bottom edge', () => {
-    const side = flyingDie({ x: 2, vx: -600, h: 40, vh: 0 })
+    const side = flyingDie({ x: 2, vx: -600, h: 40, vh: 0, z: 200 })
     const [sided] = stepDice([side, flyingDie({ alive: false })], 1 / 60, metrics)
     expect(sided.x).toBeGreaterThanOrEqual(dieSize(sided.z, metrics) / 2 - 1)
     expect(sided.vx).toBeGreaterThan(0)
+    expect(sided.hitBackWall).toBeFalsy()
 
     const bottom = flyingDie({ z: -5, vz: -500, h: 30, vh: 200 })
     const [backed] = stepDice([bottom, flyingDie({ alive: false })], 1 / 60, metrics)
@@ -225,6 +227,45 @@ describe('bounces', () => {
     const [next] = stepDice([die, flyingDie({ alive: false })], 1 / 60, metrics)
     expect(next.alive).toBe(true)
     expect(next.vz).toBeLessThan(0)
+  })
+
+  it('keeps a flat middle and matching corners short of the flat wall', () => {
+    expect(backEdgeZ(540)).toBeCloseTo(metrics.wallZ)
+    expect(backEdgeZ(300)).toBeCloseTo(metrics.wallZ)
+    expect(backEdgeZ(780)).toBeCloseTo(metrics.wallZ)
+    expect(backEdgeZ(0)).toBeCloseTo(backEdgeZ(metrics.width))
+    expect(backEdgeZ(40)).toBeCloseTo(backEdgeZ(metrics.width - 40))
+    expect(metrics.wallZ - backEdgeZ(0)).toBeGreaterThan(100)
+  })
+
+  it('bounces a low die off each curved corner before the flat wall', () => {
+    const steady = () => 0.5
+    const bounceCorner = (x: number) => {
+      const edge = backEdgeZ(x)
+      const radius = dieSize(edge, metrics) / 2
+      const die = flyingDie({ x, z: edge - radius - 1, vz: 700, vx: 0, h: 20, vh: 0, w: { x: 0, y: 0, z: 0 } })
+      const [next] = stepDice([die, flyingDie({ alive: false })], 1 / 60, metrics, steady)
+      return next
+    }
+    const left = bounceCorner(36)
+    const right = bounceCorner(metrics.width - 36)
+    expect(left.hitBackWall).toBe(true)
+    expect(left.leaving).toBe(false)
+    expect(left.z).toBeLessThan(metrics.wallZ - dieSize(left.z, metrics) / 2)
+    expect(left.vx).toBeGreaterThan(0)
+    expect(right.hitBackWall).toBe(true)
+    expect(right.leaving).toBe(false)
+    expect(right.z).toBeLessThan(metrics.wallZ - dieSize(right.z, metrics) / 2)
+    expect(right.vx).toBeLessThan(0)
+  })
+
+  it('leaves over a curved corner without reaching the flat wall', () => {
+    const x = 36
+    const die = flyingDie({ x, z: backEdgeZ(x) + 4, vz: 400, h: metrics.wallHeight + 30, vh: 50 })
+    const [next] = stepDice([die, flyingDie({ alive: false })], 1 / 60, metrics)
+    expect(next.leaving).toBe(true)
+    expect(next.alive).toBe(true)
+    expect(next.z).toBeLessThan(metrics.wallZ)
   })
 
   it('scatters every rail without changing horizontal speed', () => {
@@ -585,6 +626,20 @@ describe('throw cycle', () => {
     const right = flyingDie({ resting: true, topFace: 1, alive: true, x: 620, z: 200 })
     const result = advanceThrow(
       { ...state, phase: 'flying', reachTracked: true, reachZ: [line + 8, line + 8], dice: [left, right] },
+      0.016,
+      1000,
+      volume,
+    )
+    expect(result.result).toEqual({ total: 7, label: 'Pass Line' })
+  })
+
+  it('counts a short peak once the die has hit the back wall', () => {
+    const state = createThrowState(0, 540)
+    const line = metrics.wallZ * DIE_MIN_REACH_FRACTION
+    const left = flyingDie({ resting: true, topFace: 6, alive: true, z: 200, hitBackWall: true })
+    const right = flyingDie({ resting: true, topFace: 1, alive: true, x: 620, z: 200, hitBackWall: true })
+    const result = advanceThrow(
+      { ...state, phase: 'flying', reachTracked: true, reachZ: [line - 40, line - 10], dice: [left, right] },
       0.016,
       1000,
       volume,
