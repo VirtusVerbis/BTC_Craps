@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  DIE_ARC_LIFT_HEIGHT_PX,
+  DIE_ARC_LIFT_SCALE,
   DIE_BINANCE_BUY_REF,
   DIE_BINANCE_SELL_REF,
   DIE_COINBASE_BUY_REF,
@@ -28,8 +30,10 @@ import {
 } from './diceConstants'
 import { applyRoll, puckPlacement } from './puckState'
 import {
+  advanceArcDisplay,
   advanceThrow,
   aimHeldPair,
+  arcDisplayFrom,
   clearSharedX,
   createHoldingDice,
   createThrowState,
@@ -42,8 +46,12 @@ import {
   probeGestureArc,
   logUnit,
   readTopFace,
+  spreadPairX,
   stageMetrics,
   stepDice,
+  syncArcDisplay,
+  visualDieSize,
+  type ArcDisplay,
   type Die,
   type Quat,
   type ThrowState,
@@ -77,6 +85,78 @@ describe('die size', () => {
     const screen = dieScreenCenter(left, metrics)
     expect(screen.y + screen.size / 2).toBeCloseTo(metrics.height)
     expect(screen.y - screen.size / 2).toBeGreaterThan(metrics.wallBottom)
+  })
+})
+
+const quatAngle = (a: Quat, b: Quat): number => {
+  const dot = Math.abs(a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w)
+  return 2 * Math.acos(Math.min(1, dot))
+}
+
+describe('arc lift', () => {
+  it('swells with height and stays on the depth size at the felt', () => {
+    expect(visualDieSize(0, 0, metrics)).toBe(DIE_LAUNCH_SIZE_PX)
+    expect(visualDieSize(metrics.wallZ, 0, metrics)).toBeCloseTo(DIE_LAUNCH_SIZE_PX * DIE_DEPTH_SCALE)
+    const midZ = metrics.wallZ / 2
+    expect(visualDieSize(midZ, DIE_ARC_LIFT_HEIGHT_PX, metrics)).toBeCloseTo(dieSize(midZ, metrics) * DIE_ARC_LIFT_SCALE)
+    expect(visualDieSize(100, DIE_ARC_LIFT_HEIGHT_PX * 2, metrics)).toBeCloseTo(
+      visualDieSize(100, DIE_ARC_LIFT_HEIGHT_PX, metrics),
+    )
+    const felt = dieSize(400, metrics)
+    const hop = visualDieSize(400, 38, metrics)
+    expect(hop).toBeGreaterThan(felt)
+    expect(hop).toBeLessThan(felt * 1.15)
+  })
+
+  it('spreads an enlarged pair and leaves a resting pair put', () => {
+    const [left, right] = createHoldingDice(540)
+    expect(spreadPairX(left, right, metrics)).toEqual([left.x, right.x])
+    const airL = flyingDie({ x: 500, z: 280, h: DIE_ARC_LIFT_HEIGHT_PX })
+    const airR = flyingDie({ x: 540, z: 280, h: DIE_ARC_LIFT_HEIGHT_PX })
+    const [x0, x1] = spreadPairX(airL, airR, metrics)
+    const span = (visualDieSize(airL.z, airL.h, metrics) + visualDieSize(airR.z, airR.h, metrics)) / 2
+    expect(x1 - x0).toBeGreaterThanOrEqual(span - 1e-6)
+  })
+
+  it('does not write the simulation pose', () => {
+    const die = flyingDie({ h: 100, vh: 200, w: { x: 4, y: 1, z: -1 } })
+    const q = { ...die.q }
+    const w = { ...die.w }
+    advanceArcDisplay(arcDisplayFrom(die), die, 1 / 60)
+    expect(die.q).toEqual(q)
+    expect(die.w).toEqual(w)
+  })
+
+  it('slows the crest and meets the simulation pose on the felt', () => {
+    const launched = launchGestureThrow(createThrowState(0), 0, {
+      launchX: metrics.width / 2,
+      speed: GESTURE_SPEED_MIN_PX_PER_S,
+      lean: 0,
+    })
+    let dice = launched.dice
+    let display: [ArcDisplay, ArcDisplay] = [arcDisplayFrom(dice[0]), arcDisplayFrom(dice[1])]
+    let maxH = 0
+    let crestGap = 0
+    let lastAirGap = 0
+    let matchedOnFelt = false
+    const dt = 1 / 60
+    for (let i = 0; i < 240 && !matchedOnFelt; i += 1) {
+      dice = stepDice(dice, dt, metrics, () => 0.5, (pair, stepDt) => {
+        display = syncArcDisplay(display, pair, stepDt)
+        const die = pair[0]
+        if (die.h > maxH) {
+          maxH = die.h
+          crestGap = quatAngle(display[0].q, die.q)
+        }
+        if (die.h > 0) lastAirGap = quatAngle(display[0].q, die.q)
+        if (maxH > 0 && die.h <= 0) matchedOnFelt = quatAngle(display[0].q, die.q) < 1e-4
+        return pair
+      })
+    }
+    expect(maxH).toBeGreaterThan(DIE_ARC_LIFT_HEIGHT_PX * 0.8)
+    expect(crestGap).toBeGreaterThan(0.3)
+    expect(lastAirGap).toBeLessThan(0.05)
+    expect(matchedOnFelt).toBe(true)
   })
 })
 

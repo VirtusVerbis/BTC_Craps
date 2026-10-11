@@ -109,6 +109,18 @@ export const GESTURE_MID_FELT_FRACTION = 0.5
 /** Air time of a legal flick. Forward speed moves the landing; lift stays on this arc. */
 export const GESTURE_ARC_SEC = 0.85
 
+/**
+ * Drawn size at full lift, relative to the depth size.
+ * A steep flick crests near 63px. In the hand the dice stay at `DIE_LAUNCH_SIZE_PX`.
+ */
+export const DIE_ARC_LIFT_SCALE = 1.75
+
+/** Height that counts as full lift. The gesture crest is about this high. */
+export const DIE_ARC_LIFT_HEIGHT_PX = 220
+
+/** Drawn tumble rate at full lift. 1 is the simulation spin. */
+export const DIE_ARC_SPIN_MIN = 0.45
+
 /** Forward speed at and above the no-roll line, relative to the speed that lands on the wall. */
 export const GESTURE_OVERSHOOT_FORWARD_SCALE = 1.45
 

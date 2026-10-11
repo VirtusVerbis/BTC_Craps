@@ -1,6 +1,9 @@
 import { REFERENCE_HEIGHT, REFERENCE_WIDTH } from '../config/constants'
 import { applyRoll } from './puckState'
 import {
+  DIE_ARC_LIFT_HEIGHT_PX,
+  DIE_ARC_LIFT_SCALE,
+  DIE_ARC_SPIN_MIN,
   DIE_BINANCE_BUY_REF,
   DIE_BINANCE_SELL_REF,
   DIE_COINBASE_BUY_REF,
@@ -149,6 +152,37 @@ export const dieScreenCenter = (die: Die, metrics: StageMetrics = stageMetrics()
   const size = dieSize(die.z, metrics)
   const contactY = metrics.height - die.z
   return { x: die.x, y: contactY - size / 2 - die.h, size }
+}
+
+/** 0 on the felt, 1 at and above the gesture crest. Flat at both ends. */
+export const arcLift = (h: number): number => {
+  const t = clamp(Math.max(0, h) / DIE_ARC_LIFT_HEIGHT_PX, 0, 1)
+  return t * t * (3 - 2 * t)
+}
+
+/** Drawn size. Collision and the felt seat stay on `dieSize`. */
+export const visualDieSize = (z: number, h: number, metrics: StageMetrics = stageMetrics()): number =>
+  dieSize(z, metrics) * (1 + (DIE_ARC_LIFT_SCALE - 1) * arcLift(h))
+
+/**
+ * Screen x of each die. Extra visual radius is split outward so a crest
+ * does not pull the pair through itself. Height 0 leaves the physics x alone.
+ */
+export const spreadPairX = (
+  left: Die,
+  right: Die,
+  metrics: StageMetrics = stageMetrics(),
+): [number, number] => {
+  const extra =
+    (visualDieSize(left.z, left.h, metrics) -
+      dieSize(left.z, metrics) +
+      visualDieSize(right.z, right.h, metrics) -
+      dieSize(right.z, metrics)) /
+    2
+  if (!(extra > 0)) return [left.x, right.x]
+  const shift = extra / 2
+  const sign = right.x >= left.x ? 1 : -1
+  return [left.x - sign * shift, right.x + sign * shift]
 }
 
 export const randomSharedX = (random: () => number = Math.random): number => {
@@ -887,6 +921,51 @@ const integrateQuat = (q: Quat, w: Vec3, dt: number): Quat => {
     w: q.w - q.x * hx - q.y * hy - q.z * hz,
   })
 }
+
+export interface ArcDisplay {
+  q: Quat
+  /** Seconds of tumble the picture has not shown yet. */
+  lag: number
+}
+
+export const arcDisplayFrom = (die: Die): ArcDisplay => ({ q: { ...die.q }, lag: 0 })
+
+const arcSpinRate = (h: number): number => 1 - (1 - DIE_ARC_SPIN_MIN) * arcLift(h)
+
+/** Seconds until a ballistic die meets the felt. Vertical speed is upward-positive. */
+const timeToFelt = (h: number, vh: number): number => {
+  const disc = vh * vh + 2 * DIE_GRAVITY_PX_PER_S2 * h
+  return Math.max(1e-4, (-vh + Math.sqrt(Math.max(0, disc))) / DIE_GRAVITY_PX_PER_S2)
+}
+
+/**
+ * Drawing-only tumble. Rising dice follow the lift curve down to `DIE_ARC_SPIN_MIN`.
+ * Falling dice add enough rate to spend the unshown time before the felt.
+ * Contact, rest, and leaving copy the simulation pose.
+ */
+export const advanceArcDisplay = (display: ArcDisplay, die: Die, dt: number): ArcDisplay => {
+  if (!(dt > 0) || !die.alive || die.resting || die.leaving || die.h <= 0) {
+    return { q: { ...die.q }, lag: 0 }
+  }
+  const artistic = arcSpinRate(die.h)
+  let rate = artistic
+  if (die.vh < 0 && display.lag > 0) {
+    const lift = arcLift(die.h)
+    const needed = 1 + display.lag / timeToFelt(die.h, die.vh)
+    rate = artistic * lift + needed * (1 - lift)
+  }
+  const shown = Math.min(Math.max(0, dt * rate), dt + display.lag)
+  return {
+    q: integrateQuat(display.q, die.w, shown),
+    lag: display.lag + dt - shown,
+  }
+}
+
+export const syncArcDisplay = (
+  display: readonly [ArcDisplay, ArcDisplay],
+  dice: readonly [Die, Die],
+  dt: number,
+): [ArcDisplay, ArcDisplay] => [advanceArcDisplay(display[0], dice[0], dt), advanceArcDisplay(display[1], dice[1], dt)]
 
 const rotateVec = (q: Quat, v: Vec3): Vec3 => {
   const n = normalizeQuat(q)

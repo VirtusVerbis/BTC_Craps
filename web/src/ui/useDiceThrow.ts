@@ -33,6 +33,7 @@ import { DIE_RESULT_HOLD_MS, SHOT_CLOCK_MS } from './diceConstants'
 import {
   advanceThrow,
   aimHeldPair,
+  arcDisplayFrom,
   clearSharedX,
   createHoldingDice,
   createThrowState,
@@ -40,7 +41,11 @@ import {
   launchHeldAuto,
   dieScreenCenter,
   quatToCssMatrix,
+  spreadPairX,
   stageMetrics,
+  syncArcDisplay,
+  visualDieSize,
+  type ArcDisplay,
   type Die,
   type DicePoseHook,
   type ThrowResult,
@@ -116,18 +121,19 @@ const emptyVolume = (): VolumeTotals => ({
   coinbaseSell: 0,
 })
 
-const toView = (die: Die, id: 'left' | 'right'): DieView => {
+const toView = (die: Die, id: 'left' | 'right', x: number, display: ArcDisplay): DieView => {
   const metrics = stageMetrics()
   const screen = dieScreenCenter(die, metrics)
   const depth = metrics.wallZ > 0 ? Math.min(1, Math.max(0, die.z / metrics.wallZ)) : 0
+  const airborne = die.alive && !die.resting && !die.leaving && die.h > 0
   return {
     id,
     visible: die.alive,
-    x: screen.x,
+    x,
     y: screen.y,
-    size: screen.size,
+    size: visualDieSize(die.z, die.h, metrics),
     depth,
-    transform: quatToCssMatrix(die.q),
+    transform: quatToCssMatrix(airborne ? display.q : die.q),
   }
 }
 
@@ -146,20 +152,24 @@ const present = (
   bonusStakes: BonusStakes,
   rollStreak: RollStreakView,
   nowMs: number,
-): DicePresentation => ({
-  dice: [toView(state.dice[0], 'left'), toView(state.dice[1], 'right')],
-  result: state.phase === 'result' ? state.result : null,
-  point: state.point,
-  chips: chips.slice(),
-  guides: guides.slice(),
-  speech: speech.slice(),
-  pnl,
-  shooter,
-  bonusStakes,
-  rollStreak,
-  phase: state.phase,
-  shotClockMs: shotClockMs(state, nowMs),
-})
+  display: readonly [ArcDisplay, ArcDisplay],
+): DicePresentation => {
+  const [x0, x1] = spreadPairX(state.dice[0], state.dice[1])
+  return {
+    dice: [toView(state.dice[0], 'left', x0, display[0]), toView(state.dice[1], 'right', x1, display[1])],
+    result: state.phase === 'result' ? state.result : null,
+    point: state.point,
+    chips: chips.slice(),
+    guides: guides.slice(),
+    speech: speech.slice(),
+    pnl,
+    shooter,
+    bonusStakes,
+    rollStreak,
+    phase: state.phase,
+    shotClockMs: shotClockMs(state, nowMs),
+  }
+}
 
 const laneKey = (world: ChipWorld): string =>
   lineLaunchObstacles(world)
@@ -216,6 +226,10 @@ export const useDiceThrow = (
   const onCountedRollRef = useRef(onCountedRoll)
   onCountedRollRef.current = onCountedRoll
   const stateRef = useRef<ThrowState>(createThrowState(performance.now()))
+  const displayRef = useRef<[ArcDisplay, ArcDisplay]>([
+    arcDisplayFrom(stateRef.current.dice[0]),
+    arcDisplayFrom(stateRef.current.dice[1]),
+  ])
   const worldRef = useRef<ChipWorld | null>(null)
   const pnlRef = useRef<CharacterPnlBook>(loadCharacterPnl())
   const shooterRef = useRef<ShooterBook>(loadShooterBook())
@@ -234,7 +248,18 @@ export const useDiceThrow = (
     [],
   )
   const [presentation, setPresentation] = useState<DicePresentation>(() =>
-    present(stateRef.current, [], [], [], pnlRef.current, shooterRef.current, emptyBonusStakes(), streakView(), performance.now()),
+    present(
+      stateRef.current,
+      [],
+      [],
+      [],
+      pnlRef.current,
+      shooterRef.current,
+      emptyBonusStakes(),
+      streakView(),
+      performance.now(),
+      displayRef.current,
+    ),
   )
   const manualRef = useRef(shooterMode)
   manualRef.current = shooterMode
@@ -266,6 +291,7 @@ export const useDiceThrow = (
     if (!enabled) return undefined
     commandRef.current = []
     stateRef.current = createThrowState(performance.now())
+    displayRef.current = [arcDisplayFrom(stateRef.current.dice[0]), arcDisplayFrom(stateRef.current.dice[1])]
     worldRef.current = null
     pnlRef.current = loadCharacterPnl()
     shooterRef.current = loadShooterBook()
@@ -276,7 +302,20 @@ export const useDiceThrow = (
     sevenOutRef.current = false
     speechRef.current = {}
     streakRef.current = { longest: loadRollStreakLongest(), current: 0 }
-    setPresentation(present(stateRef.current, [], [], [], pnlRef.current, shooterRef.current, emptyBonusStakes(), streakView(), performance.now()))
+    setPresentation(
+      present(
+        stateRef.current,
+        [],
+        [],
+        [],
+        pnlRef.current,
+        shooterRef.current,
+        emptyBonusStakes(),
+        streakView(),
+        performance.now(),
+        displayRef.current,
+      ),
+    )
     let frame = 0
     let last = performance.now()
 
@@ -316,8 +355,11 @@ export const useDiceThrow = (
 
     const poseHook: DicePoseHook = (dice, dt, metrics) => {
       const world = worldRef.current
-      if (!world) return dice
-      return resolveDiceChips(world, dice, dt, metrics, puckObstacle(stateRef.current.point))
+      const next = world
+        ? resolveDiceChips(world, dice, dt, metrics, puckObstacle(stateRef.current.point))
+        : dice
+      displayRef.current = syncArcDisplay(displayRef.current, next, dt)
+      return next
     }
 
     let aimedKey = ''
@@ -374,6 +416,9 @@ export const useDiceThrow = (
         if (bets.length > 0) worldRef.current = worldFromBets(bets, Math.floor(now))
       }
       holdLane()
+      if (stateRef.current.phase !== 'flying') {
+        displayRef.current = [arcDisplayFrom(stateRef.current.dice[0]), arcDisplayFrom(stateRef.current.dice[1])]
+      }
       const phaseBefore = stateRef.current.phase
       const pointBefore = stateRef.current.point
       stateRef.current = advanceThrow(stateRef.current, dt, now, volumeRef.current, metrics, poseHook)
@@ -431,7 +476,20 @@ export const useDiceThrow = (
       if (worldRef.current?.restack) worldRef.current = tickRestack(worldRef.current, now)
       const chips = worldRef.current ? presentChips(worldRef.current, now, metrics) : []
       const guides = worldRef.current ? guideFrames(worldRef.current, metrics) : []
-      setPresentation(present(stateRef.current, chips, guides, liveSpeech(speechRef.current, now), pnlRef.current, shooterRef.current, bonusStakeDollars(betsRef.current), streakView(), now))
+      setPresentation(
+        present(
+          stateRef.current,
+          chips,
+          guides,
+          liveSpeech(speechRef.current, now),
+          pnlRef.current,
+          shooterRef.current,
+          bonusStakeDollars(betsRef.current),
+          streakView(),
+          now,
+          displayRef.current,
+        ),
+      )
       frame = window.requestAnimationFrame(loop)
     }
     frame = window.requestAnimationFrame(loop)
