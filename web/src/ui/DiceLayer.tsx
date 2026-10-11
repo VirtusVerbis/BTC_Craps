@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { DIE_BACK_WALL_TILT_DEG, DIE_LAUNCH_TILT_DEG, PUCK_IMAGE_WIDTH_PX } from './diceConstants'
 import { dieFaceGradient, diePigment, dieRainbowStep, dieShade, type DieColorId } from './diceColor'
+import { formatShotClock } from './gestureThrow'
 import { puckPlacement } from './puckState'
 import type { DicePresentation } from './useDiceThrow'
 
@@ -140,6 +141,12 @@ export const DiceLayer = ({
           ) : null,
         )}
       </div>
+      {presentation.shotClockMs != null ? (
+        <div className="shot-clock">
+          <div className="shot-clock-label">Shot Clock</div>
+          <div className="shot-clock-time">{formatShotClock(presentation.shotClockMs)}</div>
+        </div>
+      ) : null}
       {result ? (
         <div className="dice-result">
           {'noRoll' in result ? (

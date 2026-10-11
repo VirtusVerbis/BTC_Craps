@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import type { MarketSnapshot } from '../game/types'
 import { useOpenInterest } from '../data/openInterest'
 import {
@@ -29,12 +29,15 @@ import {
   type ChipWorld,
   type StackGuideView,
 } from './chipPhysics'
-import { DIE_RESULT_HOLD_MS } from './diceConstants'
+import { DIE_RESULT_HOLD_MS, SHOT_CLOCK_MS } from './diceConstants'
 import {
   advanceThrow,
+  aimHeldPair,
   clearSharedX,
   createHoldingDice,
   createThrowState,
+  launchGestureThrow,
+  launchHeldAuto,
   dieScreenCenter,
   quatToCssMatrix,
   stageMetrics,
@@ -42,7 +45,9 @@ import {
   type DicePoseHook,
   type ThrowResult,
   type ThrowState,
+  type VolumeTotals,
 } from './dicePhysics'
+import type { GestureStroke } from './gestureThrow'
 import type { ChipCharacter } from './chipConstants'
 import { useDiceVolumeWindow } from './useDiceVolumeWindow'
 import { emptyBonusHand, type BonusHand } from './bonusCraps'
@@ -91,7 +96,25 @@ export interface DicePresentation {
   shooter: ShooterBook
   bonusStakes: BonusStakes
   rollStreak: RollStreakView
+  phase: ThrowState['phase']
+  /** Remaining shot-clock time while Shooter mode is holding. Null otherwise. */
+  shotClockMs: number | null
 }
+
+export interface ShooterControls {
+  aimLaunchX: (stageX: number) => void
+  releaseGesture: (stroke: GestureStroke) => void
+  launchAutoNow: () => void
+}
+
+type ShooterCommand = { kind: 'aim'; x: number } | { kind: 'gesture'; stroke: GestureStroke } | { kind: 'auto' }
+
+const emptyVolume = (): VolumeTotals => ({
+  binanceBuy: 0,
+  binanceSell: 0,
+  coinbaseBuy: 0,
+  coinbaseSell: 0,
+})
 
 const toView = (die: Die, id: 'left' | 'right'): DieView => {
   const metrics = stageMetrics()
@@ -108,6 +131,11 @@ const toView = (die: Die, id: 'left' | 'right'): DieView => {
   }
 }
 
+const shotClockMs = (state: ThrowState, nowMs: number): number | null => {
+  if (state.phase !== 'holding' || !state.manualHold) return null
+  return Math.max(0, SHOT_CLOCK_MS - (nowMs - state.phaseStartedMs))
+}
+
 const present = (
   state: ThrowState,
   chips: readonly ChipDisc[],
@@ -117,6 +145,7 @@ const present = (
   shooter: ShooterBook,
   bonusStakes: BonusStakes,
   rollStreak: RollStreakView,
+  nowMs: number,
 ): DicePresentation => ({
   dice: [toView(state.dice[0], 'left'), toView(state.dice[1], 'right')],
   result: state.phase === 'result' ? state.result : null,
@@ -128,6 +157,8 @@ const present = (
   shooter,
   bonusStakes,
   rollStreak,
+  phase: state.phase,
+  shotClockMs: shotClockMs(state, nowMs),
 })
 
 const laneKey = (world: ChipWorld): string =>
@@ -169,6 +200,8 @@ export const useDiceThrow = (
   rolls: readonly number[],
   onCountedRoll?: (result: ThrowResult) => number | void,
   bonusHandRef?: RefObject<BonusHand>,
+  shooterMode = false,
+  shooterControlsRef?: { current: ShooterControls | null },
 ): DicePresentation | null => {
   const oi = useOpenInterest()
   const volume = useDiceVolumeWindow(market)
@@ -201,11 +234,37 @@ export const useDiceThrow = (
     [],
   )
   const [presentation, setPresentation] = useState<DicePresentation>(() =>
-    present(stateRef.current, [], [], [], pnlRef.current, shooterRef.current, emptyBonusStakes(), streakView()),
+    present(stateRef.current, [], [], [], pnlRef.current, shooterRef.current, emptyBonusStakes(), streakView(), performance.now()),
   )
+  const manualRef = useRef(shooterMode)
+  manualRef.current = shooterMode
+  const commandRef = useRef<ShooterCommand[]>([])
+  const lastVolumeRef = useRef<VolumeTotals>(emptyVolume())
+  const controls = useMemo<ShooterControls>(
+    () => ({
+      aimLaunchX: (stageX) => {
+        commandRef.current.push({ kind: 'aim', x: stageX })
+      },
+      releaseGesture: (stroke) => {
+        commandRef.current.push({ kind: 'gesture', stroke })
+      },
+      launchAutoNow: () => {
+        commandRef.current.push({ kind: 'auto' })
+      },
+    }),
+    [],
+  )
+  useEffect(() => {
+    if (!shooterControlsRef) return undefined
+    shooterControlsRef.current = controls
+    return () => {
+      if (shooterControlsRef.current === controls) shooterControlsRef.current = null
+    }
+  }, [controls, shooterControlsRef])
 
   useEffect(() => {
     if (!enabled) return undefined
+    commandRef.current = []
     stateRef.current = createThrowState(performance.now())
     worldRef.current = null
     pnlRef.current = loadCharacterPnl()
@@ -217,7 +276,7 @@ export const useDiceThrow = (
     sevenOutRef.current = false
     speechRef.current = {}
     streakRef.current = { longest: loadRollStreakLongest(), current: 0 }
-    setPresentation(present(stateRef.current, [], [], [], pnlRef.current, shooterRef.current, emptyBonusStakes(), streakView()))
+    setPresentation(present(stateRef.current, [], [], [], pnlRef.current, shooterRef.current, emptyBonusStakes(), streakView(), performance.now()))
     let frame = 0
     let last = performance.now()
 
@@ -263,6 +322,7 @@ export const useDiceThrow = (
 
     let aimedKey = ''
     const holdLane = () => {
+      if (stateRef.current.aimLocked) return
       const world = worldRef.current
       if (!world || stateRef.current.phase !== 'holding') {
         if (stateRef.current.phase !== 'holding') aimedKey = ''
@@ -273,10 +333,42 @@ export const useDiceThrow = (
       stateRef.current = aimed.state
     }
 
+    const armManualHold = (now: number) => {
+      const state = stateRef.current
+      if (state.phase !== 'holding') return
+      if (manualRef.current && !state.manualHold) {
+        stateRef.current = { ...state, manualHold: true, phaseStartedMs: now, aimLocked: false }
+      } else if (!manualRef.current && state.manualHold) {
+        stateRef.current = { ...state, manualHold: false }
+      }
+    }
+
+    const drainCommands = (now: number, metrics: ReturnType<typeof stageMetrics>) => {
+      const commands = commandRef.current.splice(0)
+      for (const command of commands) {
+        if (stateRef.current.phase !== 'holding') continue
+        if (command.kind === 'aim' && manualRef.current) {
+          stateRef.current = aimHeldPair(stateRef.current, command.x)
+        } else if (command.kind === 'gesture' && stateRef.current.manualHold) {
+          stateRef.current = launchGestureThrow(stateRef.current, now, command.stroke, metrics)
+        } else if (command.kind === 'auto') {
+          stateRef.current = launchHeldAuto(stateRef.current, now, lastVolumeRef.current, metrics)
+        }
+      }
+    }
+
     const loop = (now: number) => {
       const dt = Math.min(0.05, (now - last) / 1000)
       last = now
       const metrics = stageMetrics()
+      armManualHold(now)
+      drainCommands(now, metrics)
+      if (stateRef.current.phase === 'holding' && stateRef.current.manualHold) {
+        lastVolumeRef.current = volumeRef.current
+        if (now - stateRef.current.phaseStartedMs >= SHOT_CLOCK_MS) {
+          stateRef.current = launchHeldAuto(stateRef.current, now, lastVolumeRef.current, metrics)
+        }
+      }
       if (!worldRef.current) {
         const bets = betsNow(now)
         if (bets.length > 0) worldRef.current = worldFromBets(bets, Math.floor(now))
@@ -329,6 +421,9 @@ export const useDiceThrow = (
         const bets = betsNow(now)
         worldRef.current = settleColumns(worldRef.current ?? emptyChipWorld(), bets, now, Math.floor(now))
         aimedKey = ''
+        if (manualRef.current) {
+          stateRef.current = { ...stateRef.current, manualHold: true, phaseStartedMs: now, aimLocked: false }
+        }
         holdLane()
       } else if (stateRef.current.phase === 'result' && worldRef.current) {
         worldRef.current = driftLooseChips(worldRef.current, dt, metrics, puckObstacle(stateRef.current.point))
@@ -336,7 +431,7 @@ export const useDiceThrow = (
       if (worldRef.current?.restack) worldRef.current = tickRestack(worldRef.current, now)
       const chips = worldRef.current ? presentChips(worldRef.current, now, metrics) : []
       const guides = worldRef.current ? guideFrames(worldRef.current, metrics) : []
-      setPresentation(present(stateRef.current, chips, guides, liveSpeech(speechRef.current, now), pnlRef.current, shooterRef.current, bonusStakeDollars(betsRef.current), streakView()))
+      setPresentation(present(stateRef.current, chips, guides, liveSpeech(speechRef.current, now), pnlRef.current, shooterRef.current, bonusStakeDollars(betsRef.current), streakView(), now))
       frame = window.requestAnimationFrame(loop)
     }
     frame = window.requestAnimationFrame(loop)

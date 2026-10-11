@@ -77,6 +77,7 @@ const delayMsFor = (sequenceId: Bg2MemeSequenceId): number => {
 export const useBg2MemeState = (
   binancePrice: number,
   coinbasePrice: number,
+  paused = false,
 ): Bg2MemeState => {
   const [activeMeme, setActiveMeme] = useState<Bg2ActiveMeme | null>(null)
   const lastTriggerAtRef = useRef(0)
@@ -101,7 +102,13 @@ export const useBg2MemeState = (
   }, [binancePrice, coinbasePrice])
 
   useEffect(() => {
-    if (activeMeme !== null) return
+    if (!paused) return
+    lastTriggerAtRef.current = Date.now()
+    setActiveMeme(null)
+  }, [paused])
+
+  useEffect(() => {
+    if (paused || activeMeme !== null) return
     const now = Date.now()
     if (now - lastTriggerAtRef.current < BG2_MEME_PRICE_WINDOW_MS) return
 
@@ -182,10 +189,10 @@ export const useBg2MemeState = (
       lastTriggerAtRef.current = now
       setActiveMeme({ sequenceId: 'arrowDown', frameIndex: 0 })
     }
-  }, [activeMeme, binancePrice, coinbasePrice])
+  }, [activeMeme, binancePrice, coinbasePrice, paused])
 
   useEffect(() => {
-    if (activeMeme === null) return
+    if (paused || activeMeme === null) return
     const sequenceId = activeMeme.sequenceId
     const frameCount = frameCountFor(sequenceId)
     const id = window.setTimeout(() => {
@@ -196,7 +203,7 @@ export const useBg2MemeState = (
       })
     }, delayMsFor(sequenceId))
     return () => window.clearTimeout(id)
-  }, [activeMeme])
+  }, [activeMeme, paused])
 
   return { activeMeme }
 }

@@ -61,6 +61,9 @@ body {
   border-radius: 18px;
   overflow: hidden;
   background: #0a0812;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .scene {
@@ -496,6 +499,40 @@ body {
   pointer-events: none;
 }
 
+.shot-clock {
+  position: absolute;
+  left: 50%;
+  top: 58%;
+  z-index: 25;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0;
+  color: #fff;
+  text-align: center;
+  pointer-events: none;
+  text-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.95),
+    0 4px 10px rgba(0, 0, 0, 0.95),
+    0 0 16px rgba(0, 0, 0, 0.85);
+}
+
+.shot-clock-label {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+.shot-clock-time {
+  margin-top: 6px;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
 .dice-result-total {
   font-size: 96px;
   font-weight: 800;
@@ -547,6 +584,8 @@ body {
 .overlay {
   position: absolute;
   inset: 0;
+  user-select: none;
+  -webkit-user-select: none;
   pointer-events: none;
   padding: 1rem 0.75rem 0.6rem;
   display: flex;
@@ -938,11 +977,64 @@ body {
     0 0 22px rgba(0, 0, 0, 0.95);
 }
 
-.repo-links-panel {
+.table-side {
   position: absolute;
   left: calc(100% + 1rem);
   top: 50%;
   transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  width: max-content;
+}
+
+.shooter-mode-button {
+  appearance: none;
+  border: 0;
+  border-radius: 14px;
+  padding: 0.72rem 1rem;
+  font: inherit;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  cursor: pointer;
+  color: #1a1208;
+}
+
+.shooter-mode-button.is-auto {
+  animation: shooter-mode-pulse 2.8s ease-in-out infinite;
+}
+
+.shooter-mode-button.is-manual {
+  background: #7a7a80;
+  color: #f6f0da;
+}
+
+.shooter-mode-button:focus-visible {
+  outline: 2px solid #f7931a;
+  outline-offset: 2px;
+}
+
+@keyframes shooter-mode-pulse {
+  0%,
+  100% {
+    background-color: rgba(247, 147, 26, 0.28);
+  }
+  50% {
+    background-color: #f7931a;
+  }
+}
+
+html.shooter-gesture-lock,
+html.shooter-gesture-lock body {
+  touch-action: none;
+  overscroll-behavior: none;
+}
+
+.repo-links-panel {
+  position: static;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
@@ -1011,10 +1103,14 @@ body {
     width: auto;
   }
 
-  .repo-links-panel {
+  .table-side {
     position: static;
     transform: none;
     margin-top: 0.9rem;
+    width: auto;
+  }
+
+  .repo-links-panel {
     width: auto;
     flex-direction: row;
     flex-wrap: wrap;

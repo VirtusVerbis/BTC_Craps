@@ -39,7 +39,7 @@ const spawnCat = (): InternalCatState => {
 }
 
 /** Foreground cat lifecycle: sparse spawn, cross-screen walk, despawn. */
-export const useFg3CatState = (): Fg3CatState => {
+export const useFg3CatState = (paused = false): Fg3CatState => {
   const [cat, setCat] = useState<InternalCatState>({
     active: false,
     direction: 'left',
@@ -48,6 +48,12 @@ export const useFg3CatState = (): Fg3CatState => {
   })
 
   useEffect(() => {
+    if (!paused) return
+    setCat((prev) => (prev.active ? { ...prev, active: false, frame: 0 } : prev))
+  }, [paused])
+
+  useEffect(() => {
+    if (paused) return undefined
     const spawnId = window.setInterval(() => {
       setCat((prev) => (prev.active ? prev : spawnCat()))
     }, FG3_CAT_SPAWN_INTERVAL_MS)
@@ -70,7 +76,7 @@ export const useFg3CatState = (): Fg3CatState => {
       window.clearInterval(spawnId)
       window.clearInterval(tickId)
     }
-  }, [])
+  }, [paused])
 
   return {
     active: cat.active,

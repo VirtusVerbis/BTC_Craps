@@ -19,7 +19,8 @@ import { applyBonusRoll, bonusFlashTotals, emptyBonusHand } from './ui/bonusCrap
 import { bonusTestHand, isBonusTestSeed, type BonusTestSeed } from './ui/bonusTest'
 import type { ThrowResult } from './ui/dicePhysics'
 import { loadHistogramRolls, pushRoll, saveHistogramRolls } from './ui/histogramModel'
-import { useDiceThrow } from './ui/useDiceThrow'
+import { useDiceThrow, type ShooterControls } from './ui/useDiceThrow'
+import { useShooterGesture, useShooterPageLock } from './ui/useShooterGesture'
 import { useHistogramVisibility } from './ui/useHistogramVisibility'
 import { useFg3CatState } from './ui/useFg3CatState'
 import { useVideoOverlayState } from './ui/useVideoOverlayState'
@@ -69,6 +70,10 @@ const GitHubMark = () => (
 function App() {
   const appShellRef = useRef<HTMLElement | null>(null)
   const stageAnchorRef = useRef<HTMLDivElement | null>(null)
+  const stageRef = useRef<HTMLDivElement | null>(null)
+  const displayRef = useRef<HTMLDivElement | null>(null)
+  const shooterControlsRef = useRef<ShooterControls | null>(null)
+  const [manualShooter, setManualShooter] = useState(false)
   const [splashDone, setSplashDone] = useState(false)
   const onSplashDone = useCallback(() => setSplashDone(true), [])
 
@@ -77,31 +82,36 @@ function App() {
   const [candles, setCandles] = useState<Candle[]>([])
   const [sceneWidthPx, setSceneWidthPx] = useState(REFERENCE_WIDTH)
   const [sceneHeightPx, setSceneHeightPx] = useState(REFERENCE_HEIGHT)
+  const [displayWidthPx, setDisplayWidthPx] = useState(REFERENCE_WIDTH)
 
   useLayoutEffect(() => {
     const el = stageAnchorRef.current
+    const display = displayRef.current
     if (!el) return
     const measure = () => {
       const w = el.clientWidth
       const h = el.clientHeight
       setSceneWidthPx(w > 0 ? w : REFERENCE_WIDTH)
       setSceneHeightPx(h > 0 ? h : REFERENCE_HEIGHT)
+      const dw = display?.getBoundingClientRect().width ?? 0
+      if (dw > 0) setDisplayWidthPx(dw)
     }
     measure()
     const ro = new ResizeObserver(measure)
     ro.observe(el)
+    if (display) ro.observe(display)
     return () => ro.disconnect()
   }, [])
 
   const setFeedRef = useRef(setFeed)
   setFeedRef.current = setFeed
 
-  const bg2Meme = useBg2MemeState(feed.market.binance.price, feed.market.coinbase.price)
+  const bg2Meme = useBg2MemeState(feed.market.binance.price, feed.market.coinbase.price, manualShooter)
   const hasActiveBg2Meme = bg2Meme.activeMeme !== null
-  const videoOverlay = useVideoOverlayState()
+  const videoOverlay = useVideoOverlayState(manualShooter)
   const isVideoActive = videoOverlay.isVideoActive
   const bg2Visible = useBg2ChartVisible(hasActiveBg2Meme || isVideoActive)
-  const fg3 = useFg3CatState()
+  const fg3 = useFg3CatState(manualShooter)
   const [dieColor, setDieColor] = useState(loadDieColor)
   const onTimeClick = useCallback(() => {
     setDieColor((current) => {
@@ -166,7 +176,17 @@ function App() {
     }
   }, [armBonusTest])
   const histogram = useHistogramVisibility(splashDone, histogramBoost)
-  const dice = useDiceThrow(feed.market, splashDone, rolls, onCountedRoll, bonusHandRef)
+  const dice = useDiceThrow(feed.market, splashDone, rolls, onCountedRoll, bonusHandRef, manualShooter, shooterControlsRef)
+  const gestureReady = manualShooter && dice?.phase === 'holding'
+  const pageLocked = manualShooter && (dice?.phase === 'holding' || dice?.phase === 'flying')
+  useShooterGesture(gestureReady, stageRef, shooterControlsRef)
+  useShooterPageLock(pageLocked)
+  const onShooterMode = useCallback(() => {
+    setManualShooter((current) => {
+      if (current) shooterControlsRef.current?.launchAutoNow()
+      return !current
+    })
+  }, [])
 
   const marketService = useMemo(
     () =>
@@ -196,15 +216,15 @@ function App() {
     return () => window.clearInterval(id)
   }, [])
 
-  const showCandleChart = bg2Visible && !isVideoActive
-  const showBg2Meme = splashDone && hasActiveBg2Meme && !isVideoActive
+  const showCandleChart = bg2Visible && !isVideoActive && !manualShooter
+  const showBg2Meme = splashDone && hasActiveBg2Meme && !isVideoActive && !manualShooter
 
   return (
     <main ref={appShellRef} className="app-shell">
       {!splashDone ? <SplashSequence onDone={onSplashDone} /> : null}
       <div className="app-layout">
         <div className="stage-anchor" ref={stageAnchorRef}>
-          <Stage shellRef={appShellRef}>
+          <Stage shellRef={appShellRef} stageRef={stageRef} displayRef={displayRef}>
             <CrapsScene
               showCandleChart={showCandleChart}
               showBg2Meme={showBg2Meme}
@@ -212,7 +232,7 @@ function App() {
               sceneWidthPx={sceneWidthPx}
               sceneHeightPx={sceneHeightPx}
               candles={candles}
-              showFg3Cat={fg3.active}
+              showFg3Cat={fg3.active && !manualShooter}
               fg3Direction={fg3.direction}
               fg3Frame={fg3.frame}
               fg3Left={fg3.left}
@@ -239,7 +259,7 @@ function App() {
               rollStreak={dice?.rollStreak ?? emptyRollStreakView()}
               status={feed.status}
             />
-            {videoOverlay.active ? (
+            {videoOverlay.active && !manualShooter ? (
               <VideoOverlay
                 videoId={videoOverlay.active.videoId}
                 soundEnabled={videoOverlay.soundEnabled}
@@ -253,7 +273,17 @@ function App() {
           </Stage>
         </div>
 
-        <aside className="repo-links-panel" aria-label="Source repositories">
+        <div className="table-side">
+          <button
+            className={manualShooter ? 'shooter-mode-button is-manual' : 'shooter-mode-button is-auto'}
+            type="button"
+            style={{ width: Math.max(120, displayWidthPx / 3) }}
+            aria-pressed={manualShooter}
+            onClick={onShooterMode}
+          >
+            {manualShooter ? 'Auto' : 'Shooter'}
+          </button>
+          <aside className="repo-links-panel" aria-label="Source repositories">
           <div className="repo-link-lnurl" aria-label="LNURL address">
             <img className="lnurl-badge" src="/mobile/lnurl_address.jpg.jpeg" alt="LNURL address" draggable={false} />
           </div>
@@ -273,7 +303,8 @@ function App() {
             <br />
             Website is work in progress...
           </p>
-        </aside>
+          </aside>
+        </div>
       </div>
     </main>
   )

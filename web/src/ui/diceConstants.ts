@@ -86,6 +86,38 @@ export const DIE_MIN_REACH_FRACTION =  0.973//0.983 //0.985
  */
 export const DIE_UP_ADD_PX_PER_S = 300
 
+/** Shooter-mode countdown before one auto roll. */
+export const SHOT_CLOCK_MS = 60_000
+
+/** Upward travel, in stage pixels, required before a stroke launches. */
+export const GESTURE_MIN_DISTANCE_PX = 64
+
+/** Release speed is the upward travel over this tail of the stroke. */
+export const GESTURE_RELEASE_WINDOW_MS = 80
+
+/**
+ * Stage pixels per second of the finger.
+ * Min lands at mid-felt, wall reaches the back wall, and no-roll clears it.
+ */
+export const GESTURE_SPEED_MIN_PX_PER_S = 3100//1350//450
+export const GESTURE_SPEED_WALL_PX_PER_S = 5000//2300//1400
+export const GESTURE_SPEED_NO_ROLL_PX_PER_S = 6400//3000//2100
+
+/** First landing of the slowest valid flick, as a fraction of the depth to the back wall. */
+export const GESTURE_MID_FELT_FRACTION = 0.5
+
+/** Air time of a legal flick. Forward speed moves the landing; lift stays on this arc. */
+export const GESTURE_ARC_SEC = 0.85
+
+/** Forward speed at and above the no-roll line, relative to the speed that lands on the wall. */
+export const GESTURE_OVERSHOOT_FORWARD_SCALE = 1.45
+
+/** Lean (sideways / upward) that maps to a full shared side spin. */
+export const GESTURE_MAX_LEAN = 0.65
+
+/** Forward tumble on every flick, including a straight one. Side lean is added on top. */
+export const GESTURE_BASE_SPIN = 4
+
 /** Log-scale references for one volume window. Tune per exchange. */
 export const DIE_BINANCE_BUY_REF = 6
 export const DIE_COINBASE_BUY_REF = 1.5

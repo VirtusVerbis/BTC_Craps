@@ -10,6 +10,14 @@ import {
   DIE_FELT_SPEED_KEEP,
   DIE_FORWARD_SPIN_SCALE,
   DIE_FULL_REACH_SEC,
+  GESTURE_ARC_SEC,
+  GESTURE_BASE_SPIN,
+  GESTURE_MAX_LEAN,
+  GESTURE_MID_FELT_FRACTION,
+  GESTURE_OVERSHOOT_FORWARD_SCALE,
+  GESTURE_SPEED_MIN_PX_PER_S,
+  GESTURE_SPEED_NO_ROLL_PX_PER_S,
+  GESTURE_SPEED_WALL_PX_PER_S,
   DIE_GRAVITY_PX_PER_S2,
   DIE_LAUNCH_DELAY_MS,
   DIE_LAUNCH_SIZE_PX,
@@ -30,6 +38,7 @@ import {
   DIE_WALL_SPIN_RAD,
   DIE_WALL_TOP_FRACTION,
 } from './diceConstants'
+import { clampLaunchX, type GestureStroke } from './gestureThrow'
 
 export interface Vec3 {
   x: number
@@ -62,6 +71,8 @@ export interface Die {
   topFace: number | null
   /** Latched once this die crosses mid-felt. Shooter stacks collide after that. */
   pastFeltMid?: boolean
+  /** Latched when this die bounces on the back wall. */
+  hitBackWall?: boolean
 }
 
 export interface VolumeTotals {
@@ -91,6 +102,12 @@ export interface ThrowState {
   reachZ: [number, number]
   /** True after a launch, so a resting test die is not judged as a short throw. */
   reachTracked: boolean
+  /** Shooter mode waits at the rail for a flick or an explicit auto launch. */
+  manualHold: boolean
+  /** The finger chose a rail x, so clear-lane aim stays off for this hold. */
+  aimLocked: boolean
+  /** Gesture throws count only when both dice bounce on the back wall. */
+  requireWallContact: boolean
 }
 
 export interface StageMetrics {
@@ -259,6 +276,9 @@ export const createThrowState = (
   flightMs: 0,
   reachZ: [0, 0],
   reachTracked: false,
+  manualHold: false,
+  aimLocked: false,
+  requireWallContact: false,
 })
 
 export const readTopFace = (q: Quat): number => {
@@ -319,6 +339,38 @@ export const stepDice = (
   return next
 }
 
+/** First felt touch of one flicked die, or a clear of the back wall. */
+export const probeGestureArc = (
+  releaseSpeed: number,
+  metrics: StageMetrics = stageMetrics(),
+): { firstZ: number | null; cleared: boolean } => {
+  const { forward, up } = gestureLaunchSpeeds(releaseSpeed, metrics)
+  const [die] = createHoldingDice(metrics.width / 2, () => 0)
+  die.resting = false
+  die.topFace = null
+  die.vz = forward
+  die.vh = up
+  const idle = createHoldingDice(0, () => 0)[0]
+  idle.alive = false
+  let pair: [Die, Die] = [die, idle]
+  let airborne = false
+  let firstZ: number | null = null
+  let cleared = false
+  const watch: DicePoseHook = (dice) => {
+    const probe = dice[0]
+    if (probe.leaving || !probe.alive) cleared = true
+    if (probe.h > 4) airborne = true
+    if (firstZ == null && airborne && probe.h <= 0) firstZ = probe.z
+    return dice
+  }
+  const dt = 1 / 60
+  const steps = Math.ceil(4 / dt)
+  for (let i = 0; i < steps && !cleared && firstZ == null; i += 1) {
+    pair = stepDice(pair, dt, metrics, () => 0.5, watch)
+  }
+  return { firstZ, cleared }
+}
+
 export const advanceThrow = (
   state: ThrowState,
   dtSec: number,
@@ -328,19 +380,11 @@ export const advanceThrow = (
   poseHook?: DicePoseHook,
 ): ThrowState => {
   if (state.phase === 'holding') {
+    if (state.manualHold) return state
     if (nowMs - state.phaseStartedMs < DIE_LAUNCH_DELAY_MS) return state
     if (!(volume.binanceBuy > 0)) return state
     if (!(volume.coinbaseBuy > 0) && !(DIE_UP_ADD_PX_PER_S > 0)) return state
-    return {
-      ...state,
-      phase: 'flying',
-      phaseStartedMs: nowMs,
-      flightMs: 0,
-      result: null,
-      reachZ: [0, 0],
-      reachTracked: true,
-      dice: launchDice(state.dice, volume, metrics),
-    }
+    return launchHeldAuto(state, nowMs, volume, metrics)
   }
 
   if (state.phase === 'flying') {
@@ -375,8 +419,9 @@ export const advanceThrow = (
       return { ...state, dice, flightMs, reachZ }
     }
     const line = metrics.wallZ * DIE_MIN_REACH_FRACTION
-    const short = tracking && dice.some((die, index) => die.alive && reachZ[index] < line)
-    const noRoll = dice.some((die) => !die.alive) || short
+    const short = !state.requireWallContact && tracking && dice.some((die, index) => die.alive && reachZ[index] < line)
+    const missedWall = state.requireWallContact && dice.some((die) => die.alive && !die.hitBackWall)
+    const noRoll = dice.some((die) => !die.alive) || short || missedWall
     const total = (dice[0].topFace ?? 0) + (dice[1].topFace ?? 0)
     const roll = noRoll ? null : applyRoll(state.point, total)
     return {
@@ -404,6 +449,9 @@ export const advanceThrow = (
     flightMs: 0,
     reachZ: [0, 0],
     reachTracked: false,
+    manualHold: false,
+    aimLocked: false,
+    requireWallContact: false,
   }
 }
 
@@ -430,6 +478,7 @@ const launchDice = (dice: readonly [Die, Die], volume: VolumeTotals, metrics: St
 const applyLaunch = (die: Die, forward: number, up: number, spin: number, sign: number) => {
   die.resting = false
   die.topFace = null
+  die.hitBackWall = false
   die.vx = 0
   die.vz = forward
   die.vh = up
@@ -438,6 +487,118 @@ const applyLaunch = (die: Die, forward: number, up: number, spin: number, sign: 
     y: sign * spin * 0.45,
     z: sign * spin * 0.7,
   }
+}
+
+const applyGestureLaunch = (die: Die, forward: number, up: number, leanSpin: number) => {
+  die.resting = false
+  die.topFace = null
+  die.hitBackWall = false
+  die.vx = 0
+  die.vz = forward
+  die.vh = up
+  die.w = {
+    x: GESTURE_BASE_SPIN * DIE_FORWARD_SPIN_SCALE,
+    y: leanSpin * 0.45,
+    z: leanSpin * 0.7,
+  }
+}
+
+/** Auto launch with no rail delay and no positive-volume gate. */
+export const launchHeldAuto = (
+  state: ThrowState,
+  nowMs: number,
+  volume: VolumeTotals,
+  metrics: StageMetrics = stageMetrics(),
+): ThrowState => {
+  if (state.phase !== 'holding') return state
+  return {
+    ...state,
+    phase: 'flying',
+    phaseStartedMs: nowMs,
+    flightMs: 0,
+    result: null,
+    reachZ: [0, 0],
+    reachTracked: true,
+    manualHold: false,
+    requireWallContact: false,
+    dice: launchDice(state.dice, volume, metrics),
+  }
+}
+
+/**
+ * Forward speed follows flick speed. Lift is the arc that lands a legal flick
+ * on the chosen depth. At the no-roll line lift stays put and forward carries the dice over the wall.
+ */
+export const gestureLaunchSpeeds = (
+  releaseSpeed: number,
+  metrics: StageMetrics = stageMetrics(),
+): { forward: number; up: number } => {
+  const up = (DIE_GRAVITY_PX_PER_S2 * GESTURE_ARC_SEC) / 2
+  const wallForward = metrics.wallZ / GESTURE_ARC_SEC
+  const midForward = wallForward * GESTURE_MID_FELT_FRACTION
+  const overForward = wallForward * GESTURE_OVERSHOOT_FORWARD_SCALE
+  const speed = Math.max(0, releaseSpeed)
+  if (speed <= GESTURE_SPEED_MIN_PX_PER_S) return { forward: midForward, up }
+  if (speed >= GESTURE_SPEED_NO_ROLL_PX_PER_S) return { forward: overForward, up }
+  if (speed <= GESTURE_SPEED_WALL_PX_PER_S) {
+    const span = GESTURE_SPEED_WALL_PX_PER_S - GESTURE_SPEED_MIN_PX_PER_S
+    const t = span > 0 ? (speed - GESTURE_SPEED_MIN_PX_PER_S) / span : 1
+    return { forward: midForward + (wallForward - midForward) * t, up }
+  }
+  const span = GESTURE_SPEED_NO_ROLL_PX_PER_S - GESTURE_SPEED_WALL_PX_PER_S
+  const t = span > 0 ? (speed - GESTURE_SPEED_WALL_PX_PER_S) / span : 1
+  return { forward: wallForward + (overForward - wallForward) * t, up }
+}
+
+const gestureLeanSpin = (lean: number): number => {
+  const capped = Math.max(-1, Math.min(1, lean / GESTURE_MAX_LEAN))
+  return capped * DIE_MAX_SPIN_RAD_PER_S
+}
+
+/** Flick launch. Both dice share the lean spin. The pair center is the pointer-down x. */
+export const launchGestureThrow = (
+  state: ThrowState,
+  nowMs: number,
+  stroke: GestureStroke,
+  metrics: StageMetrics = stageMetrics(),
+): ThrowState => {
+  if (state.phase !== 'holding') return state
+  const sharedX = clampLaunchX(stroke.launchX)
+  const half = DIE_LAUNCH_SIZE_PX / 2
+  const { forward, up } = gestureLaunchSpeeds(stroke.speed, metrics)
+  const leanSpin = gestureLeanSpin(stroke.lean)
+  const left = cloneDie(state.dice[0])
+  const right = cloneDie(state.dice[1])
+  left.x = sharedX - half
+  right.x = sharedX + half
+  applyGestureLaunch(left, forward, up, leanSpin)
+  applyGestureLaunch(right, forward, up, leanSpin)
+  return {
+    ...state,
+    phase: 'flying',
+    phaseStartedMs: nowMs,
+    sharedX,
+    flightMs: 0,
+    result: null,
+    reachZ: [0, 0],
+    reachTracked: true,
+    manualHold: false,
+    aimLocked: false,
+    requireWallContact: true,
+    dice: [left, right],
+  }
+}
+
+/** Slide a held pair to the finger's x without changing the facing. */
+export const aimHeldPair = (state: ThrowState, stageX: number): ThrowState => {
+  if (state.phase !== 'holding') return state
+  const sharedX = clampLaunchX(stageX)
+  const half = DIE_LAUNCH_SIZE_PX / 2
+  const left = cloneDie(state.dice[0])
+  const right = cloneDie(state.dice[1])
+  left.x = sharedX - half
+  right.x = sharedX + half
+  return { ...state, sharedX, aimLocked: true, dice: [left, right] }
 }
 
 const substep = (dice: [Die, Die], dt: number, metrics: StageMetrics, random: () => number): [Die, Die] => {
@@ -498,6 +659,7 @@ const constrain = (die: Die, metrics: StageMetrics, dt: number, random: () => nu
   const front = next.z + radius
   if (front >= metrics.wallZ && next.vz > 0 && next.h <= metrics.wallHeight) {
     next.z = Math.max(0, metrics.wallZ - radius)
+    next.hitBackWall = true
     bounceRail(next, 'z', -1, random)
   }
 

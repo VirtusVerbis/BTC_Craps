@@ -31,13 +31,15 @@ const shuffle = <T,>(arr: readonly T[]): T[] => {
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
 
-export const useVideoOverlayState = (): VideoOverlayState => {
+export const useVideoOverlayState = (paused = false): VideoOverlayState => {
   const [active, setActive] = useState<ActiveVideoOverlay | null>(null)
   const [soundEnabled, setSoundEnabled] = useState(!VIDEO_OVERLAY_DEFAULT_MUTED)
   const activeRef = useRef<ActiveVideoOverlay | null>(null)
   const erroredPresetIdsRef = useRef<Set<string>>(new Set())
   const queueRef = useRef<string[]>([])
   const wakeLoopRef = useRef<(() => void) | null>(null)
+  const pausedRef = useRef(paused)
+  pausedRef.current = paused
 
   useEffect(() => {
     activeRef.current = active
@@ -78,6 +80,14 @@ export const useVideoOverlayState = (): VideoOverlayState => {
   }, [wakeSpawnLoop])
 
   useEffect(() => {
+    if (!paused) return undefined
+    activeRef.current = null
+    setActive(null)
+    wakeSpawnLoop()
+    return undefined
+  }, [paused, wakeSpawnLoop])
+
+  useEffect(() => {
     let cancelled = false
 
     const waitUntilVideoClears = async () => {
@@ -92,6 +102,10 @@ export const useVideoOverlayState = (): VideoOverlayState => {
     const run = async () => {
       await sleep(VIDEO_OVERLAY_AUTO_SPAWN_DELAY_MS)
       while (!cancelled) {
+        while (!cancelled && pausedRef.current) {
+          await sleep(250)
+        }
+        if (cancelled) break
         if (activeRef.current !== null) {
           await waitUntilVideoClears()
           continue

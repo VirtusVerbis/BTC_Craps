@@ -8,6 +8,10 @@ import {
   DIE_FORWARD_SPIN_SCALE,
   DIE_LAUNCH_DELAY_MS,
   DIE_LAUNCH_SIZE_PX,
+  GESTURE_MID_FELT_FRACTION,
+  GESTURE_SPEED_MIN_PX_PER_S,
+  GESTURE_SPEED_NO_ROLL_PX_PER_S,
+  GESTURE_SPEED_WALL_PX_PER_S,
   DIE_MAX_SPIN_RAD_PER_S,
   DIE_MIN_REACH_FRACTION,
   DIE_NO_ROLL_PAUSE_MS,
@@ -25,12 +29,17 @@ import {
 import { applyRoll, puckPlacement } from './puckState'
 import {
   advanceThrow,
+  aimHeldPair,
   clearSharedX,
   createHoldingDice,
   createThrowState,
   dieScreenCenter,
   dieSize,
+  gestureLaunchSpeeds,
+  launchGestureThrow,
+  launchHeldAuto,
   launchSpeeds,
+  probeGestureArc,
   logUnit,
   readTopFace,
   stageMetrics,
@@ -603,5 +612,70 @@ describe('pass line puck', () => {
     expect(reset.point).toBe(6)
     expect(puckPlacement(null)).toMatchObject({ src: '/Off_Puck.png', x: PUCK_OFF_X, y: PUCK_OFF_Y, scale: PUCK_OFF_SCALE })
     expect(puckPlacement(6)).toMatchObject({ src: '/On_Puck.png', x: PUCK_ON_6_X, y: PUCK_ON_6_Y, scale: PUCK_ON_6_SCALE })
+  })
+})
+
+describe('gesture launch', () => {
+  const volume = { binanceBuy: 0, coinbaseBuy: 0, binanceSell: 0, coinbaseSell: 0 }
+
+  it('keeps a shooter hold from auto-launching and still launches a zero-volume timeout', () => {
+    const held = { ...createThrowState(0, 540), manualHold: true }
+    const waiting = advanceThrow(held, 0.016, DIE_LAUNCH_DELAY_MS + 50, {
+      binanceBuy: 4,
+      coinbaseBuy: 2,
+      binanceSell: 1,
+      coinbaseSell: 1,
+    })
+    expect(waiting.phase).toBe('holding')
+    const launched = launchHeldAuto(held, 80, volume)
+    expect(launched.phase).toBe('flying')
+    expect(launched.requireWallContact).toBe(false)
+    expect(launched.dice[0].vz).toBeGreaterThan(0)
+  })
+
+  it('lands a slow flick near mid-felt and sends a hot flick over the wall', () => {
+    const soft = probeGestureArc(GESTURE_SPEED_MIN_PX_PER_S)
+    const hot = probeGestureArc(GESTURE_SPEED_NO_ROLL_PX_PER_S)
+    const mid = metrics.wallZ * GESTURE_MID_FELT_FRACTION
+    expect(soft.cleared).toBe(false)
+    expect(soft.firstZ).toBeGreaterThan(mid * 0.85)
+    expect(soft.firstZ).toBeLessThan(mid * 1.2)
+    expect(hot.cleared).toBe(true)
+    const speeds = gestureLaunchSpeeds(GESTURE_SPEED_WALL_PX_PER_S)
+    const slow = gestureLaunchSpeeds(GESTURE_SPEED_MIN_PX_PER_S)
+    expect(slow.up).toBeCloseTo(speeds.up)
+    expect(slow.forward).toBeLessThan(speeds.forward)
+  })
+
+  it('calls No Roll when either gestured die misses the back wall', () => {
+    const state = { ...createThrowState(0, 540), phase: 'flying' as const, requireWallContact: true, reachTracked: true }
+    const left = flyingDie({ resting: true, alive: true, topFace: 3, hitBackWall: true })
+    const right = flyingDie({ resting: true, alive: true, topFace: 4, hitBackWall: false, x: 700 })
+    const missed = advanceThrow({ ...state, dice: [left, right], reachZ: [metrics.wallZ, metrics.wallZ] }, 0.016, 1000, volume)
+    expect(missed.result).toEqual({ noRoll: true })
+
+    const both = advanceThrow(
+      { ...state, dice: [left, flyingDie({ resting: true, alive: true, topFace: 4, hitBackWall: true, x: 700 })] },
+      0.016,
+      1000,
+      volume,
+    )
+    expect(both.result).toEqual({ total: 7, label: 'Pass Line' })
+  })
+
+  it('launches both dice from the pointer-down x with the same lean spin', () => {
+    const state = createThrowState(0, 200)
+    const launched = launchGestureThrow(state, 1000, { launchX: 800, speed: GESTURE_SPEED_MIN_PX_PER_S, lean: -0.4 })
+    expect(launched.requireWallContact).toBe(true)
+    expect(launched.sharedX).toBe(800)
+    expect(launched.dice[1].x - launched.dice[0].x).toBeCloseTo(DIE_LAUNCH_SIZE_PX)
+    expect(launched.dice[0].w.z).toBeLessThan(0)
+    expect(launched.dice[1].w.z).toBeCloseTo(launched.dice[0].w.z)
+    expect(launched.dice[0].w.x).toBeGreaterThan(0)
+    expect(launched.dice[1].w.x).toBeCloseTo(launched.dice[0].w.x)
+    const aimed = aimHeldPair(state, 800)
+    expect(aimed.sharedX).toBe(800)
+    expect(aimed.aimLocked).toBe(true)
+    expect(aimed.dice[0].q).toEqual(state.dice[0].q)
   })
 })
