@@ -10,8 +10,14 @@ export const DIE_LAUNCH_STACK_MARGIN_PX = 18
 /** Size at the back wall, relative to `DIE_LAUNCH_SIZE_PX`. */
 export const DIE_DEPTH_SCALE = 0.6//0.6//0.50
 
-/** Red face opacity. Pips stay opaque. */
+/** Face opacity. Pips stay opaque. */
 export const DIE_FACE_ALPHA = 0.65//0.55
+
+/**
+ * How long one rainbow die color stays before the next.
+ * 50 matches the roll streak. Raise it to slow the dice, lower it to speed them up.
+ */
+export const DIE_RAINBOW_STEP_MS = 50
 
 /** Camera lean at the launch rail. Negative tips the near side up. */
 export const DIE_LAUNCH_TILT_DEG = -55

@@ -38,7 +38,7 @@ export const SplashSequence = ({ onDone }: SplashSequenceProps) => {
   if (phase >= 2) return null
 
   const src =
-    phase === 0 ? resolveMobileAssetUrl('vv_splash.png') : '/BitcoinMidnight_Splash%20Dice.png'
+    phase === 0 ? resolveMobileAssetUrl('vv_splash.png') : '/Bitcoin%20Midnight_%20Neon%20Craps.png'
 
   return (
     <div

@@ -5,6 +5,7 @@ import { BlockHeightService, type BlockState } from './data/blockHeight'
 import { MarketDataService, type MarketFeedUpdate } from './data/marketData'
 import { emptyCharacterPnl } from './ui/characterPnl'
 import { emptyBonusStakes, loadShooterBook } from './ui/shooterProfile'
+import { loadDieColor, nextDieColor, saveDieColor } from './ui/diceColor'
 import { emptyRollStreakView } from './ui/rollStreak'
 import { CrapsScene } from './ui/CrapsScene'
 import { Overlay } from './ui/Overlay'
@@ -101,6 +102,14 @@ function App() {
   const isVideoActive = videoOverlay.isVideoActive
   const bg2Visible = useBg2ChartVisible(hasActiveBg2Meme || isVideoActive)
   const fg3 = useFg3CatState()
+  const [dieColor, setDieColor] = useState(loadDieColor)
+  const onTimeClick = useCallback(() => {
+    setDieColor((current) => {
+      const next = nextDieColor(current)
+      saveDieColor(next)
+      return next
+    })
+  }, [])
   const [rolls, setRolls] = useState(loadHistogramRolls)
   useEffect(() => {
     saveHistogramRolls(rolls)
@@ -218,12 +227,13 @@ function App() {
               bonusHits={bonusHits}
               bonusFlashing={bonusFlashing}
               bonusLines={bonusLines}
+              dieColor={dieColor}
               characterPnl={dice?.pnl ?? emptyCharacterPnl()}
             />
             <Overlay
               market={feed.market}
               block={blockState}
-              onTimeClick={() => {}}
+              onTimeClick={onTimeClick}
               shooter={dice?.shooter ?? loadShooterBook()}
               bonusStakes={dice?.bonusStakes ?? emptyBonusStakes()}
               rollStreak={dice?.rollStreak ?? emptyRollStreakView()}

@@ -1,4 +1,6 @@
-import { DIE_BACK_WALL_TILT_DEG, DIE_FACE_ALPHA, DIE_LAUNCH_TILT_DEG, PUCK_IMAGE_WIDTH_PX } from './diceConstants'
+import { useEffect, useState } from 'react'
+import { DIE_BACK_WALL_TILT_DEG, DIE_LAUNCH_TILT_DEG, PUCK_IMAGE_WIDTH_PX } from './diceConstants'
+import { dieFaceGradient, diePigment, dieRainbowStep, dieShade, type DieColorId } from './diceColor'
 import { puckPlacement } from './puckState'
 import type { DicePresentation } from './useDiceThrow'
 
@@ -47,26 +49,68 @@ const FACES: Array<{ name: string; value: number }> = [
   { name: 'bottom', value: 6 },
 ]
 
-const Face = ({ name, value }: { name: string; value: number }) => (
-  <div className={`die-face die-face-${name}`} style={{ backgroundColor: `rgba(196, 28, 36, ${DIE_FACE_ALPHA})` }}>
-    {PIP_LAYOUT[value].map(([x, y]) => (
-      <span key={`${name}-${x}-${y}`} className="die-pip" style={{ left: `${x}%`, top: `${y}%` }} />
-    ))}
-  </div>
-)
+const useRainbowStep = (active: boolean) => {
+  const [step, setStep] = useState(0)
+
+  useEffect(() => {
+    if (!active) return undefined
+    const startedAt = performance.now()
+    let frame = 0
+    const tick = (now: number) => {
+      const next = dieRainbowStep(now - startedAt)
+      setStep((current) => (current === next ? current : next))
+      frame = window.requestAnimationFrame(tick)
+    }
+    setStep(0)
+    frame = window.requestAnimationFrame(tick)
+    return () => window.cancelAnimationFrame(frame)
+  }, [active])
+
+  return step
+}
+
+const Face = ({
+  name,
+  value,
+  color,
+  rainbowStep,
+}: {
+  name: string
+  value: number
+  color: DieColorId
+  rainbowStep: number
+}) => {
+  const pigment = diePigment(color, rainbowStep)
+  return (
+    <div
+      className={`die-face die-face-${name}`}
+      style={{
+        backgroundImage: dieFaceGradient(pigment),
+        ['--die-shade' as string]: dieShade(pigment),
+      }}
+    >
+      {PIP_LAYOUT[value].map(([x, y]) => (
+        <span key={`${name}-${x}-${y}`} className="die-pip" style={{ left: `${x}%`, top: `${y}%` }} />
+      ))}
+    </div>
+  )
+}
 
 export const DiceLayer = ({
   presentation,
   bonusLines = [],
+  dieColor = 'orange',
 }: {
   presentation: DicePresentation
   bonusLines?: readonly string[]
+  dieColor?: DieColorId
 }) => {
+  const rainbowStep = useRainbowStep(dieColor === 'rainbow')
   const puck = puckPlacement(presentation.point)
   const result = presentation.result
   return (
     <>
-      <div className="dice-layer" aria-hidden={result == null}>
+      <div className="dice-layer" data-die-color={dieColor} aria-hidden={result == null}>
         <img
           className="puck"
           src={puck.src}
@@ -89,7 +133,7 @@ export const DiceLayer = ({
             >
               <div className="die-spin" style={{ transform: `rotateX(${viewTiltDeg(die.depth)}deg) ${die.transform}` }}>
                 {FACES.map((face) => (
-                  <Face key={face.name} name={face.name} value={face.value} />
+                  <Face key={face.name} name={face.name} value={face.value} color={dieColor} rainbowStep={rainbowStep} />
                 ))}
               </div>
             </div>

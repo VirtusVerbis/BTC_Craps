@@ -20,6 +20,7 @@ import { formatPnlBtc, formatPnlUsd, pnlColor, PL_CHARACTERS, type CharacterPnlB
 import { PL_LABEL_ANCHOR, PL_LABEL_FONT_PX } from './characterPnlConstants'
 import { ChipLayer } from './ChipStack'
 import { DiceLayer } from './DiceLayer'
+import type { DieColorId } from './diceColor'
 import { SpeechLayer } from './SpeechLayer'
 import { RollHistogram } from './RollHistogram'
 import type { DicePresentation } from './useDiceThrow'
@@ -77,6 +78,7 @@ interface CrapsSceneProps {
   bonusHits: readonly number[]
   bonusFlashing: readonly number[]
   bonusLines: readonly string[]
+  dieColor: DieColorId
 }
 
 export const CrapsScene = ({
@@ -102,6 +104,7 @@ export const CrapsScene = ({
   bonusHits,
   bonusFlashing,
   bonusLines,
+  dieColor,
 }: CrapsSceneProps) => {
   const m = mobileAssetManifest
   const bg2MemeSrc = (() => {
@@ -213,7 +216,7 @@ export const CrapsScene = ({
       ) : null}
       <ChipLayer discs={dice?.chips ?? []} guides={dice?.guides ?? []} />
       <SpeechLayer speech={dice?.speech ?? []} />
-      {dice ? <DiceLayer presentation={dice} bonusLines={bonusLines} /> : null}
+      {dice ? <DiceLayer presentation={dice} bonusLines={bonusLines} dieColor={dieColor} /> : null}
     </div>
   )
 }
