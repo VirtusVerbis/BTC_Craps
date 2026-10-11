@@ -47,11 +47,14 @@ const SOLID_PIGMENTS: Record<Exclude<DieColorId, 'rainbow'>, DiePigment> = {
     mid: [247, 147, 26],
     dark: [214, 96, 0],
   },
-  /** Flat fill was `rgba(196, 28, 36, DIE_FACE_ALPHA)`. */
+  /** Flat fill was `rgba(196, 28, 36, DIE_FACE_ALPHA)`. Photo acrylic red replaces that pigment. */
   red: {
-    light: [236, 78, 84],
-    mid: [196, 28, 36],
-    dark: [132, 12, 20],
+    // light: [236, 78, 84],
+    // mid: [196, 28, 36],
+    // dark: [132, 12, 20],
+    light: [247, 80, 66],
+    mid: [238, 42, 33],
+    dark: [197, 23, 19],
   },
   blue: {
     light: [96, 158, 255],
