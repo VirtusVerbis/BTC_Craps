@@ -257,6 +257,7 @@ function App() {
               shooter={dice?.shooter ?? loadShooterBook()}
               bonusStakes={dice?.bonusStakes ?? emptyBonusStakes()}
               rollStreak={dice?.rollStreak ?? emptyRollStreakView()}
+              shooterMode={manualShooter}
               status={feed.status}
             />
             {videoOverlay.active && !manualShooter ? (

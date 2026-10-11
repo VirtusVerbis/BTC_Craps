@@ -33,3 +33,12 @@ export const LIQ_TICKER_MS = 26_000
 
 /** Ticker text. Yellow reads as an alarm against the felt and the open-interest orange. */
 export const LIQ_TICKER_COLOR = '#FFE566'
+
+/** How long the new-shooter banner stays up after Shooter mode turns on. */
+export const NEW_SHOOTER_BANNER_MS = 3_000
+
+/** Time for one shimmer sweep across the banner. */
+export const NEW_SHOOTER_SHIMMER_MS = 1_400
+
+/** Vertical center of the banner, in stage pixels. Raising this moves it down. */
+export const NEW_SHOOTER_BANNER_Y = 1000

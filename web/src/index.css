@@ -1137,6 +1137,58 @@ html.shooter-gesture-lock body {
   transform: translateY(-1px);
 }
 
+.new-shooter-banner {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  z-index: 6;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.new-shooter-banner img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.new-shooter-shimmer {
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(
+    105deg,
+    transparent 0%,
+    transparent 42%,
+    rgba(255, 255, 255, 0.16) 47%,
+    rgba(255, 255, 255, 0.78) 50%,
+    rgba(255, 255, 255, 0.16) 53%,
+    transparent 58%,
+    transparent 100%
+  );
+  background-size: 220% 100%;
+  background-repeat: no-repeat;
+  mix-blend-mode: screen;
+  -webkit-mask-image: url('/here-comes-a-new-shooter.png');
+  mask-image: url('/here-comes-a-new-shooter.png');
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  animation-name: new-shooter-shimmer;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  pointer-events: none;
+}
+
+@keyframes new-shooter-shimmer {
+  from {
+    background-position: 130% 0;
+  }
+  to {
+    background-position: -130% 0;
+  }
+}
+
 .repo-link:focus-visible {
   outline: 2px solid #f7931a;
   outline-offset: 2px;

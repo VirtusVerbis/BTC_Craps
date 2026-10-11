@@ -8,6 +8,7 @@ import { resolveMobileAssetUrl } from './mobileAssetUrls'
 import { formatElapsed, formatExchangePriceLabel, formatLiqBtc, formatLiqUsd } from './format'
 import { HotShooterTicker } from './HotShooterTicker'
 import { LiqTicker } from './LiqTicker'
+import { NewShooterBanner } from './NewShooterBanner'
 import { LIQ_LABEL_X, LIQ_LABEL_Y, OI_LABEL_FONT_REM, OI_LABEL_X, OI_LABEL_Y } from './overlayConstants'
 import { SHOOTER_ON } from './characterBetConstants'
 import {
@@ -35,6 +36,8 @@ interface OverlayProps {
   shooter: ShooterBook
   bonusStakes: BonusStakes
   rollStreak: RollStreakView
+  /** True while the Shooter button has switched the table into manual throws. */
+  shooterMode: boolean
   status: {
     binance: FeedStatus
     coinbase: FeedStatus
@@ -171,7 +174,16 @@ const formatOpenInterest = (value: number): string => Math.round(value).toLocale
 
 const formatAccountPct = (value: number): string => `${Math.round(value)}%`
 
-export const Overlay = ({ market, block, onTimeClick, shooter, bonusStakes, rollStreak, status }: OverlayProps) => {
+export const Overlay = ({
+  market,
+  block,
+  onTimeClick,
+  shooter,
+  bonusStakes,
+  rollStreak,
+  shooterMode,
+  status,
+}: OverlayProps) => {
   const makeEmAll = SHOOTER_ON ? formatMakeEmAll(shooter.allWorking) : null
   const allTall = formatAllTall(bonusStakes.tall)
   const allSmall = formatAllSmall(bonusStakes.small)
@@ -446,6 +458,7 @@ export const Overlay = ({ market, block, onTimeClick, shooter, bonusStakes, roll
         <p>Short {openInterest ? formatAccountPct(openInterest.shortPct) : '—'} (Don't)</p>
       </div>
       {SHOOTER_ON ? <HotShooterTicker current={rollStreak.current} /> : null}
+      <NewShooterBanner enabled={shooterMode} />
       <LiqTicker snapshot={openInterest} />
       <div
         className="overlay-oi overlay-liq"
