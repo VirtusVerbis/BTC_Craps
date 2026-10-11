@@ -56,7 +56,7 @@ export const DIE_FELT_SPEED_KEEP = 0.62
 /** Exponential damping while a die is sliding on the felt. */
 export const DIE_SLIDE_DAMP_PER_S = 2.2
 /** How much spin becomes a sideways kick on contact. */
-export const DIE_SPIN_KICK = 0.18
+export const DIE_SPIN_KICK = 1.4// 0.18
 export const DIE_SPIN_DAMP = 0.45
 
 export const DIE_REST_SPEED_PX_PER_S = 70
@@ -113,7 +113,7 @@ export const GESTURE_ARC_SEC = 0.85
 export const GESTURE_OVERSHOOT_FORWARD_SCALE = 1.45
 
 /** Lean (sideways / upward) that maps to a full shared side spin. */
-export const GESTURE_MAX_LEAN = 0.65
+export const GESTURE_MAX_LEAN = 0.3//0.65
 
 /** Forward tumble on every flick, including a straight one. Side lean is added on top. */
 export const GESTURE_BASE_SPIN = 4
