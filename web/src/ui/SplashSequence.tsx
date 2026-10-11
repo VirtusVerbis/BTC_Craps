@@ -8,7 +8,7 @@ interface SplashSequenceProps {
 
 type Phase = 0 | 1 | 2
 
-/** Two full-screen steps, then the main scene. The title step still uses the placeholder. */
+/** Two full-screen steps, then the main scene. */
 export const SplashSequence = ({ onDone }: SplashSequenceProps) => {
   const [phase, setPhase] = useState<Phase>(0)
   const finished = useRef(false)
@@ -37,7 +37,8 @@ export const SplashSequence = ({ onDone }: SplashSequenceProps) => {
 
   if (phase >= 2) return null
 
-  const src = phase === 0 ? resolveMobileAssetUrl('vv_splash.png') : '/placeholder-splash.png'
+  const src =
+    phase === 0 ? resolveMobileAssetUrl('vv_splash.png') : '/BitcoinMidnight_Splash%20Dice.png'
 
   return (
     <div
