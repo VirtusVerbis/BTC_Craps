@@ -78,6 +78,16 @@ const GitHubMark = () => (
   </svg>
 )
 
+const ReleaseNote = ({ wideTop = false }: { wideTop?: boolean }) => (
+  <p className={wideTop ? 'repo-release-note repo-release-note-top' : 'repo-release-note'}>
+    Released on 2026-Oct-10
+    <br />
+    Bitcoin was $82k.
+    <br />
+    Website is work in progress...
+  </p>
+)
+
 function App() {
   const appShellRef = useRef<HTMLElement | null>(null)
   const stageAnchorRef = useRef<HTMLDivElement | null>(null)
@@ -267,8 +277,6 @@ function App() {
               showCandleChart={showCandleChart}
               showBg2Meme={showBg2Meme}
               bg2ActiveMeme={bg2Meme.activeMeme}
-              sceneWidthPx={sceneWidthPx}
-              sceneHeightPx={sceneHeightPx}
               candles={candles}
               showFg3Cat={fg3.active && !manualShooter}
               fg3Direction={fg3.direction}
@@ -313,6 +321,7 @@ function App() {
         </div>
 
         <div className="table-side">
+          <ReleaseNote wideTop />
           <div className="shooter-mode-row">
             <button
               className={manualShooter ? 'shooter-mode-button is-manual' : 'shooter-mode-button is-auto'}
@@ -340,13 +349,7 @@ function App() {
             <GitHubMark />
             <span>GitHub Repo</span>
           </a>
-          <p className="repo-release-note">
-            Released on 2026-Oct-10
-            <br />
-            Bitcoin was $82k.
-            <br />
-            Website is work in progress...
-          </p>
+          <ReleaseNote />
           </aside>
         </div>
       </div>

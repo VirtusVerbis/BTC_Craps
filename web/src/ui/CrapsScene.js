@@ -1,5 +1,6 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import {} from 'react';
+import { REFERENCE_HEIGHT, REFERENCE_WIDTH } from '../config/constants';
 import { BG2_ARROW_DOWN_ASPECT_HEIGHT_PER_WIDTH, BG2_ARROW_DOWN_TOP_OFFSET_FRACTION, BG2_ARROW_UP_ASPECT_HEIGHT_PER_WIDTH, BG2_ARROW_UP_TOP_OFFSET_FRACTION, BG2_BDWW_ASPECT_HEIGHT_PER_WIDTH, BG2_BDWW_TOP_OFFSET_FRACTION, BG2_DCB_ASPECT_HEIGHT_PER_WIDTH, BG2_DCB_TOP_OFFSET_FRACTION, BG2_FR_ASPECT_HEIGHT_PER_WIDTH, BG2_FR_TOP_OFFSET_FRACTION, BG2_NEO_ASPECT_HEIGHT_PER_WIDTH, BG2_NEO_TOP_OFFSET_FRACTION, } from './androidMirrorConstants';
 import { BonusFields } from './BonusFields';
 import { BtcCandleChart } from './BtcCandleChart';
@@ -28,7 +29,7 @@ const boxStyle = (layer) => ({
     height: `${layer.height * 100}%`,
     pointerEvents: 'none',
 });
-export const CrapsScene = ({ showCandleChart, showBg2Meme, bg2ActiveMeme, sceneWidthPx, sceneHeightPx, candles, showFg3Cat, fg3Direction, fg3Frame, fg3Left, fg3Top, fg3Width, fg3Height, dice, characterPnl, rolls, histogramReveal, histogramAnimate, histogramTransitionMs, bonusHits, bonusFlashing, bonusLines, dieColor, }) => {
+export const CrapsScene = ({ showCandleChart, showBg2Meme, bg2ActiveMeme, candles, showFg3Cat, fg3Direction, fg3Frame, fg3Left, fg3Top, fg3Width, fg3Height, dice, characterPnl, rolls, histogramReveal, histogramAnimate, histogramTransitionMs, bonusHits, bonusFlashing, bonusLines, dieColor, }) => {
     const m = mobileAssetManifest;
     const bg2MemeSrc = (() => {
         if (!bg2ActiveMeme)
@@ -75,7 +76,8 @@ export const CrapsScene = ({ showCandleChart, showBg2Meme, bg2ActiveMeme, sceneW
             return BG2_ARROW_UP_ASPECT_HEIGHT_PER_WIDTH;
         return BG2_ARROW_DOWN_ASPECT_HEIGHT_PER_WIDTH;
     })();
-    const bg2HeightPct = sceneHeightPx > 0 ? (sceneWidthPx * bg2Aspect * 100) / sceneHeightPx : bg2Aspect * 100;
+    // Percentages resolve against the 1080×1920 stage, not the scaled anchor.
+    const bg2HeightPct = (REFERENCE_WIDTH * bg2Aspect * 100) / REFERENCE_HEIGHT;
     const bg2Style = {
         position: 'absolute',
         zIndex: m.meme.zIndex,

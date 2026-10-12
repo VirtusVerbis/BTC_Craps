@@ -1,4 +1,5 @@
 import { type CSSProperties } from 'react'
+import { REFERENCE_HEIGHT, REFERENCE_WIDTH } from '../config/constants'
 import type { Candle } from '../data/candles'
 import {
   BG2_ARROW_DOWN_ASPECT_HEIGHT_PER_WIDTH,
@@ -59,8 +60,6 @@ interface CrapsSceneProps {
   showCandleChart: boolean
   showBg2Meme: boolean
   bg2ActiveMeme: Bg2ActiveMeme | null
-  sceneWidthPx: number
-  sceneHeightPx: number
   candles: Candle[]
   showFg3Cat: boolean
   fg3Direction: Fg3CatState['direction']
@@ -85,8 +84,6 @@ export const CrapsScene = ({
   showCandleChart,
   showBg2Meme,
   bg2ActiveMeme,
-  sceneWidthPx,
-  sceneHeightPx,
   candles,
   showFg3Cat,
   fg3Direction,
@@ -134,7 +131,8 @@ export const CrapsScene = ({
     if (bg2ActiveMeme.sequenceId === 'arrowUp') return BG2_ARROW_UP_ASPECT_HEIGHT_PER_WIDTH
     return BG2_ARROW_DOWN_ASPECT_HEIGHT_PER_WIDTH
   })()
-  const bg2HeightPct = sceneHeightPx > 0 ? (sceneWidthPx * bg2Aspect * 100) / sceneHeightPx : bg2Aspect * 100
+  // Percentages resolve against the 1080×1920 stage, not the scaled anchor.
+  const bg2HeightPct = (REFERENCE_WIDTH * bg2Aspect * 100) / REFERENCE_HEIGHT
   const bg2Style: CSSProperties = {
     position: 'absolute',
     zIndex: m.meme.zIndex,

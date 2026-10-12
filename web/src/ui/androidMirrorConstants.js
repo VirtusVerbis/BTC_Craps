@@ -47,31 +47,50 @@ export const BG2_FR_PRICE_DROP_PERCENT_MAX = 2.0;
 export const BG2_FR_TOP_OFFSET_FRACTION = 0.065;
 export const BG2_FR_ASPECT_HEIGHT_PER_WIDTH = 1.0;
 /**
- * Known, and must be accounted for on every arrow y change:
- * `arrow_up_0.png` and `arrow_down_0.png` are both 345×240, but the drawing
- * is not on the same rows. Green has 11px empty at the top. Red has that 11px
- * empty at the bottom, so the red art sits higher in the file. Punch Up ships
- * the same PNGs and one shared offset, so this mismatch is in the source art.
- * The square meme box uses `object-fit: contain`, which letterboxes both the
- * same and does not cancel the 11px. Keep the green offset as the visual
- * target. The red offset stays lower by 11/345 of stage width, as a fraction
- * of stage height.
+ * `arrow_up_0.png` and `arrow_down_0.png` are both 345×240 and are vertical
+ * flips of each other. Green has 11px empty above the up-arrow tip. Red has
+ * that 11px empty under the down-arrow tip, so the red bitmap's top (the
+ * candles) sits 11px higher in the file than the green tip.
+ *
+ * The meme box is square and full stage width, with `object-fit: contain` and
+ * the default centered position. The bitmap is shorter than that square, so
+ * contain letterboxes it and the painted pixels start below the box top.
+ * A test that only checks the box `top` still passes when that gap puts the
+ * tip on the stage edge.
+ *
+ * Box height has to stay on the 1080×1920 stage. Percentages resolve against
+ * that box. Measuring the on-screen anchor instead changes the letterbox
+ * whenever the anchor aspect drifts, and the bitmap jumps up to the box top
+ * once the box is no taller than the image.
  */
 const BG2_ARROW_PNG_WIDTH_PX = 345;
-const BG2_ARROW_RED_ART_HIGHER_PX = 11;
+const BG2_ARROW_PNG_HEIGHT_PX = 240;
+const BG2_ARROW_GREEN_TIP_PAD_PX = 11;
+const stageWidthOverHeight = REFERENCE_WIDTH / REFERENCE_HEIGHT;
+/** File px, scaled with the width-fit bitmap, as a fraction of stage height. */
+const arrowFilePxToStageFraction = (px) => (px / BG2_ARROW_PNG_WIDTH_PX) * stageWidthOverHeight;
+/** Empty band `object-fit: contain` leaves above the bitmap in a square box. */
+const arrowContainLetterboxFraction = (boxAspect) => {
+    const imageAspect = BG2_ARROW_PNG_HEIGHT_PX / BG2_ARROW_PNG_WIDTH_PX;
+    return ((boxAspect - imageAspect) / 2) * stageWidthOverHeight;
+};
 export const BG2_ARROW_UP_DISPLAY_MS = 10_000;
 export const BG2_ARROW_UP_PRICE_INCREASE_PERCENT = 0.1;
 export const BG2_ARROW_UP_PRICE_INCREASE_PERCENT_MAX = 0.9999;
-/** Align with candle chart band top (`BG2_CHART_TOP_OFFSET_FRACTION`); tall aspect fills downward. */
-export const BG2_ARROW_UP_TOP_OFFSET_FRACTION = -0.11; //-0.17//0.06//0.13
-export const BG2_ARROW_UP_ASPECT_HEIGHT_PER_WIDTH = 1; //3.5
+export const BG2_ARROW_UP_ASPECT_HEIGHT_PER_WIDTH = 1;
+/**
+ * Box top. The green tip is this plus the contain letterbox plus the 11px pad,
+ * which is `BG2_CHART_TOP_OFFSET_FRACTION`.
+ */
+export const BG2_ARROW_UP_TOP_OFFSET_FRACTION = BG2_CHART_TOP_OFFSET_FRACTION -
+    arrowContainLetterboxFraction(BG2_ARROW_UP_ASPECT_HEIGHT_PER_WIDTH) -
+    arrowFilePxToStageFraction(BG2_ARROW_GREEN_TIP_PAD_PX);
 export const BG2_ARROW_DOWN_DISPLAY_MS = 10_000;
 export const BG2_ARROW_DOWN_PRICE_DROP_PERCENT = 0.1;
 export const BG2_ARROW_DOWN_PRICE_DROP_PERCENT_MAX = 0.9999;
-/** Green offset, plus the 11px red-file shift. See the note above. */
-export const BG2_ARROW_DOWN_TOP_OFFSET_FRACTION = BG2_ARROW_UP_TOP_OFFSET_FRACTION +
-    (BG2_ARROW_RED_ART_HIGHER_PX / BG2_ARROW_PNG_WIDTH_PX) * (REFERENCE_WIDTH / REFERENCE_HEIGHT);
-export const BG2_ARROW_DOWN_ASPECT_HEIGHT_PER_WIDTH = 1; //3.5
+/** Drop the red box by the 11px file shift so its top meets the green tip. */
+export const BG2_ARROW_DOWN_TOP_OFFSET_FRACTION = BG2_ARROW_UP_TOP_OFFSET_FRACTION + arrowFilePxToStageFraction(BG2_ARROW_GREEN_TIP_PAD_PX);
+export const BG2_ARROW_DOWN_ASPECT_HEIGHT_PER_WIDTH = 1;
 export const BG4_SIGN_FRAME_DELAY_MS = 600;
 export const BG4_SIGN_SPAWN_INTERVAL_MS = 60_000;
 export const BG4_SIGN_SIZE_DP = 82;
