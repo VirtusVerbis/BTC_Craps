@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DIE_GRAVITY_PX_PER_S2, GESTURE_SPEED_MIN_PX_PER_S, GESTURE_SPEED_WALL_PX_PER_S } from './diceConstants'
+import { DIE_GRAVITY_PX_PER_S2, GESTURE_SPEED_MIN_PX_PER_S, GESTURE_SPEED_NO_ROLL_PX_PER_S, GESTURE_SPEED_WALL_PX_PER_S } from './diceConstants'
 import {
   aimDepth,
   aimMetrics,
@@ -23,16 +23,23 @@ describe('precision aim', () => {
     expect(aimDepth(target.y, metrics)).toBe(metrics.wallZ)
   })
 
-  it('lands a wall-speed toss on the back wall and a slow toss short of it', () => {
-    const wall = precisionVelocity(metrics.width / 2, target, 37, GESTURE_SPEED_WALL_PX_PER_S, metrics)
-    const slow = precisionVelocity(metrics.width / 2, target, 37, GESTURE_SPEED_MIN_PX_PER_S, metrics)
+  it('lands a wall-speed toss on the back wall and scales distance with flick speed', () => {
     const flight = (vh: number) => (2 * vh) / DIE_GRAVITY_PX_PER_S2
-    const wallLanding = wall.vz * flight(wall.vh)
-    const slowLanding = slow.vz * flight(slow.vh)
+    const landing = (speed: number) => {
+      const velocity = precisionVelocity(metrics.width / 2, target, 37, speed, metrics)
+      return velocity.vz * flight(velocity.vh)
+    }
+    const wall = precisionVelocity(metrics.width / 2, target, 37, GESTURE_SPEED_WALL_PX_PER_S, metrics)
+    const wallLanding = landing(GESTURE_SPEED_WALL_PX_PER_S)
+    const slowLanding = landing(GESTURE_SPEED_MIN_PX_PER_S)
+    const hardLanding = landing(GESTURE_SPEED_NO_ROLL_PX_PER_S)
     expect(Math.abs(wall.vx)).toBeLessThan(1)
     expect(wallLanding).toBeGreaterThan(metrics.wallZ * 0.85)
     expect(wallLanding).toBeLessThan(metrics.wallZ * 1.15)
-    expect(slowLanding).toBeLessThan(wallLanding * 0.7)
+    expect(slowLanding).toBeGreaterThan(metrics.wallZ * 0.45)
+    expect(slowLanding).toBeLessThan(metrics.wallZ * 0.55)
+    expect(hardLanding).toBeGreaterThan(metrics.wallZ * 1.35)
+    expect(hardLanding).toBeLessThan(metrics.wallZ * 1.55)
     expect(flickScale(GESTURE_SPEED_MIN_PX_PER_S)).toBeLessThan(flickScale(GESTURE_SPEED_WALL_PX_PER_S))
   })
 

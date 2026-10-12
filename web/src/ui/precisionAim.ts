@@ -143,7 +143,9 @@ export const precisionVelocity = (
   const cap = Math.max(vxz / Math.max(maxVxz, 1), vh / Math.max(maxVh, 1), 1)
   vxz /= cap
   vh /= cap
-  const scale = flickScale(releaseSpeed)
+  // The loft stays fixed, so distance follows the square of speed. The flick
+  // fraction is a landing distance, and the velocity uses its square root.
+  const scale = Math.sqrt(flickScale(releaseSpeed))
   const inv = distance > 1 ? 1 / distance : 0
   return {
     vx: dx * inv * vxz * scale,
