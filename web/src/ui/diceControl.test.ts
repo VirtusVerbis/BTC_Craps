@@ -11,6 +11,7 @@ const settings = (comeOut: DiceControlSettings['comeOut'], point: DiceControlSet
   comeOut,
   point,
   stacked,
+  precisionTargeting: false,
 })
 
 const roll = (

@@ -29,6 +29,7 @@ import {
   DIE_WALL_SPIN_RAD,
 } from './diceConstants'
 import { backEdgeZ } from './backWall'
+import { defaultPrecisionTarget } from './precisionAim'
 import { DICE_SETS, diceSet } from './diceSets'
 import { applyRoll, puckPlacement } from './puckState'
 import {
@@ -44,6 +45,7 @@ import {
   gestureLaunchSpeeds,
   launchGestureThrow,
   launchHeldAuto,
+  launchPrecisionThrow,
   launchSpeeds,
   probeGestureArc,
   logUnit,
@@ -815,6 +817,26 @@ describe('gesture launch', () => {
     expect(aimed.sharedX).toBe(800)
     expect(aimed.aimLocked).toBe(true)
     expect(aimed.dice[0].q).toEqual(state.dice[0].q)
+  })
+
+  it('keeps a precision toss on the rail spot and uses the spin phase for the roll', () => {
+    const state = createThrowState(0, 540)
+    const target = defaultPrecisionTarget()
+    const launched = launchPrecisionThrow(state, 1000, {
+      targetX: 800,
+      targetY: target.y,
+      angleDeg: 37,
+      spin: -4,
+      speed: GESTURE_SPEED_WALL_PX_PER_S,
+      lean: 0.2,
+    })
+    expect(launched.phase).toBe('flying')
+    expect(launched.requireWallContact).toBe(true)
+    expect(launched.sharedX).toBe(540)
+    expect(launched.dice[0].w.x).toBeCloseTo(-4 * DIE_FORWARD_SPIN_SCALE)
+    expect(launched.dice[0].vx).toBeGreaterThan(0)
+    expect(launched.dice[1].w.x).toBeCloseTo(launched.dice[0].w.x)
+    expect(launched.dice[0].w.z).toBeGreaterThan(0)
   })
 })
 

@@ -8,12 +8,15 @@ export interface DiceControlSettings {
   comeOut: DiceSetId
   point: DiceSetId
   stacked: boolean
+  /** Shooter mode uses the precision aim flow when this is on. Off keeps the flick. */
+  precisionTargeting: boolean
 }
 
 export const DEFAULT_DICE_CONTROL: DiceControlSettings = {
   comeOut: 'random',
   point: 'random',
   stacked: false,
+  precisionTargeting: false,
 }
 
 /** Face-pair counts. Index is `(left - 1) * 6 + (right - 1)` with faces 1 through 6. */
@@ -89,11 +92,12 @@ export const loadDiceControlSettings = (): DiceControlSettings => {
   try {
     const parsed: unknown = JSON.parse(storage.getItem(SETTINGS_KEY) ?? '')
     if (!parsed || typeof parsed !== 'object') return { ...DEFAULT_DICE_CONTROL }
-    const row = parsed as { comeOut?: unknown; point?: unknown; stacked?: unknown }
+    const row = parsed as { comeOut?: unknown; point?: unknown; stacked?: unknown; precisionTargeting?: unknown }
     return {
       comeOut: isDiceSetId(row.comeOut) ? row.comeOut : 'random',
       point: isDiceSetId(row.point) ? row.point : 'random',
       stacked: row.stacked === true,
+      precisionTargeting: row.precisionTargeting === true,
     }
   } catch {
     return { ...DEFAULT_DICE_CONTROL }

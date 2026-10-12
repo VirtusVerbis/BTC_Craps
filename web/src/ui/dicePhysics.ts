@@ -43,6 +43,7 @@ import {
 } from './diceConstants'
 import { backRailContact } from './backWall'
 import { clampLaunchX, type GestureStroke } from './gestureThrow'
+import { precisionVelocity, type PrecisionThrow } from './precisionAim'
 
 export interface Vec3 {
   x: number
@@ -642,6 +643,25 @@ const applyGestureLaunch = (die: Die, forward: number, up: number, leanSpin: num
   }
 }
 
+const applyPrecisionLaunch = (
+  die: Die,
+  velocity: { vx: number; vz: number; vh: number },
+  spin: number,
+  leanSpin: number,
+) => {
+  die.resting = false
+  die.topFace = null
+  die.hitBackWall = false
+  die.vx = velocity.vx
+  die.vz = velocity.vz
+  die.vh = velocity.vh
+  die.w = {
+    x: spin * DIE_FORWARD_SPIN_SCALE,
+    y: leanSpin * 0.45,
+    z: leanSpin * 0.7,
+  }
+}
+
 /** Auto launch with no rail delay and no positive-volume gate. */
 export const launchHeldAuto = (
   state: ThrowState,
@@ -720,6 +740,48 @@ export const launchGestureThrow = (
   }
   applyGestureLaunch(left, forward, up, leanSpin)
   applyGestureLaunch(right, forward, up, leanSpin)
+  return {
+    ...state,
+    phase: 'flying',
+    phaseStartedMs: nowMs,
+    sharedX,
+    flightMs: 0,
+    result: null,
+    reachZ: [0, 0],
+    reachTracked: true,
+    manualHold: false,
+    aimLocked: false,
+    requireWallContact: true,
+    controlSnap: controlSnapOf(state),
+    dice: [left, right],
+  }
+}
+
+/** Aimed toss. The pair stays on its rail spot. Spin comes from the spin phase, lean from the flick. */
+export const launchPrecisionThrow = (
+  state: ThrowState,
+  nowMs: number,
+  shot: PrecisionThrow,
+  metrics: StageMetrics = stageMetrics(),
+): ThrowState => {
+  if (state.phase !== 'holding') return state
+  const sharedX = clampLaunchX(state.sharedX)
+  const half = DIE_LAUNCH_SIZE_PX / 2
+  const velocity = precisionVelocity(sharedX, { x: shot.targetX, y: shot.targetY }, shot.angleDeg, shot.speed, metrics)
+  const leanSpin = gestureLeanSpin(shot.lean)
+  const left = cloneDie(state.dice[0])
+  const right = cloneDie(state.dice[1])
+  if (state.hold.stacked) {
+    left.x = sharedX
+    right.x = sharedX
+  } else {
+    left.x = sharedX - half
+    right.x = sharedX + half
+    left.h = 0
+    right.h = 0
+  }
+  applyPrecisionLaunch(left, velocity, shot.spin, leanSpin)
+  applyPrecisionLaunch(right, velocity, shot.spin, leanSpin)
   return {
     ...state,
     phase: 'flying',

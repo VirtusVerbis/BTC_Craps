@@ -32,6 +32,9 @@ import {
 import { DiceControlHistogram, DiceControlPanel } from './ui/DiceControlPanel'
 import { ShooterScrollNote } from './ui/ShooterScrollNote'
 import { useShooterGesture, useShooterPageLock } from './ui/useShooterGesture'
+import { usePrecisionPhases } from './ui/usePrecisionPhases'
+import { PrecisionOverlay } from './ui/PrecisionOverlay'
+import type { PrecisionThrow } from './ui/precisionAim'
 import { useHistogramVisibility } from './ui/useHistogramVisibility'
 import { useFg3CatState } from './ui/useFg3CatState'
 import { useVideoOverlayState } from './ui/useVideoOverlayState'
@@ -77,6 +80,14 @@ const GitHubMark = () => (
     <path fill="currentColor" d={GITHUB_MARK_PATH} />
   </svg>
 )
+
+const precisionLaunch = (dice: { dice: ReadonlyArray<{ visible: boolean; x: number; y: number }> } | null) => {
+  const pair = dice?.dice
+  if (!pair || pair.length < 2 || !pair[0].visible) {
+    return { x: REFERENCE_WIDTH / 2, y: REFERENCE_HEIGHT - 48 }
+  }
+  return { x: (pair[0].x + pair[1].x) / 2, y: (pair[0].y + pair[1].y) / 2 }
+}
 
 const ReleaseNote = ({ wideTop = false }: { wideTop?: boolean }) => (
   <p className={wideTop ? 'repo-release-note repo-release-note-top' : 'repo-release-note'}>
@@ -215,6 +226,7 @@ function App() {
     }
   }, [armBonusTest])
   const histogram = useHistogramVisibility(splashDone, histogramBoost)
+  const precisionShotRef = useRef<Omit<PrecisionThrow, 'speed' | 'lean'> | null>(null)
   const dice = useDiceThrow(
     feed.market,
     splashDone,
@@ -225,9 +237,18 @@ function App() {
     shooterControlsRef,
     diceControlRef,
     onDiceControlRoll,
+    precisionShotRef,
   )
   const gestureReady = manualShooter && dice?.phase === 'holding'
-  useShooterGesture(gestureReady, stageRef, shooterControlsRef)
+  const precisionOn = diceControl.precisionTargeting
+  const precision = usePrecisionPhases(
+    gestureReady && precisionOn,
+    precisionOn,
+    stageRef,
+    shooterControlsRef,
+    precisionShotRef,
+  )
+  useShooterGesture(gestureReady && !precisionOn, stageRef, shooterControlsRef)
   useShooterPageLock(manualShooter)
   const onShooterMode = useCallback(() => {
     setManualShooter((current) => {
@@ -306,6 +327,16 @@ function App() {
               shooterMode={manualShooter}
               status={feed.status}
             />
+            <PrecisionOverlay
+              active={gestureReady && precisionOn}
+              phase={precision.phase}
+              target={precision.target}
+              angle={precision.angle}
+              spin={precision.spin}
+              launch={precisionLaunch(dice)}
+              dieColor={dieColor}
+              onOk={precision.accept}
+            />
             {videoOverlay.active && !manualShooter ? (
               <VideoOverlay
                 videoId={videoOverlay.active.videoId}
@@ -334,6 +365,31 @@ function App() {
             </button>
             <ShooterScrollNote active={manualShooter} />
           </div>
+          {manualShooter ? (
+            <div
+              className="precision-mode-switch"
+              style={{ width: Math.max(200, displayWidthPx / 3) }}
+              role="group"
+              aria-label="Shooter style"
+            >
+              <button
+                type="button"
+                aria-pressed={!diceControl.precisionTargeting}
+                className={diceControl.precisionTargeting ? '' : 'is-selected'}
+                onClick={() => onDiceControl({ precisionTargeting: false })}
+              >
+                Regular
+              </button>
+              <button
+                type="button"
+                aria-pressed={diceControl.precisionTargeting}
+                className={diceControl.precisionTargeting ? 'is-selected' : ''}
+                onClick={() => onDiceControl({ precisionTargeting: true })}
+              >
+                Precision
+              </button>
+            </div>
+          ) : null}
           <DiceControlPanel settings={diceControl} onChange={onDiceControl} />
           <DiceControlHistogram settings={diceControl} book={diceControlBook} />
           <aside className="repo-links-panel" aria-label="Source repositories">

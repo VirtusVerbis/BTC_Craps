@@ -214,7 +214,9 @@ export const CrapsScene = ({
       ) : null}
       <ChipLayer discs={dice?.chips ?? []} guides={dice?.guides ?? []} />
       <SpeechLayer speech={dice?.speech ?? []} />
-      {dice ? <DiceLayer presentation={dice} bonusLines={bonusLines} dieColor={dieColor} /> : null}
+      {dice ? (
+        <DiceLayer presentation={dice} bonusLines={bonusLines} dieColor={dieColor} />
+      ) : null}
     </div>
   )
 }

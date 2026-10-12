@@ -50,7 +50,7 @@ const FACES: Array<{ name: string; value: number }> = [
   { name: 'bottom', value: 6 },
 ]
 
-const useRainbowStep = (active: boolean) => {
+export const useRainbowStep = (active: boolean) => {
   const [step, setStep] = useState(0)
 
   useEffect(() => {
@@ -97,6 +97,44 @@ const Face = ({
   )
 }
 
+export const DieMesh = ({
+  x,
+  y,
+  size,
+  tiltDeg,
+  transform,
+  color,
+  rainbowStep,
+  opacity = 1,
+}: {
+  x: number
+  y: number
+  size: number
+  tiltDeg: number
+  transform: string
+  color: DieColorId
+  rainbowStep: number
+  opacity?: number
+}) => (
+  <div
+    className="die"
+    style={{
+      width: size,
+      height: size,
+      left: x - size / 2,
+      top: y - size / 2,
+      opacity,
+      ['--die-half' as string]: `${size / 2}px`,
+    }}
+  >
+    <div className="die-spin" style={{ transform: `rotateX(${tiltDeg}deg) ${transform}` }}>
+      {FACES.map((face) => (
+        <Face key={face.name} name={face.name} value={face.value} color={color} rainbowStep={rainbowStep} />
+      ))}
+    </div>
+  </div>
+)
+
 export const DiceLayer = ({
   presentation,
   bonusLines = [],
@@ -121,23 +159,16 @@ export const DiceLayer = ({
         />
         {presentation.dice.map((die) =>
           die.visible ? (
-            <div
+            <DieMesh
               key={die.id}
-              className="die"
-              style={{
-                width: die.size,
-                height: die.size,
-                left: die.x - die.size / 2,
-                top: die.y - die.size / 2,
-                ['--die-half' as string]: `${die.size / 2}px`,
-              }}
-            >
-              <div className="die-spin" style={{ transform: `rotateX(${viewTiltDeg(die.depth)}deg) ${die.transform}` }}>
-                {FACES.map((face) => (
-                  <Face key={face.name} name={face.name} value={face.value} color={dieColor} rainbowStep={rainbowStep} />
-                ))}
-              </div>
-            </div>
+              x={die.x}
+              y={die.y}
+              size={die.size}
+              tiltDeg={viewTiltDeg(die.depth)}
+              transform={die.transform}
+              color={dieColor}
+              rainbowStep={rainbowStep}
+            />
           ) : null,
         )}
       </div>

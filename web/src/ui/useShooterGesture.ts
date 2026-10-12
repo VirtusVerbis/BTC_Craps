@@ -5,7 +5,11 @@ import type { ShooterControls } from './useDiceThrow'
 
 const blockedTarget = (target: EventTarget | null): boolean => {
   if (!(target instanceof Element)) return false
-  return Boolean(target.closest('.shooter-mode-button, .shooter-scroll-note, .time-button, .video-overlay-close, a'))
+  return Boolean(
+    target.closest(
+      '.shooter-mode-button, .shooter-scroll-note, .time-button, .video-overlay-close, .side-panel, .precision-mode-switch, .precision-ok, a',
+    ),
+  )
 }
 
 const stagePoint = (stage: HTMLElement, clientX: number, clientY: number): { x: number; y: number } | null => {

@@ -3,6 +3,7 @@ export const DEFAULT_DICE_CONTROL = {
     comeOut: 'random',
     point: 'random',
     stacked: false,
+    precisionTargeting: false,
 };
 const SETTINGS_KEY = 'btc-craps.dice-control-settings';
 const COUNTS_KEY = 'btc-craps.dice-control-counts';
@@ -40,6 +41,7 @@ export const loadDiceControlSettings = () => {
             comeOut: isDiceSetId(row.comeOut) ? row.comeOut : 'random',
             point: isDiceSetId(row.point) ? row.point : 'random',
             stacked: row.stacked === true,
+            precisionTargeting: row.precisionTargeting === true,
         };
     }
     catch {

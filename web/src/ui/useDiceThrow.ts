@@ -29,7 +29,7 @@ import {
   type ChipWorld,
   type StackGuideView,
 } from './chipPhysics'
-import { DIE_RESULT_HOLD_MS, SHOT_CLOCK_MS } from './diceConstants'
+import { DIE_RESULT_HOLD_MS, GESTURE_SPEED_WALL_PX_PER_S, SHOT_CLOCK_MS } from './diceConstants'
 import {
   advanceThrow,
   aimHeldPair,
@@ -39,6 +39,7 @@ import {
   createThrowState,
   launchGestureThrow,
   launchHeldAuto,
+  launchPrecisionThrow,
   reseatHeldDice,
   dieScreenCenter,
   quatToCssMatrix,
@@ -55,6 +56,7 @@ import {
 } from './dicePhysics'
 import { DEFAULT_DICE_CONTROL, holdFor, type DiceControlRoll, type DiceControlSettings } from './diceControl'
 import type { GestureStroke } from './gestureThrow'
+import type { PrecisionThrow } from './precisionAim'
 import type { ChipCharacter } from './chipConstants'
 import { useDiceVolumeWindow } from './useDiceVolumeWindow'
 import { emptyBonusHand, type BonusHand } from './bonusCraps'
@@ -111,10 +113,15 @@ export interface DicePresentation {
 export interface ShooterControls {
   aimLaunchX: (stageX: number) => void
   releaseGesture: (stroke: GestureStroke) => void
+  releasePrecision: (shot: PrecisionThrow) => void
   launchAutoNow: () => void
 }
 
-type ShooterCommand = { kind: 'aim'; x: number } | { kind: 'gesture'; stroke: GestureStroke } | { kind: 'auto' }
+type ShooterCommand =
+  | { kind: 'aim'; x: number }
+  | { kind: 'gesture'; stroke: GestureStroke }
+  | { kind: 'precision'; shot: PrecisionThrow }
+  | { kind: 'auto' }
 
 const emptyVolume = (): VolumeTotals => ({
   binanceBuy: 0,
@@ -216,6 +223,7 @@ export const useDiceThrow = (
   shooterControlsRef?: { current: ShooterControls | null },
   diceControlRef?: RefObject<DiceControlSettings>,
   onDiceControlRoll?: (roll: DiceControlRoll) => void,
+  precisionShotRef?: RefObject<Omit<PrecisionThrow, 'speed' | 'lean'> | null>,
 ): DicePresentation | null => {
   const oi = useOpenInterest()
   const volume = useDiceVolumeWindow(market)
@@ -280,6 +288,9 @@ export const useDiceThrow = (
       },
       releaseGesture: (stroke) => {
         commandRef.current.push({ kind: 'gesture', stroke })
+      },
+      releasePrecision: (shot) => {
+        commandRef.current.push({ kind: 'precision', shot })
       },
       launchAutoNow: () => {
         commandRef.current.push({ kind: 'auto' })
@@ -404,6 +415,8 @@ export const useDiceThrow = (
           stateRef.current = aimHeldPair(stateRef.current, command.x)
         } else if (command.kind === 'gesture' && stateRef.current.manualHold) {
           stateRef.current = launchGestureThrow(stateRef.current, now, command.stroke, metrics)
+        } else if (command.kind === 'precision' && stateRef.current.manualHold) {
+          stateRef.current = launchPrecisionThrow(stateRef.current, now, command.shot, metrics)
         } else if (command.kind === 'auto') {
           stateRef.current = launchHeldAuto(stateRef.current, now, lastVolumeRef.current, metrics)
         }
@@ -423,7 +436,15 @@ export const useDiceThrow = (
       if (stateRef.current.phase === 'holding' && stateRef.current.manualHold) {
         lastVolumeRef.current = volumeRef.current
         if (now - stateRef.current.phaseStartedMs >= SHOT_CLOCK_MS) {
-          stateRef.current = launchHeldAuto(stateRef.current, now, lastVolumeRef.current, metrics)
+          const aimed = precisionShotRef?.current
+          stateRef.current = aimed
+            ? launchPrecisionThrow(
+                stateRef.current,
+                now,
+                { ...aimed, speed: GESTURE_SPEED_WALL_PX_PER_S, lean: 0 },
+                metrics,
+              )
+            : launchHeldAuto(stateRef.current, now, lastVolumeRef.current, metrics)
         }
       }
       if (!worldRef.current) {

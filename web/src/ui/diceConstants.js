@@ -100,6 +100,33 @@ export const GESTURE_OVERSHOOT_FORWARD_SCALE = 1.45;
 export const GESTURE_MAX_LEAN = 0.3; //0.65
 /** Forward tumble on every flick, including a straight one. Side lean is added on top. */
 export const GESTURE_BASE_SPIN = 4;
+/** Yellow used for the precision reticle, arc, and angle ray. */
+export const PRECISION_AIM_COLOR = '#FFE566';
+/** Constant thickness of the precision aim strip, in stage pixels. */
+export const PRECISION_AIM_THICKNESS_PX = 14;
+/** Loft of today's wall-reaching flick. A refresh starts here. */
+export const PRECISION_DEFAULT_ANGLE_DEG = 37;
+/** Stage pixels of vertical drag that change the loft by one degree. */
+export const PRECISION_ANGLE_DRAG_PX = 8;
+/** Movement below this, in stage pixels, does not commit a phase. */
+export const PRECISION_DRAG_MIN_PX = 12;
+/**
+ * Over-the-top spin before `DIE_FORWARD_SPIN_SCALE`. Positive rolls the top toward the back wall.
+ * Matches `GESTURE_BASE_SPIN`.
+ */
+export const PRECISION_SPIN_DEFAULT = 4;
+/** Fastest swipe in either direction, in the same units as `PRECISION_SPIN_DEFAULT`. */
+export const PRECISION_SPIN_MAX = 8;
+/** Up or down travel required before a spin swipe replaces the preset. */
+export const PRECISION_SPIN_MIN_DISTANCE_PX = 48;
+/** Finger speed that reaches `PRECISION_SPIN_MAX`. */
+export const PRECISION_SPIN_FULL_PX_PER_S = 1800;
+/** Drawn size of the spin-phase preview dice. */
+export const PRECISION_SPIN_PREVIEW_PX = 100;
+/** How long one ghost trip from the rail to the reticle takes. */
+export const PRECISION_GHOST_LOOP_MS = 1400;
+/** Gap between the arrow tip and the reticle center. */
+export const PRECISION_ARROW_GAP_PX = 36;
 /** Log-scale references for one volume window. Tune per exchange. */
 export const DIE_BINANCE_BUY_REF = 6;
 export const DIE_COINBASE_BUY_REF = 1.5;

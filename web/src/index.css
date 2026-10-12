@@ -1021,6 +1021,186 @@ body {
   outline-offset: 2px;
 }
 
+.precision-mode-switch {
+  display: flex;
+  margin-top: -0.35rem;
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+.precision-mode-switch button {
+  appearance: none;
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  padding: 0.55rem 0.35rem;
+  background: #7a7a80;
+  color: #f6f0da;
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.precision-mode-switch button.is-selected {
+  background: #f7931a;
+  color: #1a1208;
+}
+
+.precision-mode-switch button:focus-visible {
+  outline: 2px solid #f7931a;
+  outline-offset: 2px;
+  z-index: 1;
+}
+
+.precision-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+}
+
+.precision-overlay .die,
+.precision-overlay svg {
+  pointer-events: none;
+}
+
+.precision-arc,
+.precision-reticle,
+.precision-gauge {
+  position: absolute;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.precision-arc {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.precision-reticle {
+  width: 64px;
+  height: 64px;
+  transform: translate(-50%, -50%);
+}
+
+.precision-reticle-line {
+  fill: none;
+  stroke: #ffe566;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+.precision-reticle-dot {
+  fill: #ffe566;
+}
+
+.precision-gauge {
+  left: 50%;
+  top: calc(58% + 54px);
+  width: 495px;
+  height: 427.5px;
+  transform: translate(-50%, 0);
+}
+
+.precision-gauge-axis {
+  stroke: #000;
+  stroke-width: 4.5;
+  stroke-linecap: round;
+}
+
+.precision-gauge-guide {
+  stroke: #adadad;
+  stroke-width: 5;
+  stroke-linecap: butt;
+  stroke-dasharray: 12 8;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.9));
+}
+
+.precision-gauge-guide-label {
+  fill: #fff;
+  font-size: 18px;
+  font-weight: 700;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.9));
+}
+
+.precision-gauge-ray {
+  stroke: #ffe566;
+  stroke-width: 5;
+  stroke-linecap: butt;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.9));
+}
+
+.precision-gauge-readout {
+  fill: #ffe566;
+  font-size: 28px;
+  font-weight: 800;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.9));
+}
+
+.precision-phase-label {
+  position: absolute;
+  left: 50%;
+  top: calc(58% + 69px);
+  z-index: 26;
+  width: max-content;
+  max-width: 92%;
+  margin: 0;
+  transform: translate(-50%, -50%);
+  color: #fff;
+  font-size: 42px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
+  text-align: center;
+  text-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.95),
+    0 4px 10px rgba(0, 0, 0, 0.95),
+    0 0 16px rgba(0, 0, 0, 0.85);
+  pointer-events: none;
+}
+
+.precision-ok {
+  position: absolute;
+  right: 24px;
+  top: 1656px;
+  z-index: 31;
+  min-width: 138px;
+  padding: 0.68rem 1.65rem;
+  border: 0;
+  border-radius: 16px;
+  background: #f7931a;
+  color: #1a1208;
+  font: inherit;
+  font-size: 42px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  cursor: pointer;
+  pointer-events: auto;
+  animation: precision-ok-pulse 3.2s ease-in-out infinite;
+}
+
+@keyframes precision-ok-pulse {
+  0%,
+  100% {
+    background-color: #f7931a;
+    box-shadow: 0 0 0 0 rgba(247, 147, 26, 0.35);
+  }
+  50% {
+    background-color: #ffd27a;
+    box-shadow: 0 0 22px 6px rgba(247, 147, 26, 0.7);
+  }
+}
+
+.precision-ok:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
 @keyframes shooter-mode-pulse {
   0%,
   100% {
