@@ -20,6 +20,16 @@ import { bonusTestHand, isBonusTestSeed, type BonusTestSeed } from './ui/bonusTe
 import type { ThrowResult } from './ui/dicePhysics'
 import { loadHistogramRolls, pushRoll, saveHistogramRolls } from './ui/histogramModel'
 import { useDiceThrow, type ShooterControls } from './ui/useDiceThrow'
+import {
+  loadDiceControlBook,
+  loadDiceControlSettings,
+  recordDiceControlRoll,
+  saveDiceControlBook,
+  saveDiceControlSettings,
+  type DiceControlRoll,
+  type DiceControlSettings,
+} from './ui/diceControl'
+import { DiceControlHistogram, DiceControlPanel } from './ui/DiceControlPanel'
 import { ShooterScrollNote } from './ui/ShooterScrollNote'
 import { useShooterGesture, useShooterPageLock } from './ui/useShooterGesture'
 import { useHistogramVisibility } from './ui/useHistogramVisibility'
@@ -74,6 +84,24 @@ function App() {
   const stageRef = useRef<HTMLDivElement | null>(null)
   const displayRef = useRef<HTMLDivElement | null>(null)
   const shooterControlsRef = useRef<ShooterControls | null>(null)
+  const [diceControl, setDiceControl] = useState(loadDiceControlSettings)
+  const diceControlRef = useRef(diceControl)
+  diceControlRef.current = diceControl
+  const [diceControlBook, setDiceControlBook] = useState(loadDiceControlBook)
+  const onDiceControl = useCallback((patch: Partial<DiceControlSettings>) => {
+    setDiceControl((current) => {
+      const next = { ...current, ...patch }
+      saveDiceControlSettings(next)
+      return next
+    })
+  }, [])
+  const onDiceControlRoll = useCallback((roll: DiceControlRoll) => {
+    setDiceControlBook((current) => {
+      const next = recordDiceControlRoll(current, roll)
+      saveDiceControlBook(next)
+      return next
+    })
+  }, [])
   const [manualShooter, setManualShooter] = useState(false)
   const [splashDone, setSplashDone] = useState(false)
   const onSplashDone = useCallback(() => setSplashDone(true), [])
@@ -177,7 +205,17 @@ function App() {
     }
   }, [armBonusTest])
   const histogram = useHistogramVisibility(splashDone, histogramBoost)
-  const dice = useDiceThrow(feed.market, splashDone, rolls, onCountedRoll, bonusHandRef, manualShooter, shooterControlsRef)
+  const dice = useDiceThrow(
+    feed.market,
+    splashDone,
+    rolls,
+    onCountedRoll,
+    bonusHandRef,
+    manualShooter,
+    shooterControlsRef,
+    diceControlRef,
+    onDiceControlRoll,
+  )
   const gestureReady = manualShooter && dice?.phase === 'holding'
   useShooterGesture(gestureReady, stageRef, shooterControlsRef)
   useShooterPageLock(manualShooter)
@@ -287,6 +325,8 @@ function App() {
             </button>
             <ShooterScrollNote active={manualShooter} />
           </div>
+          <DiceControlPanel settings={diceControl} onChange={onDiceControl} />
+          <DiceControlHistogram settings={diceControl} book={diceControlBook} />
           <aside className="repo-links-panel" aria-label="Source repositories">
           <div className="repo-link-lnurl" aria-label="LNURL address">
             <img className="lnurl-badge" src="/mobile/lnurl_address.jpg.jpeg" alt="LNURL address" draggable={false} />

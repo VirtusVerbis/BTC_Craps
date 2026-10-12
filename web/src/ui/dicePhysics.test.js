@@ -1,0 +1,703 @@
+import { describe, expect, it } from 'vitest';
+import { DIE_ARC_LIFT_HEIGHT_PX, DIE_ARC_LIFT_SCALE, DIE_BINANCE_BUY_REF, DIE_BINANCE_SELL_REF, DIE_COINBASE_BUY_REF, DIE_COINBASE_SELL_REF, DIE_DEPTH_SCALE, DIE_FORWARD_SPIN_SCALE, DIE_LAUNCH_DELAY_MS, DIE_LAUNCH_SIZE_PX, GESTURE_MID_FELT_FRACTION, GESTURE_SPEED_MIN_PX_PER_S, GESTURE_SPEED_NO_ROLL_PX_PER_S, GESTURE_SPEED_WALL_PX_PER_S, DIE_MAX_SPIN_RAD_PER_S, DIE_MIN_REACH_FRACTION, DIE_NO_ROLL_PAUSE_MS, DIE_RESULT_HOLD_MS, DIE_UP_ADD_PX_PER_S, PUCK_OFF_SCALE, PUCK_OFF_X, PUCK_OFF_Y, PUCK_ON_6_SCALE, PUCK_ON_6_X, PUCK_ON_6_Y, DIE_WALL_RESTITUTION, DIE_WALL_SPIN_RAD, } from './diceConstants';
+import { backEdgeZ } from './backWall';
+import { DICE_SETS, diceSet } from './diceSets';
+import { applyRoll, puckPlacement } from './puckState';
+import { advanceArcDisplay, advanceThrow, aimHeldPair, arcDisplayFrom, clearSharedX, createHoldingDice, createThrowState, dieScreenCenter, dieSize, gestureLaunchSpeeds, launchGestureThrow, launchHeldAuto, launchSpeeds, probeGestureArc, logUnit, readFacing, readTopFace, reseatHeldDice, spreadPairX, stageMetrics, stepDice, syncArcDisplay, visualDieSize, } from './dicePhysics';
+const metrics = stageMetrics();
+const flyingDie = (patch) => {
+    const [base] = createHoldingDice(540);
+    return {
+        ...base,
+        resting: false,
+        topFace: null,
+        ...patch,
+        q: patch.q ?? base.q,
+        w: patch.w ?? { x: 0, y: 0, z: 0 },
+    };
+};
+describe('die size', () => {
+    it('is the launch size at the bottom and the depth scale at the wall', () => {
+        expect(dieSize(0, metrics)).toBe(DIE_LAUNCH_SIZE_PX);
+        expect(dieSize(metrics.wallZ, metrics)).toBeCloseTo(DIE_LAUNCH_SIZE_PX * DIE_DEPTH_SCALE);
+        const mid = dieSize(metrics.wallZ / 2, metrics);
+        expect(mid).toBeGreaterThan(DIE_LAUNCH_SIZE_PX * DIE_DEPTH_SCALE);
+        expect(mid).toBeLessThan(DIE_LAUNCH_SIZE_PX);
+    });
+    it('sits fully above the bottom edge while holding', () => {
+        const [left] = createHoldingDice(540);
+        const screen = dieScreenCenter(left, metrics);
+        expect(screen.y + screen.size / 2).toBeCloseTo(metrics.height);
+        expect(screen.y - screen.size / 2).toBeGreaterThan(metrics.wallBottom);
+    });
+});
+const quatAngle = (a, b) => {
+    const dot = Math.abs(a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w);
+    return 2 * Math.acos(Math.min(1, dot));
+};
+describe('arc lift', () => {
+    it('swells with height and stays on the depth size at the felt', () => {
+        expect(visualDieSize(0, 0, metrics)).toBe(DIE_LAUNCH_SIZE_PX);
+        expect(visualDieSize(metrics.wallZ, 0, metrics)).toBeCloseTo(DIE_LAUNCH_SIZE_PX * DIE_DEPTH_SCALE);
+        const midZ = metrics.wallZ / 2;
+        expect(visualDieSize(midZ, DIE_ARC_LIFT_HEIGHT_PX, metrics)).toBeCloseTo(dieSize(midZ, metrics) * DIE_ARC_LIFT_SCALE);
+        expect(visualDieSize(100, DIE_ARC_LIFT_HEIGHT_PX * 2, metrics)).toBeCloseTo(visualDieSize(100, DIE_ARC_LIFT_HEIGHT_PX, metrics));
+        const felt = dieSize(400, metrics);
+        const hop = visualDieSize(400, 38, metrics);
+        expect(hop).toBeGreaterThan(felt);
+        expect(hop).toBeLessThan(felt * 1.15);
+    });
+    it('spreads an enlarged pair and leaves a resting pair put', () => {
+        const [left, right] = createHoldingDice(540);
+        expect(spreadPairX(left, right, metrics)).toEqual([left.x, right.x]);
+        const airL = flyingDie({ x: 500, z: 280, h: DIE_ARC_LIFT_HEIGHT_PX });
+        const airR = flyingDie({ x: 540, z: 280, h: DIE_ARC_LIFT_HEIGHT_PX });
+        const [x0, x1] = spreadPairX(airL, airR, metrics);
+        const span = (visualDieSize(airL.z, airL.h, metrics) + visualDieSize(airR.z, airR.h, metrics)) / 2;
+        expect(x1 - x0).toBeGreaterThanOrEqual(span - 1e-6);
+    });
+    it('does not write the simulation pose', () => {
+        const die = flyingDie({ h: 100, vh: 200, w: { x: 4, y: 1, z: -1 } });
+        const q = { ...die.q };
+        const w = { ...die.w };
+        advanceArcDisplay(arcDisplayFrom(die), die, 1 / 60);
+        expect(die.q).toEqual(q);
+        expect(die.w).toEqual(w);
+    });
+    it('slows the crest and meets the simulation pose on the felt', () => {
+        const launched = launchGestureThrow(createThrowState(0), 0, {
+            launchX: metrics.width / 2,
+            speed: GESTURE_SPEED_MIN_PX_PER_S,
+            lean: 0,
+        });
+        let dice = launched.dice;
+        let display = [arcDisplayFrom(dice[0]), arcDisplayFrom(dice[1])];
+        let maxH = 0;
+        let crestGap = 0;
+        let lastAirGap = 0;
+        let matchedOnFelt = false;
+        const dt = 1 / 60;
+        for (let i = 0; i < 240 && !matchedOnFelt; i += 1) {
+            dice = stepDice(dice, dt, metrics, () => 0.5, (pair, stepDt) => {
+                display = syncArcDisplay(display, pair, stepDt);
+                const die = pair[0];
+                if (die.h > maxH) {
+                    maxH = die.h;
+                    crestGap = quatAngle(display[0].q, die.q);
+                }
+                if (die.h > 0)
+                    lastAirGap = quatAngle(display[0].q, die.q);
+                if (maxH > 0 && die.h <= 0)
+                    matchedOnFelt = quatAngle(display[0].q, die.q) < 1e-4;
+                return pair;
+            });
+        }
+        expect(maxH).toBeGreaterThan(DIE_ARC_LIFT_HEIGHT_PX * 0.8);
+        expect(crestGap).toBeGreaterThan(0.3);
+        expect(lastAirGap).toBeLessThan(0.05);
+        expect(matchedOnFelt).toBe(true);
+    });
+});
+describe('faces', () => {
+    it('reads 1 on top for the identity pose and 6 after a half turn', () => {
+        expect(readTopFace({ x: 0, y: 0, z: 0, w: 1 })).toBe(1);
+        const turned = { x: 1, y: 0, z: 0, w: 0 };
+        expect(readTopFace(turned)).toBe(6);
+        expect(readTopFace({ x: 0, y: 0, z: 0, w: 1 }) + readTopFace(turned)).toBe(7);
+    });
+    it('snaps a tilted die onto a flat face', () => {
+        const tilted = flyingDie({
+            h: 0,
+            vh: -10,
+            vx: 0,
+            vz: 0,
+            q: { x: 0.05, y: 0.02, z: 0, w: 0.998 },
+        });
+        const [settled] = stepDice([tilted, flyingDie({ alive: false })], 1 / 30, metrics);
+        expect(settled.resting).toBe(true);
+        expect(settled.topFace).toBe(1);
+        expect(settled.vx).toBe(0);
+        expect(settled.vh).toBe(0);
+    });
+});
+describe('bounces', () => {
+    it('keeps forward speed on a felt hit and sends the die back up', () => {
+        const die = flyingDie({ h: 0.2, vh: -400, vz: 500, vx: 80 });
+        const [next] = stepDice([die, flyingDie({ alive: false })], 1 / 60, metrics);
+        expect(next.alive).toBe(true);
+        expect(next.h).toBeGreaterThanOrEqual(0);
+        expect(next.vh).toBeGreaterThan(0);
+        expect(next.vz).toBeGreaterThan(0);
+        expect(next.vz).toBeLessThan(500);
+    });
+    it('bounces off the side and the bottom edge', () => {
+        const side = flyingDie({ x: 2, vx: -600, h: 40, vh: 0, z: 200 });
+        const [sided] = stepDice([side, flyingDie({ alive: false })], 1 / 60, metrics);
+        expect(sided.x).toBeGreaterThanOrEqual(dieSize(sided.z, metrics) / 2 - 1);
+        expect(sided.vx).toBeGreaterThan(0);
+        expect(sided.hitBackWall).toBeFalsy();
+        const bottom = flyingDie({ z: -5, vz: -500, h: 30, vh: 200 });
+        const [backed] = stepDice([bottom, flyingDie({ alive: false })], 1 / 60, metrics);
+        expect(backed.z).toBeGreaterThanOrEqual(0);
+        expect(backed.vz).toBeGreaterThan(0);
+    });
+    it('rolls a fast die that meets the felt on a short hop', () => {
+        const die = flyingDie({ h: 0.2, vh: -40, vz: 500, vx: 0, w: { x: 0, y: 3, z: 4 } });
+        const [next] = stepDice([die, flyingDie({ alive: false })], 1 / 60, metrics);
+        expect(next.resting).toBe(false);
+        expect(next.vh).toBe(0);
+        expect(next.vz).toBeGreaterThan(500 * 0.9);
+        expect(next.vz).toBeLessThan(500);
+        expect(next.w.x).toBeCloseTo((Math.PI / 2) * next.vz / dieSize(next.z, metrics));
+        expect(Math.abs(next.w.y)).toBeLessThan(3);
+        expect(Math.abs(next.w.z)).toBeLessThan(4);
+    });
+    it('bounces off the back wall when the die is below the top of the wall', () => {
+        const radius = dieSize(metrics.wallZ, metrics) / 2;
+        const die = flyingDie({ z: metrics.wallZ - radius - 1, vz: 700, h: 20, vh: 0 });
+        const [next] = stepDice([die, flyingDie({ alive: false })], 1 / 60, metrics);
+        expect(next.alive).toBe(true);
+        expect(next.vz).toBeLessThan(0);
+    });
+    it('keeps a flat middle and matching corners short of the flat wall', () => {
+        expect(backEdgeZ(540)).toBeCloseTo(metrics.wallZ);
+        expect(backEdgeZ(300)).toBeCloseTo(metrics.wallZ);
+        expect(backEdgeZ(780)).toBeCloseTo(metrics.wallZ);
+        expect(backEdgeZ(0)).toBeCloseTo(backEdgeZ(metrics.width));
+        expect(backEdgeZ(40)).toBeCloseTo(backEdgeZ(metrics.width - 40));
+        expect(metrics.wallZ - backEdgeZ(0)).toBeGreaterThan(100);
+    });
+    it('bounces a low die off each curved corner before the flat wall', () => {
+        const steady = () => 0.5;
+        const bounceCorner = (x) => {
+            const edge = backEdgeZ(x);
+            const radius = dieSize(edge, metrics) / 2;
+            const die = flyingDie({ x, z: edge - radius - 1, vz: 700, vx: 0, h: 20, vh: 0, w: { x: 0, y: 0, z: 0 } });
+            const [next] = stepDice([die, flyingDie({ alive: false })], 1 / 60, metrics, steady);
+            return next;
+        };
+        const left = bounceCorner(36);
+        const right = bounceCorner(metrics.width - 36);
+        expect(left.hitBackWall).toBe(true);
+        expect(left.leaving).toBe(false);
+        expect(left.z).toBeLessThan(metrics.wallZ - dieSize(left.z, metrics) / 2);
+        expect(left.vx).toBeGreaterThan(0);
+        expect(right.hitBackWall).toBe(true);
+        expect(right.leaving).toBe(false);
+        expect(right.z).toBeLessThan(metrics.wallZ - dieSize(right.z, metrics) / 2);
+        expect(right.vx).toBeLessThan(0);
+    });
+    it('leaves over a curved corner without reaching the flat wall', () => {
+        const x = 36;
+        const die = flyingDie({ x, z: backEdgeZ(x) + 4, vz: 400, h: metrics.wallHeight + 30, vh: 50 });
+        const [next] = stepDice([die, flyingDie({ alive: false })], 1 / 60, metrics);
+        expect(next.leaving).toBe(true);
+        expect(next.alive).toBe(true);
+        expect(next.z).toBeLessThan(metrics.wallZ);
+    });
+    it('scatters every rail without changing horizontal speed', () => {
+        const sequence = (values) => {
+            let index = 0;
+            return () => values[index++] ?? 0;
+        };
+        const horizontal = (die) => Math.hypot(die.vx, die.vz);
+        const radius = dieSize(metrics.wallZ, metrics) / 2;
+        const yawSeed = [1, 0.2, 0.8, 0.1];
+        const back = flyingDie({ z: metrics.wallZ - radius - 1, vz: 700, vx: 0, h: 20, vh: 0, w: { x: 0, y: 0, z: 0 } });
+        const [backed] = stepDice([back, flyingDie({ alive: false })], 1 / 60, metrics, sequence(yawSeed));
+        expect(horizontal(backed)).toBeCloseTo(700 * DIE_WALL_RESTITUTION);
+        expect(backed.vz).toBeLessThan(0);
+        expect(backed.vx).not.toBeCloseTo(0);
+        expect(backed.w.x).toBeCloseTo((0.2 * 2 - 1) * DIE_WALL_SPIN_RAD);
+        expect(backed.w.y).toBeCloseTo((0.8 * 2 - 1) * DIE_WALL_SPIN_RAD);
+        expect(backed.w.z).toBeCloseTo((0.1 * 2 - 1) * DIE_WALL_SPIN_RAD);
+        const side = flyingDie({ x: 2, vx: -600, vz: 0, h: 40, vh: 0, w: { x: 0, y: 0, z: 0 } });
+        const [sided] = stepDice([side, flyingDie({ alive: false })], 1 / 60, metrics, sequence(yawSeed));
+        expect(horizontal(sided)).toBeCloseTo(600 * DIE_WALL_RESTITUTION);
+        expect(sided.vx).toBeGreaterThan(0);
+        expect(sided.vz).not.toBeCloseTo(0);
+        const near = flyingDie({ z: -5, vz: -500, vx: 0, h: 30, vh: 200, w: { x: 0, y: 0, z: 0 } });
+        const [neared] = stepDice([near, flyingDie({ alive: false })], 1 / 60, metrics, sequence(yawSeed));
+        expect(horizontal(neared)).toBeCloseTo(500 * DIE_WALL_RESTITUTION);
+        expect(neared.vz).toBeGreaterThan(0);
+        expect(neared.vx).not.toBeCloseTo(0);
+    });
+    it('gives two dice different rail kicks', () => {
+        const sequence = (values) => {
+            let index = 0;
+            return () => values[index++] ?? 0;
+        };
+        const radius = dieSize(metrics.wallZ, metrics) / 2;
+        const z = metrics.wallZ - radius - 1;
+        const left = flyingDie({ x: 300, z, vz: 700, h: 20, vh: 0, w: { x: 0, y: 0, z: 0 } });
+        const right = flyingDie({ x: 700, z, vz: 700, h: 20, vh: 0, w: { x: 0, y: 0, z: 0 } });
+        const [a, b] = stepDice([left, right], 1 / 60, metrics, sequence([1, 0, 0, 0, 0, 1, 1, 1]));
+        expect(a.w.x).not.toBeCloseTo(b.w.x);
+        expect(a.w.y).not.toBeCloseTo(b.w.y);
+        expect(a.w.z).not.toBeCloseTo(b.w.z);
+    });
+    it('holds a die that clears the back wall while it is still on screen', () => {
+        const die = flyingDie({ z: metrics.wallZ + 4, vz: 400, h: metrics.wallHeight + 30, vh: 50 });
+        const [next] = stepDice([die, flyingDie({ alive: false })], 1 / 60, metrics);
+        expect(next.alive).toBe(true);
+        expect(next.leaving).toBe(true);
+        expect(next.resting).toBe(false);
+        expect(next.vx).toBe(0);
+        expect(next.vz).toBe(0);
+        expect(next.vh).toBe(0);
+        expect(next.w).toEqual({ x: 0, y: 0, z: 0 });
+    });
+    it('removes a die that clears the back wall already above the stage', () => {
+        const die = flyingDie({ z: metrics.wallZ + 4, vz: 400, h: metrics.height, vh: 50 });
+        const [next] = stepDice([die, flyingDie({ alive: false })], 1 / 60, metrics);
+        expect(next.alive).toBe(false);
+        expect(next.leaving).toBe(false);
+    });
+    it('separates two dice that overlap', () => {
+        const left = flyingDie({ x: 500, vx: 200, h: 10, vh: 0, z: 200 });
+        const right = flyingDie({ x: 530, vx: -200, h: 10, vh: 0, z: 200 });
+        const [a, b] = stepDice([left, right], 1 / 60, metrics);
+        expect(b.x - a.x).toBeGreaterThan(dieSize(200, metrics) * 0.8);
+        expect(a.vx).toBeLessThan(0);
+        expect(b.vx).toBeGreaterThan(0);
+    });
+});
+const travel = (binanceBuy, coinbaseBuy) => {
+    const volume = { binanceBuy, coinbaseBuy, binanceSell: 0, coinbaseSell: 0 };
+    let state = advanceThrow(createThrowState(0, 540), 0.016, 4000, volume);
+    let maxZ = 0;
+    let cleared = false;
+    let hitWall = false;
+    for (let i = 0; i < 900 && state.phase === 'flying'; i += 1) {
+        state = advanceThrow(state, 1 / 60, 5000 + i * 20, volume);
+        maxZ = Math.max(maxZ, state.dice[0].z, state.dice[1].z);
+        if (!state.dice[0].alive || !state.dice[1].alive)
+            cleared = true;
+        if (state.dice[0].vz < 0 && state.dice[0].z > metrics.wallZ * 0.75)
+            hitWall = true;
+    }
+    return { maxZ, cleared, hitWall, forward: launchSpeeds(volume, metrics).forward, up: launchSpeeds(volume, metrics).up };
+};
+const speeds = (binanceBuy, coinbaseBuy) => launchSpeeds({ binanceBuy, coinbaseBuy, binanceSell: 0, coinbaseSell: 0 }, metrics);
+describe('clear launch lane', () => {
+    const roll = (value) => () => value;
+    it('keeps both dice off a stack in the middle of the rail', () => {
+        const obstacle = { x: 540, clearance: 56 };
+        const half = DIE_LAUNCH_SIZE_PX / 2;
+        for (let i = 0; i < 30; i += 1) {
+            const sharedX = clearSharedX([obstacle], Math.random);
+            expect(Math.abs(sharedX - half - obstacle.x)).toBeGreaterThanOrEqual(obstacle.clearance);
+            expect(Math.abs(sharedX + half - obstacle.x)).toBeGreaterThanOrEqual(obstacle.clearance);
+        }
+    });
+    it('starts in the first open lane', () => {
+        expect(clearSharedX([{ x: 540, clearance: 56 }], roll(0))).toBe(DIE_LAUNCH_SIZE_PX);
+    });
+    it('skips a crack between stacks when a wider lane is open', () => {
+        const sharedX = clearSharedX([
+            { x: 120, clearance: 50 },
+            { x: 220, clearance: 30 },
+        ], roll(0));
+        expect(sharedX).toBe(270);
+    });
+    it('uses the rail edge when the stacks cover every lane', () => {
+        const sharedX = clearSharedX([{ x: 540, clearance: 2000 }], roll(0));
+        expect(sharedX).toBe(DIE_LAUNCH_SIZE_PX);
+    });
+});
+describe('launch axes', () => {
+    it('sends a full buy sample to the back wall on the full-strength pair', () => {
+        const flight = travel(DIE_BINANCE_BUY_REF, DIE_COINBASE_BUY_REF);
+        const launched = speeds(DIE_BINANCE_BUY_REF, DIE_COINBASE_BUY_REF);
+        expect(flight.maxZ).toBeGreaterThan(metrics.wallZ * 0.85);
+        expect(launched.up).toBeGreaterThan(0);
+        expect(launched.forward).toBeGreaterThan(launched.up);
+    });
+    it('adds the upward boost when Coinbase buy is zero', () => {
+        const launched = speeds(DIE_BINANCE_BUY_REF, 0);
+        const withBuy = speeds(DIE_BINANCE_BUY_REF, DIE_COINBASE_BUY_REF);
+        expect(launched.up).toBe(DIE_UP_ADD_PX_PER_S);
+        expect(withBuy.up - launched.up).toBeGreaterThan(0);
+        expect(launched.forward).toBeGreaterThan(0);
+    });
+    it('keeps upward speed on Coinbase buy when Binance buy changes', () => {
+        const weak = speeds(0.05, DIE_COINBASE_BUY_REF);
+        const strong = speeds(DIE_BINANCE_BUY_REF, DIE_COINBASE_BUY_REF);
+        expect(weak.up).toBeCloseTo(strong.up);
+        expect(strong.up).toBeGreaterThan(0);
+    });
+    it('raises a weak Binance buy so the throw still reaches the felt floor', () => {
+        const launched = speeds(0.05, 0);
+        const raw = speeds(DIE_BINANCE_BUY_REF, 0).forward * logUnit(0.05, DIE_BINANCE_BUY_REF);
+        expect(launched.up).toBe(DIE_UP_ADD_PX_PER_S);
+        expect(launched.forward).toBeGreaterThan(raw);
+        const flight = travel(0.05, 0.02);
+        expect(flight.maxZ).toBeGreaterThan(metrics.wallZ * DIE_MIN_REACH_FRACTION * 0.9);
+        expect(flight.maxZ).toBeLessThanOrEqual(metrics.wallZ + 1);
+    });
+    it('does not let Coinbase buy change forward speed when Binance buy is already full', () => {
+        const quiet = speeds(DIE_BINANCE_BUY_REF, 0);
+        const loud = speeds(DIE_BINANCE_BUY_REF, DIE_COINBASE_BUY_REF);
+        expect(loud.up).toBeGreaterThan(quiet.up);
+        expect(loud.forward).toBeCloseTo(quiet.forward);
+    });
+});
+describe('resting face', () => {
+    const sequence = (values) => {
+        let index = 0;
+        return () => values[index++] ?? 0;
+    };
+    it('gives each die its own top face and matches the quaternion', () => {
+        const [left, right] = createHoldingDice(540, sequence([0, 0, 0.5, 0]));
+        expect(left.topFace).not.toBe(1);
+        expect(right.topFace).not.toBe(left.topFace);
+        expect(readTopFace(left.q)).toBe(left.topFace);
+        expect(readTopFace(right.q)).toBe(right.topFace);
+    });
+    it('can show every face on top', () => {
+        const faces = new Set();
+        for (let face = 0; face < 6; face += 1) {
+            for (let twist = 0; twist < 4; twist += 1) {
+                const [die] = createHoldingDice(540, sequence([(face + 0.1) / 6, (twist + 0.1) / 4, 0, 0]));
+                expect(die.topFace).toBeGreaterThanOrEqual(1);
+                expect(die.topFace).toBeLessThanOrEqual(6);
+                expect(readTopFace(die.q)).toBe(die.topFace);
+                faces.add(die.topFace ?? 0);
+            }
+        }
+        expect(faces.size).toBe(6);
+    });
+});
+describe('throw cycle', () => {
+    it('waits out the pause and a quiet buy window', () => {
+        const state = createThrowState(0, 540);
+        const early = advanceThrow(state, 0.016, DIE_LAUNCH_DELAY_MS - 1, {
+            binanceBuy: 2,
+            coinbaseBuy: 1,
+            binanceSell: 0,
+            coinbaseSell: 0,
+        });
+        expect(early.phase).toBe('holding');
+        const quiet = advanceThrow(state, 0.016, DIE_LAUNCH_DELAY_MS + 10, {
+            binanceBuy: 0,
+            coinbaseBuy: 0,
+            binanceSell: 1,
+            coinbaseSell: 1,
+        });
+        expect(quiet.phase).toBe('holding');
+    });
+    it('starts a Coinbase-quiet throw only when the upward boost is set', () => {
+        const state = createThrowState(0, 540);
+        const launched = advanceThrow(state, 0.016, DIE_LAUNCH_DELAY_MS + 10, {
+            binanceBuy: 2,
+            coinbaseBuy: 0,
+            binanceSell: 0,
+            coinbaseSell: 0,
+        });
+        if (DIE_UP_ADD_PX_PER_S > 0) {
+            expect(launched.phase).toBe('flying');
+            expect(launched.dice[0].vh).toBeCloseTo(DIE_UP_ADD_PX_PER_S);
+        }
+        else {
+            expect(launched.phase).toBe('holding');
+        }
+    });
+    it('launches both dice from the same speed once both buys are live', () => {
+        const state = createThrowState(0, 540);
+        const launched = advanceThrow(state, 0.016, DIE_LAUNCH_DELAY_MS + 10, {
+            binanceBuy: 2,
+            coinbaseBuy: 0.4,
+            binanceSell: 1,
+            coinbaseSell: 0.2,
+        });
+        expect(launched.phase).toBe('flying');
+        expect(launched.dice[0].vz).toBeCloseTo(launched.dice[1].vz);
+        expect(launched.dice[0].vh).toBeCloseTo(launched.dice[1].vh);
+        expect(launched.dice[0].vh).toBeGreaterThan(0);
+        expect(launched.dice[0].vz).toBeGreaterThan(0);
+        const leftSpin = DIE_MAX_SPIN_RAD_PER_S * logUnit(1, DIE_BINANCE_SELL_REF) * DIE_FORWARD_SPIN_SCALE;
+        const rightSpin = DIE_MAX_SPIN_RAD_PER_S * logUnit(0.2, DIE_COINBASE_SELL_REF) * DIE_FORWARD_SPIN_SCALE;
+        expect(launched.dice[0].w.x).toBeCloseTo(leftSpin);
+        expect(launched.dice[1].w.x).toBeCloseTo(-rightSpin);
+        expect(launched.dice[1].x - launched.dice[0].x).toBeCloseTo(DIE_LAUNCH_SIZE_PX);
+    });
+    it('shows No Roll only after an on-screen exit has paused', () => {
+        const state = createThrowState(0, 540, () => 0);
+        const left = flyingDie({
+            leaving: true,
+            leftAtMs: 1000,
+            alive: true,
+            resting: false,
+            z: metrics.wallZ + 4,
+            h: metrics.wallHeight + 30,
+        });
+        const right = flyingDie({ resting: true, topFace: 5, alive: true, x: 700 });
+        const volume = { binanceBuy: 1, coinbaseBuy: 1, binanceSell: 0, coinbaseSell: 0 };
+        const early = advanceThrow({ ...state, phase: 'flying', dice: [left, right] }, 0.016, 1000 + DIE_NO_ROLL_PAUSE_MS - 1, volume);
+        expect(early.phase).toBe('flying');
+        expect(early.result).toBeNull();
+        expect(early.dice[0].alive).toBe(true);
+        const done = advanceThrow(early, 0.016, 1000 + DIE_NO_ROLL_PAUSE_MS, volume);
+        expect(done.phase).toBe('result');
+        expect(done.result).toEqual({ noRoll: true });
+        expect(done.point).toBeNull();
+        expect(done.dice[0].alive).toBe(false);
+    });
+    it('calls No Roll when a die leaves and the other has rested', () => {
+        const state = createThrowState(0, 540);
+        const left = flyingDie({ alive: false, resting: false });
+        const right = flyingDie({ resting: true, topFace: 5, alive: true });
+        const next = advanceThrow({ ...state, phase: 'flying', dice: [left, right] }, 0.016, 1000, { binanceBuy: 1, coinbaseBuy: 1, binanceSell: 0, coinbaseSell: 0 });
+        expect(next.phase).toBe('result');
+        expect(next.result).toEqual({ noRoll: true });
+    });
+    it('shows the face total, then resets after the result hold', () => {
+        const state = createThrowState(0, 540);
+        const left = flyingDie({ resting: true, topFace: 6, alive: true });
+        const right = flyingDie({ resting: true, topFace: 1, alive: true, x: 620 });
+        const result = advanceThrow({ ...state, phase: 'flying', dice: [left, right] }, 0.016, 1000, { binanceBuy: 1, coinbaseBuy: 1, binanceSell: 0, coinbaseSell: 0 });
+        expect(result.result).toEqual({ total: 7, label: 'Pass Line' });
+        expect(result.point).toBeNull();
+        const still = advanceThrow(result, 0.016, 1000 + DIE_RESULT_HOLD_MS - 1, {
+            binanceBuy: 1,
+            coinbaseBuy: 1,
+            binanceSell: 0,
+            coinbaseSell: 0,
+        });
+        expect(still.phase).toBe('result');
+        const reset = advanceThrow(result, 0.016, 1000 + DIE_RESULT_HOLD_MS, {
+            binanceBuy: 1,
+            coinbaseBuy: 1,
+            binanceSell: 0,
+            coinbaseSell: 0,
+        });
+        expect(reset.phase).toBe('holding');
+        expect(reset.result).toBeNull();
+        expect(reset.point).toBeNull();
+        expect(reset.dice[0].z).toBe(0);
+        expect(reset.dice[1].z).toBe(0);
+    });
+    it('keeps a bonus result up until the extended hold, then returns to the rail', () => {
+        const state = createThrowState(0, 540);
+        const left = flyingDie({ resting: true, topFace: 4, alive: true });
+        const right = flyingDie({ resting: true, topFace: 4, alive: true, x: 620 });
+        const result = advanceThrow({ ...state, phase: 'flying', dice: [left, right] }, 0.016, 1000, { binanceBuy: 1, coinbaseBuy: 1, binanceSell: 0, coinbaseSell: 0 });
+        const extended = { ...result, resultHoldMs: DIE_RESULT_HOLD_MS + 2000 };
+        const duringExtra = advanceThrow(extended, 0.016, 1000 + DIE_RESULT_HOLD_MS + 1999, {
+            binanceBuy: 1,
+            coinbaseBuy: 1,
+            binanceSell: 0,
+            coinbaseSell: 0,
+        });
+        expect(duringExtra.phase).toBe('result');
+        expect(duringExtra.result).toEqual(result.result);
+        const reset = advanceThrow(extended, 0.016, 1000 + DIE_RESULT_HOLD_MS + 2000, {
+            binanceBuy: 1,
+            coinbaseBuy: 1,
+            binanceSell: 0,
+            coinbaseSell: 0,
+        });
+        expect(reset.phase).toBe('holding');
+        expect(reset.result).toBeNull();
+    });
+    it('counts a roll that already reached the back-wall line', () => {
+        const state = createThrowState(0, 540);
+        const line = metrics.wallZ * DIE_MIN_REACH_FRACTION;
+        const left = flyingDie({ resting: true, topFace: 6, alive: true, z: 200 });
+        const right = flyingDie({ resting: true, topFace: 1, alive: true, x: 620, z: 200 });
+        const result = advanceThrow({ ...state, phase: 'flying', reachTracked: true, reachZ: [line + 8, line + 8], dice: [left, right] }, 0.016, 1000, volume);
+        expect(result.result).toEqual({ total: 7, label: 'Pass Line' });
+    });
+    it('counts a short peak once the die has hit the back wall', () => {
+        const state = createThrowState(0, 540);
+        const line = metrics.wallZ * DIE_MIN_REACH_FRACTION;
+        const left = flyingDie({ resting: true, topFace: 6, alive: true, z: 200, hitBackWall: true });
+        const right = flyingDie({ resting: true, topFace: 1, alive: true, x: 620, z: 200, hitBackWall: true });
+        const result = advanceThrow({ ...state, phase: 'flying', reachTracked: true, reachZ: [line - 40, line - 10], dice: [left, right] }, 0.016, 1000, volume);
+        expect(result.result).toEqual({ total: 7, label: 'Pass Line' });
+    });
+    it('calls No Roll when either die stays short of the back-wall line', () => {
+        const state = createThrowState(0, 540);
+        const line = metrics.wallZ * DIE_MIN_REACH_FRACTION;
+        const left = flyingDie({ resting: true, topFace: 6, alive: true, z: 200 });
+        const right = flyingDie({ resting: true, topFace: 1, alive: true, x: 620, z: 200 });
+        const result = advanceThrow({ ...state, phase: 'flying', reachTracked: true, reachZ: [line - 40, line + 8], dice: [left, right] }, 0.016, 1000, volume);
+        expect(result.result).toEqual({ noRoll: true });
+    });
+    it('still calls No Roll when a die leaves over the rack after reaching the line', () => {
+        const state = createThrowState(0, 540);
+        const line = metrics.wallZ * DIE_MIN_REACH_FRACTION;
+        const left = flyingDie({ alive: false, resting: false, z: metrics.wallZ + 20 });
+        const right = flyingDie({ resting: true, topFace: 5, alive: true, x: 700, z: line });
+        const result = advanceThrow({ ...state, phase: 'flying', reachTracked: true, reachZ: [line + 30, line], dice: [left, right] }, 0.016, 1000, volume);
+        expect(result.result).toEqual({ noRoll: true });
+    });
+});
+const volume = { binanceBuy: 1, coinbaseBuy: 1, binanceSell: 0, coinbaseSell: 0 };
+const settleRoll = (leftFace, rightFace, point = null) => {
+    const state = createThrowState(0, 540);
+    const left = flyingDie({ resting: true, topFace: leftFace, alive: true });
+    const right = flyingDie({ resting: true, topFace: rightFace, alive: true, x: 620 });
+    return advanceThrow({ ...state, phase: 'flying', point, dice: [left, right] }, 0.016, 1000, volume);
+};
+describe('pass line puck', () => {
+    it('names a come-out 7 or 11 as a pass line win and stays off', () => {
+        expect(applyRoll(null, 7)).toEqual({ point: null, label: 'Pass Line' });
+        expect(applyRoll(null, 11)).toEqual({ point: null, label: 'Pass Line' });
+        expect(settleRoll(5, 6).result).toEqual({ total: 11, label: 'Pass Line' });
+        expect(settleRoll(5, 6).point).toBeNull();
+    });
+    it('names a come-out 2, 3, or 12 as a pass line loss and stays off', () => {
+        expect(applyRoll(null, 2)).toEqual({ point: null, label: 'Pass Line loses' });
+        expect(applyRoll(null, 3)).toEqual({ point: null, label: 'Pass Line loses' });
+        expect(applyRoll(null, 12)).toEqual({ point: null, label: 'Pass Line loses' });
+        expect(settleRoll(6, 6).point).toBeNull();
+    });
+    it('sets the point on 4, 5, 6, 8, 9, or 10 and shows the total only', () => {
+        for (const total of [4, 5, 6, 8, 9, 10]) {
+            expect(applyRoll(null, total)).toEqual({ point: total, label: null });
+        }
+        const set = settleRoll(6, 4);
+        expect(set.point).toBe(10);
+        expect(set.result).toEqual({ total: 10, label: null });
+        expect(puckPlacement(set.point).src).toBe('/On_Puck.png');
+    });
+    it('clears the point when that number hits again', () => {
+        const made = settleRoll(4, 6, 10);
+        expect(made.point).toBeNull();
+        expect(made.result).toEqual({ total: 10, label: 'Point' });
+        expect(puckPlacement(made.point).src).toBe('/Off_Puck.png');
+    });
+    it('clears the point on a seven out', () => {
+        const out = settleRoll(3, 4, 10);
+        expect(out.point).toBeNull();
+        expect(out.result).toEqual({ total: 7, label: 'Seven Out!' });
+    });
+    it('leaves the point in place for any other total', () => {
+        const kept = settleRoll(5, 1, 10);
+        expect(kept.point).toBe(10);
+        expect(kept.result).toEqual({ total: 6, label: null });
+    });
+    it('keeps the point on a no roll', () => {
+        const state = createThrowState(0, 540);
+        const left = flyingDie({ alive: false, resting: false });
+        const right = flyingDie({ resting: true, topFace: 5, alive: true });
+        const next = advanceThrow({ ...state, phase: 'flying', point: 9, dice: [left, right] }, 0.016, 1000, volume);
+        expect(next.result).toEqual({ noRoll: true });
+        expect(next.point).toBe(9);
+    });
+    it('keeps the point into the next hold', () => {
+        const set = settleRoll(3, 3);
+        expect(set.point).toBe(6);
+        const reset = advanceThrow(set, 0.016, 1000 + DIE_RESULT_HOLD_MS, volume);
+        expect(reset.phase).toBe('holding');
+        expect(reset.result).toBeNull();
+        expect(reset.point).toBe(6);
+        expect(puckPlacement(null)).toMatchObject({ src: '/Off_Puck.png', x: PUCK_OFF_X, y: PUCK_OFF_Y, scale: PUCK_OFF_SCALE });
+        expect(puckPlacement(6)).toMatchObject({ src: '/On_Puck.png', x: PUCK_ON_6_X, y: PUCK_ON_6_Y, scale: PUCK_ON_6_SCALE });
+    });
+});
+describe('gesture launch', () => {
+    const volume = { binanceBuy: 0, coinbaseBuy: 0, binanceSell: 0, coinbaseSell: 0 };
+    it('keeps a shooter hold from auto-launching and still launches a zero-volume timeout', () => {
+        const held = { ...createThrowState(0, 540), manualHold: true };
+        const waiting = advanceThrow(held, 0.016, DIE_LAUNCH_DELAY_MS + 50, {
+            binanceBuy: 4,
+            coinbaseBuy: 2,
+            binanceSell: 1,
+            coinbaseSell: 1,
+        });
+        expect(waiting.phase).toBe('holding');
+        const launched = launchHeldAuto(held, 80, volume);
+        expect(launched.phase).toBe('flying');
+        expect(launched.requireWallContact).toBe(false);
+        expect(launched.dice[0].vz).toBeGreaterThan(0);
+    });
+    it('lands a slow flick near mid-felt and sends a hot flick over the wall', () => {
+        const soft = probeGestureArc(GESTURE_SPEED_MIN_PX_PER_S);
+        const hot = probeGestureArc(GESTURE_SPEED_NO_ROLL_PX_PER_S);
+        const mid = metrics.wallZ * GESTURE_MID_FELT_FRACTION;
+        expect(soft.cleared).toBe(false);
+        expect(soft.firstZ).toBeGreaterThan(mid * 0.85);
+        expect(soft.firstZ).toBeLessThan(mid * 1.2);
+        expect(hot.cleared).toBe(true);
+        const speeds = gestureLaunchSpeeds(GESTURE_SPEED_WALL_PX_PER_S);
+        const slow = gestureLaunchSpeeds(GESTURE_SPEED_MIN_PX_PER_S);
+        expect(slow.up).toBeCloseTo(speeds.up);
+        expect(slow.forward).toBeLessThan(speeds.forward);
+    });
+    it('calls No Roll when either gestured die misses the back wall', () => {
+        const state = { ...createThrowState(0, 540), phase: 'flying', requireWallContact: true, reachTracked: true };
+        const left = flyingDie({ resting: true, alive: true, topFace: 3, hitBackWall: true });
+        const right = flyingDie({ resting: true, alive: true, topFace: 4, hitBackWall: false, x: 700 });
+        const missed = advanceThrow({ ...state, dice: [left, right], reachZ: [metrics.wallZ, metrics.wallZ] }, 0.016, 1000, volume);
+        expect(missed.result).toEqual({ noRoll: true });
+        const both = advanceThrow({ ...state, dice: [left, flyingDie({ resting: true, alive: true, topFace: 4, hitBackWall: true, x: 700 })] }, 0.016, 1000, volume);
+        expect(both.result).toEqual({ total: 7, label: 'Pass Line' });
+    });
+    it('launches both dice from the pointer-down x with the same lean spin', () => {
+        const state = createThrowState(0, 200);
+        const launched = launchGestureThrow(state, 1000, { launchX: 800, speed: GESTURE_SPEED_MIN_PX_PER_S, lean: -0.4 });
+        expect(launched.requireWallContact).toBe(true);
+        expect(launched.sharedX).toBe(800);
+        expect(launched.dice[1].x - launched.dice[0].x).toBeCloseTo(DIE_LAUNCH_SIZE_PX);
+        expect(launched.dice[0].w.z).toBeLessThan(0);
+        expect(launched.dice[1].w.z).toBeCloseTo(launched.dice[0].w.z);
+        expect(launched.dice[0].w.x).toBeGreaterThan(0);
+        expect(launched.dice[1].w.x).toBeCloseTo(launched.dice[0].w.x);
+        const aimed = aimHeldPair(state, 800);
+        expect(aimed.sharedX).toBe(800);
+        expect(aimed.aimLocked).toBe(true);
+        expect(aimed.dice[0].q).toEqual(state.dice[0].q);
+    });
+});
+describe('dice set poses', () => {
+    it('matches each named top and front, with opposites summing to 7', () => {
+        for (const set of DICE_SETS) {
+            if (!set.faces || !set.quats)
+                continue;
+            for (const [index, die] of set.faces.entries()) {
+                const facing = readFacing(set.quats[index]);
+                expect(facing.top, set.id).toBe(die.top);
+                expect(facing.front, set.id).toBe(die.front);
+                expect(facing.top + facing.bottom).toBe(7);
+                expect(facing.front + facing.back).toBe(7);
+                expect(facing.left + facing.right).toBe(7);
+            }
+        }
+    });
+});
+describe('dice set launch', () => {
+    const volume = { binanceBuy: 2, coinbaseBuy: 2, binanceSell: 4, coinbaseSell: 1 };
+    it('keeps a random auto launch spinning in opposite directions', () => {
+        const launched = launchHeldAuto(createThrowState(0, 540), 0, volume);
+        expect(Math.sign(launched.dice[0].w.x)).toBe(-Math.sign(launched.dice[1].w.x));
+        expect(launched.controlSnap).toMatchObject({ setId: 'random', stacked: false, phase: 'come-out' });
+    });
+    it('throws a named set on the same axis and stacks the right die on top', () => {
+        const set = diceSet('all-sevens');
+        const held = reseatHeldDice(createThrowState(0, 540), {
+            setId: set.id,
+            stacked: true,
+            quats: set.quats,
+        });
+        expect(held.dice[0].x).toBe(540);
+        expect(held.dice[1].x).toBe(540);
+        expect(held.dice[0].h).toBe(0);
+        expect(held.dice[1].h).toBeCloseTo(dieSize(0));
+        expect(readFacing(held.dice[0].q)).toMatchObject({ top: 4, front: 2 });
+        expect(readFacing(held.dice[1].q)).toMatchObject({ top: 3, front: 5 });
+        const launched = launchHeldAuto(held, 0, volume);
+        for (const die of launched.dice) {
+            expect(die.w.x).toBeGreaterThan(0);
+            expect(Math.abs(die.w.x)).toBeGreaterThan(Math.abs(die.w.y));
+            expect(Math.abs(die.w.x)).toBeGreaterThan(Math.abs(die.w.z));
+        }
+        expect(Math.sign(launched.dice[0].w.x)).toBe(Math.sign(launched.dice[1].w.x));
+        expect(launched.controlSnap).toEqual({ setId: 'all-sevens', stacked: true, phase: 'come-out' });
+        const aimed = aimHeldPair(held, 700);
+        expect(aimed.dice[0].x).toBe(700);
+        expect(aimed.dice[1].x).toBe(700);
+        expect(aimed.dice[1].h).toBeCloseTo(dieSize(0));
+    });
+});

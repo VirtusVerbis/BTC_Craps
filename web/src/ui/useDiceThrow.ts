@@ -39,6 +39,7 @@ import {
   createThrowState,
   launchGestureThrow,
   launchHeldAuto,
+  reseatHeldDice,
   dieScreenCenter,
   quatToCssMatrix,
   spreadPairX,
@@ -52,6 +53,7 @@ import {
   type ThrowState,
   type VolumeTotals,
 } from './dicePhysics'
+import { DEFAULT_DICE_CONTROL, holdFor, type DiceControlRoll, type DiceControlSettings } from './diceControl'
 import type { GestureStroke } from './gestureThrow'
 import type { ChipCharacter } from './chipConstants'
 import { useDiceVolumeWindow } from './useDiceVolumeWindow'
@@ -184,7 +186,7 @@ const aimClearLane = (state: ThrowState, world: ChipWorld, aimedKey: string): { 
   const sharedX = clearSharedX(lineLaunchObstacles(world))
   return {
     aimedKey: key,
-    state: { ...state, sharedX, dice: createHoldingDice(sharedX) },
+    state: { ...state, sharedX, dice: createHoldingDice(sharedX, Math.random, state.hold) },
   }
 }
 
@@ -212,6 +214,8 @@ export const useDiceThrow = (
   bonusHandRef?: RefObject<BonusHand>,
   shooterMode = false,
   shooterControlsRef?: { current: ShooterControls | null },
+  diceControlRef?: RefObject<DiceControlSettings>,
+  onDiceControlRoll?: (roll: DiceControlRoll) => void,
 ): DicePresentation | null => {
   const oi = useOpenInterest()
   const volume = useDiceVolumeWindow(market)
@@ -225,6 +229,10 @@ export const useDiceThrow = (
   rollsRef.current = rolls
   const onCountedRollRef = useRef(onCountedRoll)
   onCountedRollRef.current = onCountedRoll
+  const onDiceControlRollRef = useRef(onDiceControlRoll)
+  onDiceControlRollRef.current = onDiceControlRoll
+  const diceControlFallback = useRef(DEFAULT_DICE_CONTROL)
+  if (diceControlRef) diceControlFallback.current = diceControlRef.current
   const stateRef = useRef<ThrowState>(createThrowState(performance.now()))
   const displayRef = useRef<[ArcDisplay, ArcDisplay]>([
     arcDisplayFrom(stateRef.current.dice[0]),
@@ -290,7 +298,10 @@ export const useDiceThrow = (
   useEffect(() => {
     if (!enabled) return undefined
     commandRef.current = []
-    stateRef.current = createThrowState(performance.now())
+    stateRef.current = reseatHeldDice(
+      createThrowState(performance.now()),
+      holdFor(diceControlRef?.current ?? diceControlFallback.current, null),
+    )
     displayRef.current = [arcDisplayFrom(stateRef.current.dice[0]), arcDisplayFrom(stateRef.current.dice[1])]
     worldRef.current = null
     pnlRef.current = loadCharacterPnl()
@@ -403,6 +414,10 @@ export const useDiceThrow = (
       const dt = Math.min(0.05, (now - last) / 1000)
       last = now
       const metrics = stageMetrics()
+      const desired = holdFor(diceControlRef?.current ?? diceControlFallback.current, stateRef.current.point)
+      const desiredKey = `${desired.setId}|${desired.stacked}`
+      const heldKey = `${stateRef.current.hold.setId}|${stateRef.current.hold.stacked}`
+      if (desiredKey !== heldKey) stateRef.current = reseatHeldDice(stateRef.current, desired)
       armManualHold(now)
       drainCommands(now, metrics)
       if (stateRef.current.phase === 'holding' && stateRef.current.manualHold) {
@@ -457,6 +472,18 @@ export const useDiceThrow = (
           const step = applyRollStreak(streakRef.current, pointBefore != null, result.total)
           streakRef.current = step.streak
           if (step.record) saveRollStreakLongest(step.streak.longest)
+          const launched = stateRef.current.controlSnap
+          const leftFace = faces[0].topFace
+          const rightFace = faces[1].topFace
+          if (launched && leftFace != null && rightFace != null) {
+            onDiceControlRollRef.current?.({
+              phase: launched.phase,
+              setId: launched.setId,
+              stacked: launched.stacked,
+              left: leftFace,
+              right: rightFace,
+            })
+          }
         }
         const raw = result ? onCountedRollRef.current?.(result) : 0
         const extra = typeof raw === 'number' ? raw : 0

@@ -112,7 +112,25 @@ export interface ThrowState {
   aimLocked: boolean
   /** Gesture throws count only when both dice bounce on the back wall. */
   requireWallContact: boolean
+  /** How the next hold is arranged. Named quats stay fixed. Null quats are random. */
+  hold: DiceHold
+  /** Set, grip, and phase copied at launch. A later dropdown edit does not change it. */
+  controlSnap: DiceControlSnap | null
 }
+
+export interface DiceHold {
+  setId: string
+  stacked: boolean
+  quats: [Quat, Quat] | null
+}
+
+export interface DiceControlSnap {
+  setId: string
+  stacked: boolean
+  phase: 'come-out' | 'point'
+}
+
+export const DEFAULT_DICE_HOLD: DiceHold = { setId: 'random', stacked: false, quats: null }
 
 export interface StageMetrics {
   width: number
@@ -180,7 +198,7 @@ export const spreadPairX = (
       visualDieSize(right.z, right.h, metrics) -
       dieSize(right.z, metrics)) /
     2
-  if (!(extra > 0)) return [left.x, right.x]
+  if (!(extra > 0) || Math.abs(right.x - left.x) < 1) return [left.x, right.x]
   const shift = extra / 2
   const sign = right.x >= left.x ? 1 : -1
   return [left.x - sign * shift, right.x + sign * shift]
@@ -292,9 +310,28 @@ export const clearSharedX = (
   return leastBadSharedX(min, max, obstacles, random)
 }
 
-export const createHoldingDice = (sharedX: number, random: () => number = Math.random): [Die, Die] => {
+export const createHoldingDice = (
+  sharedX: number,
+  random: () => number = Math.random,
+  hold: DiceHold = DEFAULT_DICE_HOLD,
+): [Die, Die] => {
+  const leftQ = hold.quats?.[0] ?? randomRestQuat(random)
+  const rightQ = hold.quats?.[1] ?? randomRestQuat(random)
+  if (hold.stacked) {
+    return [restingDie(sharedX, leftQ, 0), restingDie(sharedX, rightQ, dieSize(0))]
+  }
   const half = DIE_LAUNCH_SIZE_PX / 2
-  return [makeDie(sharedX - half, random), makeDie(sharedX + half, random)]
+  return [restingDie(sharedX - half, leftQ), restingDie(sharedX + half, rightQ)]
+}
+
+/** Replace a held pair with the current set. In flight, remember the set for the next hold. */
+export const reseatHeldDice = (
+  state: ThrowState,
+  hold: DiceHold,
+  random: () => number = Math.random,
+): ThrowState => {
+  if (state.phase !== 'holding') return { ...state, hold }
+  return { ...state, hold, dice: createHoldingDice(state.sharedX, random, hold) }
 }
 
 export const createThrowState = (
@@ -314,27 +351,57 @@ export const createThrowState = (
   manualHold: false,
   aimLocked: false,
   requireWallContact: false,
+  hold: DEFAULT_DICE_HOLD,
+  controlSnap: null,
 })
 
-export const readTopFace = (q: Quat): number => {
-  const faces: Array<{ v: Vec3; n: number }> = [
-    { v: { x: 1, y: 0, z: 0 }, n: 3 },
-    { v: { x: -1, y: 0, z: 0 }, n: 4 },
-    { v: { x: 0, y: 1, z: 0 }, n: 1 },
-    { v: { x: 0, y: -1, z: 0 }, n: 6 },
-    { v: { x: 0, y: 0, z: 1 }, n: 2 },
-    { v: { x: 0, y: 0, z: -1 }, n: 5 },
-  ]
+const FACE_NORMALS: Array<{ v: Vec3; n: number }> = [
+  { v: { x: 1, y: 0, z: 0 }, n: 3 },
+  { v: { x: -1, y: 0, z: 0 }, n: 4 },
+  { v: { x: 0, y: 1, z: 0 }, n: 1 },
+  { v: { x: 0, y: -1, z: 0 }, n: 6 },
+  { v: { x: 0, y: 0, z: 1 }, n: 2 },
+  { v: { x: 0, y: 0, z: -1 }, n: 5 },
+]
+
+const faceToward = (q: Quat, dir: Vec3): number => {
   let best = 1
   let bestDot = -Infinity
-  for (const face of faces) {
+  for (const face of FACE_NORMALS) {
     const world = rotateVec(q, face.v)
-    if (world.y > bestDot) {
-      bestDot = world.y
+    const dot = world.x * dir.x + world.y * dir.y + world.z * dir.z
+    if (dot > bestDot) {
+      bestDot = dot
       best = face.n
     }
   }
   return best
+}
+
+export const readTopFace = (q: Quat): number => faceToward(q, { x: 0, y: 1, z: 0 })
+
+/** World faces. Front is the face toward the shooter. */
+export const readFacing = (
+  q: Quat,
+): { top: number; front: number; back: number; bottom: number; left: number; right: number } => ({
+  top: faceToward(q, { x: 0, y: 1, z: 0 }),
+  front: faceToward(q, { x: 0, y: 0, z: -1 }),
+  back: faceToward(q, { x: 0, y: 0, z: 1 }),
+  bottom: faceToward(q, { x: 0, y: -1, z: 0 }),
+  left: faceToward(q, { x: -1, y: 0, z: 0 }),
+  right: faceToward(q, { x: 1, y: 0, z: 0 }),
+})
+
+/** The one legal orientation with this top and the face toward the shooter. */
+export const poseQuat = (top: number, front: number): Quat => {
+  for (let face = 0; face < FACE_UP_QUATS.length; face += 1) {
+    for (let twist = 0; twist < 4; twist += 1) {
+      const q = normalizeQuat(quatMul(yawQuat(twist), FACE_UP_QUATS[face]))
+      const facing = readFacing(q)
+      if (facing.top === top && facing.front === front) return q
+    }
+  }
+  throw new Error(`No die pose has ${top} on top and ${front} toward the shooter`)
 }
 
 export const quatToCssMatrix = (q: Quat): string => {
@@ -481,7 +548,7 @@ export const advanceThrow = (
     phase: 'holding',
     phaseStartedMs: nowMs,
     sharedX,
-    dice: createHoldingDice(sharedX),
+    dice: createHoldingDice(sharedX, Math.random, state.hold),
     point: state.point,
     result: null,
     flightMs: 0,
@@ -490,6 +557,8 @@ export const advanceThrow = (
     manualHold: false,
     aimLocked: false,
     requireWallContact: false,
+    hold: state.hold,
+    controlSnap: null,
   }
 }
 
@@ -502,16 +571,34 @@ export const launchSpeeds = (volume: VolumeTotals, metrics: StageMetrics = stage
   return { forward: forwardForReach(rawForward, up, targetZ, full.forward, metrics), up }
 }
 
-const launchDice = (dice: readonly [Die, Die], volume: VolumeTotals, metrics: StageMetrics): [Die, Die] => {
+const launchDice = (
+  dice: readonly [Die, Die],
+  volume: VolumeTotals,
+  metrics: StageMetrics,
+  onAxis: boolean,
+): [Die, Die] => {
   const { forward, up } = launchSpeeds(volume, metrics)
   const spinL = DIE_MAX_SPIN_RAD_PER_S * logUnit(volume.binanceSell, DIE_BINANCE_SELL_REF)
   const spinR = DIE_MAX_SPIN_RAD_PER_S * logUnit(volume.coinbaseSell, DIE_COINBASE_SELL_REF)
   const left = cloneDie(dice[0])
   const right = cloneDie(dice[1])
-  applyLaunch(left, forward, up, spinL, 1)
-  applyLaunch(right, forward, up, spinR, -1)
+  if (onAxis) {
+    const rate = (spinL + spinR) / 2
+    const gap = (spinL - spinR) * 0.25
+    applyOnAxis(left, forward, up, rate, gap)
+    applyOnAxis(right, forward, up, rate, -gap)
+  } else {
+    applyLaunch(left, forward, up, spinL, 1)
+    applyLaunch(right, forward, up, spinR, -1)
+  }
   return [left, right]
 }
+
+const controlSnapOf = (state: ThrowState): DiceControlSnap => ({
+  setId: state.hold.setId,
+  stacked: state.hold.stacked,
+  phase: state.point == null ? 'come-out' : 'point',
+})
 
 const applyLaunch = (die: Die, forward: number, up: number, spin: number, sign: number) => {
   die.resting = false
@@ -524,6 +611,20 @@ const applyLaunch = (die: Die, forward: number, up: number, spin: number, sign: 
     x: sign * spin * DIE_FORWARD_SPIN_SCALE,
     y: sign * spin * 0.45,
     z: sign * spin * 0.7,
+  }
+}
+
+const applyOnAxis = (die: Die, forward: number, up: number, rate: number, gap: number) => {
+  die.resting = false
+  die.topFace = null
+  die.hitBackWall = false
+  die.vx = 0
+  die.vz = forward
+  die.vh = up
+  die.w = {
+    x: rate * DIE_FORWARD_SPIN_SCALE,
+    y: gap * 0.35,
+    z: gap * 0.2,
   }
 }
 
@@ -559,7 +660,8 @@ export const launchHeldAuto = (
     reachTracked: true,
     manualHold: false,
     requireWallContact: false,
-    dice: launchDice(state.dice, volume, metrics),
+    controlSnap: controlSnapOf(state),
+    dice: launchDice(state.dice, volume, metrics, state.hold.quats != null),
   }
 }
 
@@ -607,8 +709,15 @@ export const launchGestureThrow = (
   const leanSpin = gestureLeanSpin(stroke.lean)
   const left = cloneDie(state.dice[0])
   const right = cloneDie(state.dice[1])
-  left.x = sharedX - half
-  right.x = sharedX + half
+  if (state.hold.stacked) {
+    left.x = sharedX
+    right.x = sharedX
+  } else {
+    left.x = sharedX - half
+    right.x = sharedX + half
+    left.h = 0
+    right.h = 0
+  }
   applyGestureLaunch(left, forward, up, leanSpin)
   applyGestureLaunch(right, forward, up, leanSpin)
   return {
@@ -623,6 +732,7 @@ export const launchGestureThrow = (
     manualHold: false,
     aimLocked: false,
     requireWallContact: true,
+    controlSnap: controlSnapOf(state),
     dice: [left, right],
   }
 }
@@ -634,8 +744,17 @@ export const aimHeldPair = (state: ThrowState, stageX: number): ThrowState => {
   const half = DIE_LAUNCH_SIZE_PX / 2
   const left = cloneDie(state.dice[0])
   const right = cloneDie(state.dice[1])
-  left.x = sharedX - half
-  right.x = sharedX + half
+  if (state.hold.stacked) {
+    left.x = sharedX
+    right.x = sharedX
+    left.h = 0
+    right.h = dieSize(0)
+  } else {
+    left.x = sharedX - half
+    right.x = sharedX + half
+    left.h = 0
+    right.h = 0
+  }
   return { ...state, sharedX, aimLocked: true, dice: [left, right] }
 }
 
@@ -837,16 +956,14 @@ const dampSpin = (die: Die) => {
   die.w = { x: die.w.x * DIE_SPIN_DAMP, y: die.w.y * DIE_SPIN_DAMP, z: die.w.z * DIE_SPIN_DAMP }
 }
 
-const makeDie = (x: number, random: () => number = Math.random): Die => restingDie(x, randomRestQuat(random))
-
-const restingDie = (x: number, q: Quat): Die => ({
+const restingDie = (x: number, q: Quat, h = 0): Die => ({
   alive: true,
   resting: true,
   leaving: false,
   leftAtMs: null,
   x,
   z: 0,
-  h: 0,
+  h,
   vx: 0,
   vz: 0,
   vh: 0,

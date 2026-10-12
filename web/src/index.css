@@ -981,7 +981,8 @@ body {
   position: absolute;
   left: calc(100% + 1rem);
   top: 50%;
-  transform: translateY(-50%);
+  /* Anchor on the Shooter button so expanding panels grow downward. */
+  transform: translateY(-1.35rem);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1243,8 +1244,246 @@ html.shooter-gesture-lock body {
 
   .repo-links-panel {
     width: auto;
-    flex-direction: row;
-    flex-wrap: wrap;
-    justify-content: center;
+    max-width: 205px;
+    flex-direction: column;
+    align-items: stretch;
   }
+}
+
+.side-panel {
+  width: 205px;
+}
+
+.side-panel-toggle {
+  appearance: none;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding: 0.58rem 0.72rem;
+  border: 1px solid rgba(247, 147, 26, 0.38);
+  border-radius: 10px;
+  color: #f6f0da;
+  background: rgba(7, 7, 12, 0.66);
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: left;
+  cursor: pointer;
+}
+
+.side-panel-toggle:focus-visible,
+.dice-control-field select:focus-visible,
+.dice-control-stack:focus-visible,
+.dice-control-references-toggle:focus-visible,
+.dice-control-help-toggle:focus-visible,
+.dice-control-references a:focus-visible {
+  outline: 2px solid #f7931a;
+  outline-offset: 2px;
+}
+
+.side-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-top: 0.45rem;
+  padding: 0.65rem 0.55rem 0.7rem;
+  border: 1px solid rgba(247, 147, 26, 0.28);
+  border-radius: 10px;
+  background: rgba(7, 7, 12, 0.72);
+}
+
+.dice-control-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  color: #f6f0da;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.dice-control-field select {
+  width: 100%;
+  padding: 0.35rem 0.4rem;
+  border: 1px solid rgba(247, 147, 26, 0.38);
+  border-radius: 8px;
+  color: #f6f0da;
+  background: #12111e;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.dice-control-note,
+.dice-control-chart-empty,
+.dice-control-hard {
+  margin: 0;
+  color: rgba(246, 240, 218, 0.78);
+  font-size: 0.72rem;
+  font-weight: 400;
+  line-height: 1.35;
+}
+
+.dice-control-stack,
+.dice-control-references-toggle {
+  appearance: none;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.4rem 0.45rem;
+  border: 1px solid rgba(247, 147, 26, 0.38);
+  border-radius: 8px;
+  color: #f6f0da;
+  background: transparent;
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.dice-control-stack[aria-pressed='true'] {
+  border-color: rgba(247, 147, 26, 0.85);
+  color: #f7931a;
+}
+
+.dice-control-references ul {
+  margin: 0.4rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.dice-control-references a {
+  color: #f6f0da;
+  font-size: 0.72rem;
+  line-height: 1.3;
+}
+
+.dice-control-help-toggle {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0;
+  border: 0;
+  color: #f6f0da;
+  background: transparent;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dice-control-help-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  border: 1px solid rgba(247, 147, 26, 0.85);
+  border-radius: 50%;
+  color: #f7931a;
+  font-size: 0.68rem;
+  font-weight: 700;
+  font-style: italic;
+  line-height: 1;
+}
+
+.dice-control-help-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-top: 0.4rem;
+}
+
+.dice-control-help-body p {
+  margin: 0;
+  color: rgba(246, 240, 218, 0.78);
+  font-size: 0.72rem;
+  font-weight: 400;
+  line-height: 1.35;
+}
+
+.dice-control-chart {
+  margin: 0;
+}
+
+.dice-control-chart-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.4rem;
+  margin-bottom: 0.35rem;
+  color: #f6f0da;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.dice-control-chart-label span {
+  color: rgba(246, 240, 218, 0.62);
+  font-weight: 400;
+}
+
+.dice-control-columns {
+  display: grid;
+  grid-template-columns: repeat(11, 1fr);
+  gap: 2px;
+  height: 108px;
+}
+
+.dice-control-column {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.dice-control-track {
+  position: relative;
+  width: 100%;
+  flex: 1;
+}
+
+.dice-control-zero {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background: rgba(246, 240, 218, 0.35);
+}
+
+.dice-control-bar {
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  border-radius: 2px;
+  background: #f7931a;
+}
+
+.dice-control-bar.is-muted {
+  opacity: 0.35;
+}
+
+.dice-control-tick {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #f6f0da;
+  transform: translateY(50%);
+}
+
+.dice-control-total {
+  color: rgba(246, 240, 218, 0.72);
+  font-size: 0.62rem;
+  line-height: 1;
+}
+
+.dice-control-hard {
+  margin-top: 0.35rem;
 }

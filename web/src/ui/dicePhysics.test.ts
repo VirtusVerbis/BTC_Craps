@@ -29,6 +29,7 @@ import {
   DIE_WALL_SPIN_RAD,
 } from './diceConstants'
 import { backEdgeZ } from './backWall'
+import { DICE_SETS, diceSet } from './diceSets'
 import { applyRoll, puckPlacement } from './puckState'
 import {
   advanceArcDisplay,
@@ -46,7 +47,9 @@ import {
   launchSpeeds,
   probeGestureArc,
   logUnit,
+  readFacing,
   readTopFace,
+  reseatHeldDice,
   spreadPairX,
   stageMetrics,
   stepDice,
@@ -812,5 +815,58 @@ describe('gesture launch', () => {
     expect(aimed.sharedX).toBe(800)
     expect(aimed.aimLocked).toBe(true)
     expect(aimed.dice[0].q).toEqual(state.dice[0].q)
+  })
+})
+
+describe('dice set poses', () => {
+  it('matches each named top and front, with opposites summing to 7', () => {
+    for (const set of DICE_SETS) {
+      if (!set.faces || !set.quats) continue
+      for (const [index, die] of set.faces.entries()) {
+        const facing = readFacing(set.quats[index])
+        expect(facing.top, set.id).toBe(die.top)
+        expect(facing.front, set.id).toBe(die.front)
+        expect(facing.top + facing.bottom).toBe(7)
+        expect(facing.front + facing.back).toBe(7)
+        expect(facing.left + facing.right).toBe(7)
+      }
+    }
+  })
+})
+
+describe('dice set launch', () => {
+  const volume = { binanceBuy: 2, coinbaseBuy: 2, binanceSell: 4, coinbaseSell: 1 }
+
+  it('keeps a random auto launch spinning in opposite directions', () => {
+    const launched = launchHeldAuto(createThrowState(0, 540), 0, volume)
+    expect(Math.sign(launched.dice[0].w.x)).toBe(-Math.sign(launched.dice[1].w.x))
+    expect(launched.controlSnap).toMatchObject({ setId: 'random', stacked: false, phase: 'come-out' })
+  })
+
+  it('throws a named set on the same axis and stacks the right die on top', () => {
+    const set = diceSet('all-sevens')
+    const held = reseatHeldDice(createThrowState(0, 540), {
+      setId: set.id,
+      stacked: true,
+      quats: set.quats,
+    })
+    expect(held.dice[0].x).toBe(540)
+    expect(held.dice[1].x).toBe(540)
+    expect(held.dice[0].h).toBe(0)
+    expect(held.dice[1].h).toBeCloseTo(dieSize(0))
+    expect(readFacing(held.dice[0].q)).toMatchObject({ top: 4, front: 2 })
+    expect(readFacing(held.dice[1].q)).toMatchObject({ top: 3, front: 5 })
+    const launched = launchHeldAuto(held, 0, volume)
+    for (const die of launched.dice) {
+      expect(die.w.x).toBeGreaterThan(0)
+      expect(Math.abs(die.w.x)).toBeGreaterThan(Math.abs(die.w.y))
+      expect(Math.abs(die.w.x)).toBeGreaterThan(Math.abs(die.w.z))
+    }
+    expect(Math.sign(launched.dice[0].w.x)).toBe(Math.sign(launched.dice[1].w.x))
+    expect(launched.controlSnap).toEqual({ setId: 'all-sevens', stacked: true, phase: 'come-out' })
+    const aimed = aimHeldPair(held, 700)
+    expect(aimed.dice[0].x).toBe(700)
+    expect(aimed.dice[1].x).toBe(700)
+    expect(aimed.dice[1].h).toBeCloseTo(dieSize(0))
   })
 })
