@@ -275,10 +275,25 @@ body {
 }
 
 /* Above the P/L labels (3), under the dice (5), speech (6), meme (7), and candle chart (8). */
+.chip-presenter-host,
 .chip-stack {
   position: absolute;
   inset: 0;
   z-index: 4;
+  pointer-events: none;
+}
+
+.chip-guide-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.chip-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
   pointer-events: none;
 }
 

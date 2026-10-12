@@ -19,6 +19,7 @@ import { applyBonusRoll, bonusFlashTotals, emptyBonusHand } from './ui/bonusCrap
 import { bonusTestHand, isBonusTestSeed, type BonusTestSeed } from './ui/bonusTest'
 import type { ThrowResult } from './ui/dicePhysics'
 import { loadHistogramRolls, pushRoll, saveHistogramRolls } from './ui/histogramModel'
+import type { ChipFrameApply } from './ui/chips/ChipPresenterHost'
 import { useDiceThrow, type ShooterControls } from './ui/useDiceThrow'
 import {
   loadDiceControlBook,
@@ -227,6 +228,7 @@ function App() {
   }, [armBonusTest])
   const histogram = useHistogramVisibility(splashDone, histogramBoost)
   const precisionShotRef = useRef<Omit<PrecisionThrow, 'speed' | 'lean'> | null>(null)
+  const chipApplyRef = useRef<ChipFrameApply | null>(null)
   const dice = useDiceThrow(
     feed.market,
     splashDone,
@@ -238,6 +240,7 @@ function App() {
     diceControlRef,
     onDiceControlRoll,
     precisionShotRef,
+    chipApplyRef,
   )
   const gestureReady = manualShooter && dice?.phase === 'holding'
   const precisionOn = diceControl.precisionTargeting
@@ -307,6 +310,7 @@ function App() {
               fg3Width={fg3.width}
               fg3Height={fg3.height}
               dice={dice}
+              chipApplyRef={chipApplyRef}
               rolls={rolls}
               histogramReveal={histogram.reveal}
               histogramAnimate={histogram.animate}

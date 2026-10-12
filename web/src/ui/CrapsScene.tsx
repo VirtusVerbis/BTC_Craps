@@ -1,4 +1,4 @@
-import { type CSSProperties } from 'react'
+import { type CSSProperties, type MutableRefObject } from 'react'
 import { REFERENCE_HEIGHT, REFERENCE_WIDTH } from '../config/constants'
 import type { Candle } from '../data/candles'
 import {
@@ -19,7 +19,8 @@ import { BonusFields } from './BonusFields'
 import { BtcCandleChart } from './BtcCandleChart'
 import { formatPnlBtc, formatPnlUsd, pnlColor, PL_CHARACTERS, type CharacterPnlBook } from './characterPnl'
 import { PL_LABEL_ANCHOR, PL_LABEL_FONT_PX } from './characterPnlConstants'
-import { ChipLayer } from './ChipStack'
+import { ChipGuideLayer } from './chips/ChipGuideLayer'
+import { ChipPresenterHost, type ChipFrameApply } from './chips/ChipPresenterHost'
 import { DiceLayer } from './DiceLayer'
 import type { DieColorId } from './diceColor'
 import { SpeechLayer } from './SpeechLayer'
@@ -69,6 +70,7 @@ interface CrapsSceneProps {
   fg3Width: number
   fg3Height: number
   dice: DicePresentation | null
+  chipApplyRef: MutableRefObject<ChipFrameApply | null>
   characterPnl: CharacterPnlBook
   rolls: readonly number[]
   histogramReveal: number
@@ -93,6 +95,7 @@ export const CrapsScene = ({
   fg3Width,
   fg3Height,
   dice,
+  chipApplyRef,
   characterPnl,
   rolls,
   histogramReveal,
@@ -212,7 +215,8 @@ export const CrapsScene = ({
           draggable={false}
         />
       ) : null}
-      <ChipLayer discs={dice?.chips ?? []} guides={dice?.guides ?? []} />
+      <ChipPresenterHost applyRef={chipApplyRef} />
+      <ChipGuideLayer guides={dice?.guides ?? []} />
       <SpeechLayer speech={dice?.speech ?? []} />
       {dice ? (
         <DiceLayer presentation={dice} bonusLines={bonusLines} dieColor={dieColor} />
