@@ -196,8 +196,8 @@ export const PrecisionOverlay = ({
       ) : null}
       {showArc ? (
         <>
-          <DieMesh meshRef={ghostLeftRef} color={dieColor} opacity={0.5} />
-          <DieMesh meshRef={ghostRightRef} color={dieColor} opacity={0.5} />
+          <DieMesh meshRef={ghostLeftRef} dieId="left" color={dieColor} opacity={0.5} />
+          <DieMesh meshRef={ghostRightRef} dieId="right" color={dieColor} opacity={0.5} />
           <svg
             className="precision-reticle"
             viewBox="0 0 64 64"
@@ -220,8 +220,8 @@ export const PrecisionOverlay = ({
       {phase === 'trajectory' ? <AngleGauge angle={angle} /> : null}
       {showSpin ? (
         <>
-          <DieMesh meshRef={spinLeftRef} color={dieColor} opacity={0.85} />
-          <DieMesh meshRef={spinRightRef} color={dieColor} opacity={0.85} />
+          <DieMesh meshRef={spinLeftRef} dieId="left" color={dieColor} opacity={0.85} />
+          <DieMesh meshRef={spinRightRef} dieId="right" color={dieColor} opacity={0.85} />
         </>
       ) : null}
       <p className="precision-phase-label">{PRECISION_PHASE_LABEL[phase]}</p>

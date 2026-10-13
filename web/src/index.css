@@ -523,6 +523,81 @@ body {
     0 0 0 0.5px rgba(var(--die-shade, 90, 40, 0), 0.28);
 }
 
+.die.is-midnight .die-face {
+  box-shadow: none;
+}
+
+.die.is-midnight .die-face::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background-image: linear-gradient(
+    105deg,
+    transparent 0%,
+    transparent 40%,
+    rgba(255, 255, 255, 0.08) 46%,
+    rgba(255, 255, 255, 0.72) 50%,
+    rgba(255, 255, 255, 0.08) 54%,
+    transparent 60%,
+    transparent 100%
+  );
+  background-size: 220% 100%;
+  background-repeat: no-repeat;
+  animation: die-midnight-shimmer var(--die-shimmer, 2400ms) linear infinite;
+}
+
+.die.is-midnight .die-face::after {
+  border: 0;
+  border-image: none;
+  /* Seam color runs light-to-dark along the edge. The mask keeps that gradient on the seam and feathers it in by --die-rim. */
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.2) 0%, #000 100%);
+  mask-image:
+    linear-gradient(to right, #000 0%, transparent var(--die-rim, 3%)),
+    linear-gradient(to left, #000 0%, transparent var(--die-rim, 3%)),
+    linear-gradient(to bottom, #000 0%, transparent var(--die-rim, 3%)),
+    linear-gradient(to top, #000 0%, transparent var(--die-rim, 3%));
+  mask-repeat: no-repeat;
+  mask-mode: alpha;
+  mask-composite: add, add, add;
+}
+
+@keyframes die-midnight-shimmer {
+  from {
+    background-position: 130% 0;
+  }
+  to {
+    background-position: -130% 0;
+  }
+}
+
+.die.is-midnight .die-pip {
+  background: radial-gradient(circle at 35% 32%, #3a3a3a 0%, #000 62%, #000 100%);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.22),
+    0 0 0 0.5px rgba(0, 0, 0, 0.55);
+}
+
+.die-mark {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--die-mark-scale, 0.6) * 100%);
+  height: calc(var(--die-mark-scale, 0.6) * 100%);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.die-mark svg,
+.die-mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
 .dice-result {
   position: absolute;
   left: 50%;

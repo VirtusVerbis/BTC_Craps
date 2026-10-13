@@ -5,7 +5,7 @@ import { BlockHeightService, type BlockState } from './data/blockHeight'
 import { MarketDataService, type MarketFeedUpdate } from './data/marketData'
 import { emptyCharacterPnl } from './ui/characterPnl'
 import { emptyBonusStakes, loadShooterBook } from './ui/shooterProfile'
-import { loadDieColor, nextDieColor, saveDieColor } from './ui/diceColor'
+import { loadDieColor, nextDieColor, saveDieColor, type DieColorId } from './ui/diceColor'
 import { emptyRollStreakView } from './ui/rollStreak'
 import { CrapsScene } from './ui/CrapsScene'
 import { Overlay } from './ui/Overlay'
@@ -164,6 +164,10 @@ function App() {
       saveDieColor(next)
       return next
     })
+  }, [])
+  const onDieColor = useCallback((color: DieColorId) => {
+    saveDieColor(color)
+    setDieColor(color)
   }, [])
   const [rolls, setRolls] = useState(loadHistogramRolls)
   useEffect(() => {
@@ -396,7 +400,12 @@ function App() {
               </button>
             </div>
           ) : null}
-          <DiceControlPanel settings={diceControl} onChange={onDiceControl} />
+          <DiceControlPanel
+            settings={diceControl}
+            onChange={onDiceControl}
+            dieColor={dieColor}
+            onDieColor={onDieColor}
+          />
           <DiceControlHistogram settings={diceControl} book={diceControlBook} />
           <aside className="repo-links-panel" aria-label="Source repositories">
           <div className="repo-link-lnurl" aria-label="LNURL address">

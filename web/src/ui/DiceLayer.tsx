@@ -1,6 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, type MutableRefObject, type Ref } from 'react'
-import { DIE_LAUNCH_SIZE_PX, PUCK_IMAGE_WIDTH_PX } from './diceConstants'
-import { dieFaceGradient, diePigment, dieShade, type DieColorId } from './diceColor'
+import {
+  DIE_LAUNCH_SIZE_PX,
+  DIE_MIDNIGHT_MARK_SCALE,
+  DIE_MIDNIGHT_RIM_FRACTION,
+  DIE_MIDNIGHT_SHIMMER_MS,
+  PUCK_IMAGE_WIDTH_PX,
+} from './diceConstants'
+import { dieFaceAlpha, dieFaceGradient, diePigment, dieShade, type DieColorId } from './diceColor'
+import { BitcoinMark, FawkesMark } from './diceMarks'
 import { paintDiceFrame, type DiceFrameApply, type DicePoseFrame } from './dicePose'
 import { puckPlacement } from './puckState'
 import type { DicePresentation } from './useDiceThrow'
@@ -48,23 +55,47 @@ const FACES: Array<{ name: string; value: number }> = [
   { name: 'bottom', value: 6 },
 ]
 
-const Face = ({ name, value, color }: { name: string; value: number; color: DieColorId }) => {
+type MidnightMark = 'bitcoin' | 'mask'
+
+const midnightMark = (color: DieColorId, dieId?: string): MidnightMark | null => {
+  if (color !== 'midnight') return null
+  return dieId === 'right' ? 'mask' : 'bitcoin'
+}
+
+const Face = ({
+  name,
+  value,
+  color,
+  mark,
+}: {
+  name: string
+  value: number
+  color: DieColorId
+  mark: MidnightMark | null
+}) => {
   const pigment = color === 'rainbow' ? null : diePigment(color, 0)
+  const showMark = value === 1 && mark != null
   return (
     <div
       className={`die-face die-face-${name}`}
       style={
         pigment
           ? {
-              backgroundImage: dieFaceGradient(pigment),
+              backgroundImage: dieFaceGradient(pigment, dieFaceAlpha(color)),
               ['--die-shade' as string]: dieShade(pigment),
             }
           : undefined
       }
     >
-      {PIP_LAYOUT[value].map(([x, y]) => (
-        <span key={`${name}-${x}-${y}`} className="die-pip" style={{ left: `${x}%`, top: `${y}%` }} />
-      ))}
+      {showMark ? (
+        <span className={`die-mark die-mark-${mark}`}>
+          {mark === 'mask' ? <FawkesMark /> : <BitcoinMark />}
+        </span>
+      ) : (
+        PIP_LAYOUT[value].map(([x, y]) => (
+          <span key={`${name}-${x}-${y}`} className="die-pip" style={{ left: `${x}%`, top: `${y}%` }} />
+        ))
+      )}
     </div>
   )
 }
@@ -79,32 +110,41 @@ export const DieMesh = ({
   opacity?: number
   meshRef?: Ref<HTMLDivElement>
   dieId?: string
-}) => (
-  <div
-    ref={meshRef}
-    className={color === 'rainbow' ? 'die is-rainbow' : 'die'}
-    data-die-id={dieId}
-    style={{
-      width: DIE_LAUNCH_SIZE_PX,
-      height: DIE_LAUNCH_SIZE_PX,
-      left: 0,
-      top: 0,
-      opacity,
-      ['--die-half' as string]: `${DIE_LAUNCH_SIZE_PX / 2}px`,
-    }}
-  >
-    <div className="die-spin">
-      {FACES.map((face) => (
-        <Face key={face.name} name={face.name} value={face.value} color={color} />
-      ))}
+}) => {
+  const mark = midnightMark(color, dieId)
+  const className = ['die', color === 'rainbow' ? 'is-rainbow' : '', color === 'midnight' ? 'is-midnight' : '']
+    .filter(Boolean)
+    .join(' ')
+  return (
+    <div
+      ref={meshRef}
+      className={className}
+      data-die-id={dieId}
+      style={{
+        width: DIE_LAUNCH_SIZE_PX,
+        height: DIE_LAUNCH_SIZE_PX,
+        left: 0,
+        top: 0,
+        opacity,
+        ['--die-half' as string]: `${DIE_LAUNCH_SIZE_PX / 2}px`,
+        ['--die-mark-scale' as string]: `${DIE_MIDNIGHT_MARK_SCALE}`,
+        ['--die-rim' as string]: `${DIE_MIDNIGHT_RIM_FRACTION * 100}%`,
+        ['--die-shimmer' as string]: `${DIE_MIDNIGHT_SHIMMER_MS}ms`,
+      }}
+    >
+      <div className="die-spin">
+        {FACES.map((face) => (
+          <Face key={face.name} name={face.name} value={face.value} color={color} mark={mark} />
+        ))}
+      </div>
     </div>
-  </div>
-)
+  )
+}
 
 export const DiceLayer = ({
   presentation,
   bonusLines = [],
-  dieColor = 'orange',
+  dieColor = 'midnight',
   applyRef,
 }: {
   presentation: DicePresentation
