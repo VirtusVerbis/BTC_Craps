@@ -275,8 +275,7 @@ body {
 }
 
 /* Above the P/L labels (3), under the dice (5), speech (6), meme (7), and candle chart (8). */
-.chip-presenter-host,
-.chip-stack {
+.chip-presenter-host {
   position: absolute;
   inset: 0;
   z-index: 4;
@@ -344,68 +343,6 @@ body {
   margin: 0;
   white-space: pre-wrap;
   overflow: hidden;
-}
-
-.chip {
-  position: absolute;
-  border-radius: 50%;
-}
-
-.chip-wall {
-  background: repeating-conic-gradient(var(--chip-spot) 0deg 16deg, var(--chip-edge) 16deg 72deg);
-}
-
-.chip-top {
-  background:
-    radial-gradient(circle closest-side at center, #d0d0d0 70%, transparent 70%),
-    repeating-conic-gradient(var(--chip-spot) 0deg 16deg, var(--chip-face) 16deg 72deg);
-}
-
-/* Inner circle is 70% of the face. The mark fills 80% of that circle on its tall side. */
-.chip-mark {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 42.56%;
-  height: 56%;
-  background: url("./ui/bitcoin-mark.svg") center / contain no-repeat;
-  pointer-events: none;
-}
-
-/* Sampled from the rack under the characters in craps-scene-layout_onepiece.png. */
-.chip-white {
-  --chip-highlight: #f4d3a0;
-  --chip-face: #e2c48a;
-  --chip-edge: #a8844c;
-  --chip-spot: #f7e6c4;
-}
-
-.chip-red {
-  --chip-highlight: #f1a082;
-  --chip-face: #9a2e18;
-  --chip-edge: #5c1408;
-  --chip-spot: #f2c9be;
-}
-
-.chip-green {
-  --chip-highlight: #b0c487;
-  --chip-face: #3a6824;
-  --chip-edge: #1e3a10;
-  --chip-spot: #8fb56a;
-}
-
-.chip-blue {
-  --chip-highlight: #c5ced4;
-  --chip-face: #2c5368;
-  --chip-edge: #0e2433;
-  --chip-spot: #8aa0ae;
-}
-
-.chip-black {
-  --chip-highlight: #9f8166;
-  --chip-face: #362112;
-  --chip-edge: #0c0804;
-  --chip-spot: #947458;
 }
 
 .puck {

@@ -25,8 +25,8 @@ import {
 import {
   CHIP_WEBGL_CYLINDER_SEGMENTS,
   CHIP_WEBGL_MAX_INSTANCES,
+  resolveChipCanvasDprCap,
 } from './chipWebglConstants'
-import { resolveChipCanvasDprCap } from './chipRendererMode'
 
 const COLORS: ChipColor[] = ['white', 'red', 'green', 'blue', 'black']
 
