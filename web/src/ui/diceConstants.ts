@@ -145,6 +145,9 @@ export const PRECISION_ANGLE_DRAG_PX = 8
 /** Movement below this, in stage pixels, does not commit a phase. */
 export const PRECISION_DRAG_MIN_PX = 12
 
+/** On-screen pixels the target reticle sits up-table from a drag. */
+export const PRECISION_RETICLE_LEAD_SCREEN_PX = 25
+
 /**
  * Over-the-top spin before `DIE_FORWARD_SPIN_SCALE`. Positive rolls the top toward the back wall.
  * Matches `GESTURE_BASE_SPIN`.
