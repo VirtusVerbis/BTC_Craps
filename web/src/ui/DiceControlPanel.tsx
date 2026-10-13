@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { diceControlCharts, type DiceControlBook, type DiceControlSettings } from './diceControl'
 import { DICE_SETS, diceSet, type DiceSetId } from './diceSets'
 import { DiceControlChart } from './DiceControlChart'
@@ -36,7 +36,7 @@ const SetSelect = ({
   </label>
 )
 
-export const DiceControlPanel = ({
+const DiceControlPanelInner = ({
   settings,
   onChange,
 }: {
@@ -106,7 +106,9 @@ export const DiceControlPanel = ({
   )
 }
 
-export const DiceControlHistogram = ({
+export const DiceControlPanel = memo(DiceControlPanelInner)
+
+const DiceControlHistogramInner = ({
   settings,
   book,
 }: {
@@ -170,3 +172,5 @@ export const DiceControlHistogram = ({
     </section>
   )
 }
+
+export const DiceControlHistogram = memo(DiceControlHistogramInner)

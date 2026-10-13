@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
+import { memo, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { BONUS_CIRCLE_COLOR, BONUS_CIRCLE_DIAMETER_PX, BONUS_CIRCLE_FLASH_MS } from './bonusConstants'
 import {
   HISTOGRAM_COLUMN_WIDTH_FRACTION,
@@ -22,7 +22,7 @@ interface RollHistogramProps {
   flashing: readonly number[]
 }
 
-export const RollHistogram = ({
+const RollHistogramInner = ({
   rolls,
   reveal,
   animate,
@@ -119,3 +119,5 @@ export const RollHistogram = ({
     </div>
   )
 }
+
+export const RollHistogram = memo(RollHistogramInner)

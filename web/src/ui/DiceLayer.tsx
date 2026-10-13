@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
-import { DIE_BACK_WALL_TILT_DEG, DIE_LAUNCH_TILT_DEG, PUCK_IMAGE_WIDTH_PX } from './diceConstants'
-import { dieFaceGradient, diePigment, dieRainbowStep, dieShade, type DieColorId } from './diceColor'
-import { formatShotClock } from './gestureThrow'
+import { useEffect, useLayoutEffect, useRef, type MutableRefObject, type Ref } from 'react'
+import { DIE_LAUNCH_SIZE_PX, PUCK_IMAGE_WIDTH_PX } from './diceConstants'
+import { dieFaceGradient, diePigment, dieShade, type DieColorId } from './diceColor'
+import { paintDiceFrame, type DiceFrameApply, type DicePoseFrame } from './dicePose'
 import { puckPlacement } from './puckState'
 import type { DicePresentation } from './useDiceThrow'
 
@@ -39,8 +39,6 @@ const PIP_LAYOUT: Record<number, Array<[number, number]>> = {
   ],
 }
 
-const viewTiltDeg = (depth: number) => DIE_LAUNCH_TILT_DEG + depth * (DIE_BACK_WALL_TILT_DEG - DIE_LAUNCH_TILT_DEG)
-
 const FACES: Array<{ name: string; value: number }> = [
   { name: 'front', value: 2 },
   { name: 'back', value: 5 },
@@ -50,45 +48,19 @@ const FACES: Array<{ name: string; value: number }> = [
   { name: 'bottom', value: 6 },
 ]
 
-export const useRainbowStep = (active: boolean) => {
-  const [step, setStep] = useState(0)
-
-  useEffect(() => {
-    if (!active) return undefined
-    const startedAt = performance.now()
-    let frame = 0
-    const tick = (now: number) => {
-      const next = dieRainbowStep(now - startedAt)
-      setStep((current) => (current === next ? current : next))
-      frame = window.requestAnimationFrame(tick)
-    }
-    setStep(0)
-    frame = window.requestAnimationFrame(tick)
-    return () => window.cancelAnimationFrame(frame)
-  }, [active])
-
-  return step
-}
-
-const Face = ({
-  name,
-  value,
-  color,
-  rainbowStep,
-}: {
-  name: string
-  value: number
-  color: DieColorId
-  rainbowStep: number
-}) => {
-  const pigment = diePigment(color, rainbowStep)
+const Face = ({ name, value, color }: { name: string; value: number; color: DieColorId }) => {
+  const pigment = color === 'rainbow' ? null : diePigment(color, 0)
   return (
     <div
       className={`die-face die-face-${name}`}
-      style={{
-        backgroundImage: dieFaceGradient(pigment),
-        ['--die-shade' as string]: dieShade(pigment),
-      }}
+      style={
+        pigment
+          ? {
+              backgroundImage: dieFaceGradient(pigment),
+              ['--die-shade' as string]: dieShade(pigment),
+            }
+          : undefined
+      }
     >
       {PIP_LAYOUT[value].map(([x, y]) => (
         <span key={`${name}-${x}-${y}`} className="die-pip" style={{ left: `${x}%`, top: `${y}%` }} />
@@ -98,38 +70,32 @@ const Face = ({
 }
 
 export const DieMesh = ({
-  x,
-  y,
-  size,
-  tiltDeg,
-  transform,
   color,
-  rainbowStep,
   opacity = 1,
+  meshRef,
+  dieId,
 }: {
-  x: number
-  y: number
-  size: number
-  tiltDeg: number
-  transform: string
   color: DieColorId
-  rainbowStep: number
   opacity?: number
+  meshRef?: Ref<HTMLDivElement>
+  dieId?: string
 }) => (
   <div
-    className="die"
+    ref={meshRef}
+    className={color === 'rainbow' ? 'die is-rainbow' : 'die'}
+    data-die-id={dieId}
     style={{
-      width: size,
-      height: size,
-      left: x - size / 2,
-      top: y - size / 2,
+      width: DIE_LAUNCH_SIZE_PX,
+      height: DIE_LAUNCH_SIZE_PX,
+      left: 0,
+      top: 0,
       opacity,
-      ['--die-half' as string]: `${size / 2}px`,
+      ['--die-half' as string]: `${DIE_LAUNCH_SIZE_PX / 2}px`,
     }}
   >
-    <div className="die-spin" style={{ transform: `rotateX(${tiltDeg}deg) ${transform}` }}>
+    <div className="die-spin">
       {FACES.map((face) => (
-        <Face key={face.name} name={face.name} value={face.value} color={color} rainbowStep={rainbowStep} />
+        <Face key={face.name} name={face.name} value={face.value} color={color} />
       ))}
     </div>
   </div>
@@ -139,17 +105,36 @@ export const DiceLayer = ({
   presentation,
   bonusLines = [],
   dieColor = 'orange',
+  applyRef,
 }: {
   presentation: DicePresentation
   bonusLines?: readonly string[]
   dieColor?: DieColorId
+  applyRef: MutableRefObject<DiceFrameApply | null>
 }) => {
-  const rainbowStep = useRainbowStep(dieColor === 'rainbow')
+  const rootRef = useRef<HTMLDivElement>(null)
+  const poseRef = useRef<DicePoseFrame | null>(null)
   const puck = puckPlacement(presentation.point)
   const result = presentation.result
+
+  useEffect(() => {
+    const apply: DiceFrameApply = (frame) => {
+      poseRef.current = frame
+      if (rootRef.current) paintDiceFrame(rootRef.current, frame)
+    }
+    applyRef.current = apply
+    return () => {
+      if (applyRef.current === apply) applyRef.current = null
+    }
+  }, [applyRef])
+
+  useLayoutEffect(() => {
+    if (rootRef.current && poseRef.current) paintDiceFrame(rootRef.current, poseRef.current)
+  })
+
   return (
     <>
-      <div className="dice-layer" data-die-color={dieColor} aria-hidden={result == null}>
+      <div ref={rootRef} className="dice-layer" data-die-color={dieColor} aria-hidden={result == null}>
         <img
           className="puck"
           src={puck.src}
@@ -158,26 +143,13 @@ export const DiceLayer = ({
           style={{ left: puck.x, top: puck.y, width: PUCK_IMAGE_WIDTH_PX * puck.scale }}
         />
         {presentation.dice.map((die) =>
-          die.visible ? (
-            <DieMesh
-              key={die.id}
-              x={die.x}
-              y={die.y}
-              size={die.size}
-              tiltDeg={viewTiltDeg(die.depth)}
-              transform={die.transform}
-              color={dieColor}
-              rainbowStep={rainbowStep}
-            />
-          ) : null,
+          die.visible ? <DieMesh key={die.id} dieId={die.id} color={dieColor} /> : null,
         )}
-      </div>
-      {presentation.shotClockMs != null ? (
-        <div className="shot-clock">
+        <div className="shot-clock" hidden>
           <div className="shot-clock-label">Shot Clock</div>
-          <div className="shot-clock-time">{formatShotClock(presentation.shotClockMs)}</div>
+          <div className="shot-clock-time" />
         </div>
-      ) : null}
+      </div>
       {result ? (
         <div className="dice-result">
           {'noRoll' in result ? (

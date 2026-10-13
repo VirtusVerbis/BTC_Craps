@@ -1,4 +1,4 @@
-import { type CSSProperties, type MutableRefObject } from 'react'
+import { memo, type CSSProperties, type MutableRefObject } from 'react'
 import { REFERENCE_HEIGHT, REFERENCE_WIDTH } from '../config/constants'
 import type { Candle } from '../data/candles'
 import {
@@ -20,7 +20,9 @@ import { BtcCandleChart } from './BtcCandleChart'
 import { formatPnlBtc, formatPnlUsd, pnlColor, PL_CHARACTERS, type CharacterPnlBook } from './characterPnl'
 import { PL_LABEL_ANCHOR, PL_LABEL_FONT_PX } from './characterPnlConstants'
 import { ChipGuideLayer } from './chips/ChipGuideLayer'
+import type { GuideFrameApply } from './chips/guidePresenter'
 import { ChipPresenterHost, type ChipFrameApply } from './chips/ChipPresenterHost'
+import type { DiceFrameApply } from './dicePose'
 import { DiceLayer } from './DiceLayer'
 import type { DieColorId } from './diceColor'
 import { SpeechLayer } from './SpeechLayer'
@@ -71,6 +73,8 @@ interface CrapsSceneProps {
   fg3Height: number
   dice: DicePresentation | null
   chipApplyRef: MutableRefObject<ChipFrameApply | null>
+  diceApplyRef: MutableRefObject<DiceFrameApply | null>
+  guideApplyRef: MutableRefObject<GuideFrameApply | null>
   characterPnl: CharacterPnlBook
   rolls: readonly number[]
   histogramReveal: number
@@ -82,7 +86,7 @@ interface CrapsSceneProps {
   dieColor: DieColorId
 }
 
-export const CrapsScene = ({
+const CrapsSceneInner = ({
   showCandleChart,
   showBg2Meme,
   bg2ActiveMeme,
@@ -96,6 +100,8 @@ export const CrapsScene = ({
   fg3Height,
   dice,
   chipApplyRef,
+  diceApplyRef,
+  guideApplyRef,
   characterPnl,
   rolls,
   histogramReveal,
@@ -216,11 +222,13 @@ export const CrapsScene = ({
         />
       ) : null}
       <ChipPresenterHost applyRef={chipApplyRef} />
-      <ChipGuideLayer guides={dice?.guides ?? []} />
+      <ChipGuideLayer applyRef={guideApplyRef} />
       <SpeechLayer speech={dice?.speech ?? []} />
       {dice ? (
-        <DiceLayer presentation={dice} bonusLines={bonusLines} dieColor={dieColor} />
+        <DiceLayer presentation={dice} bonusLines={bonusLines} dieColor={dieColor} applyRef={diceApplyRef} />
       ) : null}
     </div>
   )
 }
+
+export const CrapsScene = memo(CrapsSceneInner)

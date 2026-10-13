@@ -419,9 +419,16 @@ body {
 .die {
   position: absolute;
   z-index: 11;
+  left: 0;
+  top: 0;
+  transform-origin: center center;
   transform-style: preserve-3d;
   perspective: 1600px;
   perspective-origin: center;
+}
+
+.die:not([data-posed]) {
+  visibility: hidden;
 }
 
 .die-spin {
@@ -479,6 +486,92 @@ body {
   transform: rotateX(-90deg) translateZ(calc(var(--die-half, 40px)));
 }
 
+/* 50ms per color, seven ROLL_STREAK_COLORS. steps(7) holds each stop for one step. */
+.die.is-rainbow .die-face {
+  background-image: linear-gradient(
+    180deg,
+    var(--die-light, rgba(255, 122, 114, 0.65)) 0%,
+    var(--die-mid, rgba(255, 59, 48, 0.65)) 46%,
+    var(--die-dark, rgba(168, 39, 32, 0.65)) 100%
+  );
+  animation: die-rainbow-pigment 350ms steps(7, end) infinite;
+}
+
+@keyframes die-rainbow-pigment {
+  0% {
+    --die-light: rgba(255, 122, 114, 0.65);
+    --die-mid: rgba(255, 59, 48, 0.65);
+    --die-dark: rgba(168, 39, 32, 0.65);
+    --die-shade: 168, 39, 32;
+  }
+  14.285714% {
+    --die-light: rgba(255, 183, 82, 0.65);
+    --die-mid: rgba(255, 149, 0, 0.65);
+    --die-dark: rgba(168, 98, 0, 0.65);
+    --die-shade: 168, 98, 0;
+  }
+  28.571429% {
+    --die-light: rgba(255, 220, 82, 0.65);
+    --die-mid: rgba(255, 204, 0, 0.65);
+    --die-dark: rgba(168, 135, 0, 0.65);
+    --die-shade: 168, 135, 0;
+  }
+  42.857143% {
+    --die-light: rgba(117, 217, 142, 0.65);
+    --die-mid: rgba(52, 199, 89, 0.65);
+    --die-dark: rgba(34, 131, 59, 0.65);
+    --die-shade: 34, 131, 59;
+  }
+  57.142857% {
+    --die-light: rgba(116, 199, 238, 0.65);
+    --die-mid: rgba(50, 173, 230, 0.65);
+    --die-dark: rgba(33, 114, 152, 0.65);
+    --die-shade: 33, 114, 152;
+  }
+  71.428571% {
+    --die-light: rgba(141, 140, 227, 0.65);
+    --die-mid: rgba(88, 86, 214, 0.65);
+    --die-dark: rgba(58, 57, 141, 0.65);
+    --die-shade: 58, 57, 141;
+  }
+  85.714286%,
+  100% {
+    --die-light: rgba(201, 137, 233, 0.65);
+    --die-mid: rgba(175, 82, 222, 0.65);
+    --die-dark: rgba(116, 54, 147, 0.65);
+    --die-shade: 116, 54, 147;
+  }
+}
+
+.rainbow-letter {
+  animation: roll-streak-rainbow 350ms steps(7, end) infinite;
+}
+
+@keyframes roll-streak-rainbow {
+  0% {
+    color: #ff3b30;
+  }
+  14.285714% {
+    color: #ff9500;
+  }
+  28.571429% {
+    color: #ffcc00;
+  }
+  42.857143% {
+    color: #34c759;
+  }
+  57.142857% {
+    color: #32ade6;
+  }
+  71.428571% {
+    color: #5856d6;
+  }
+  85.714286%,
+  100% {
+    color: #af52de;
+  }
+}
+
 .die-pip {
   position: absolute;
   z-index: 2;
@@ -531,6 +624,11 @@ body {
     0 2px 0 rgba(0, 0, 0, 0.95),
     0 4px 10px rgba(0, 0, 0, 0.95),
     0 0 16px rgba(0, 0, 0, 0.85);
+}
+
+/* `display: flex` above beats the browser's `[hidden]` rule, which left the label up. */
+.shot-clock[hidden] {
+  display: none;
 }
 
 .shot-clock-label {

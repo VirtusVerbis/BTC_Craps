@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, type MutableRefObject } from 'react'
 import { REFERENCE_HEIGHT, REFERENCE_WIDTH } from '../config/constants'
 import {
   DIE_ARC_LIFT_HEIGHT_PX,
@@ -13,7 +13,8 @@ import {
   PRECISION_SPIN_PREVIEW_PX,
 } from './diceConstants'
 import type { DieColorId } from './diceColor'
-import { DieMesh, useRainbowStep } from './DiceLayer'
+import { DieMesh } from './DiceLayer'
+import { paintDie, type LaunchPoint } from './dicePose'
 import {
   aimMetrics,
   arrowTip,
@@ -90,7 +91,7 @@ export const PrecisionOverlay = ({
   target,
   angle,
   spin,
-  launch,
+  launchPointRef,
   dieColor,
   onOk,
 }: {
@@ -99,53 +100,80 @@ export const PrecisionOverlay = ({
   target: StagePoint
   angle: number
   spin: number
-  launch: StagePoint
+  launchPointRef: MutableRefObject<LaunchPoint>
   dieColor: DieColorId
   onOk: () => void
 }) => {
-  const rainbowStep = useRainbowStep(active && dieColor === 'rainbow')
-  const [ghostT, setGhostT] = useState(0)
-  const [spinDeg, setSpinDeg] = useState(0)
   const spinDegRef = useRef(0)
+  const arcPathRef = useRef<SVGPathElement>(null)
+  const ghostLeftRef = useRef<HTMLDivElement>(null)
+  const ghostRightRef = useRef<HTMLDivElement>(null)
+  const spinLeftRef = useRef<HTMLDivElement>(null)
+  const spinRightRef = useRef<HTMLDivElement>(null)
+  const targetRef = useRef(target)
+  const angleRef = useRef(angle)
+  const spinRef = useRef(spin)
+  const phaseRef = useRef(phase)
+  targetRef.current = target
+  angleRef.current = angle
+  spinRef.current = spin
+  phaseRef.current = phase
   const showArc = active && (phase === 'target' || phase === 'trajectory')
   const showSpin = active && phase === 'spin'
 
-  useEffect(() => {
-    if (!showArc) return undefined
-    const started = performance.now()
-    let frame = 0
-    const tick = (now: number) => {
-      setGhostT(((now - started) % PRECISION_GHOST_LOOP_MS) / PRECISION_GHOST_LOOP_MS)
-      frame = window.requestAnimationFrame(tick)
+  const paintRef = useRef<(now: number, started: number, last: { current: number }) => void>(() => {})
+  paintRef.current = (now: number, started: number, last: { current: number }) => {
+    const phaseNow = phaseRef.current
+    const arcOn = phaseNow === 'target' || phaseNow === 'trajectory'
+    const spinOn = phaseNow === 'spin'
+    const dt = Math.max(0, (now - last.current) / 1000)
+    last.current = now
+    if (arcOn || spinOn) {
+      spinDegRef.current += spinRef.current * DIE_FORWARD_SPIN_SCALE * dt * RAD_TO_DEG
     }
-    frame = window.requestAnimationFrame(tick)
-    return () => window.cancelAnimationFrame(frame)
-  }, [showArc])
+    const tilt = DIE_LAUNCH_TILT_DEG + (arcOn || spinOn ? spinDegRef.current : 0)
+    if (arcOn) {
+      const launch = launchPointRef.current
+      const arc = precisionArc(launch, targetRef.current, angleRef.current)
+      const tip = arrowTip(arc)
+      arcPathRef.current?.setAttribute(
+        'd',
+        `M ${arc.start.x} ${arc.start.y} Q ${arc.control.x} ${arc.control.y} ${tip.x} ${tip.y}`,
+      )
+      const ghostT = ((now - started) % PRECISION_GHOST_LOOP_MS) / PRECISION_GHOST_LOOP_MS
+      const ghost = bezierPoint(arc, ghostT)
+      const size = ghostSize(arc.start.y, arc.end.y, ghost.y, ghostT)
+      paintDie(ghostLeftRef.current, ghost.x - size * 0.55, ghost.y, size, tilt)
+      paintDie(ghostRightRef.current, ghost.x + size * 0.55, ghost.y, size, tilt)
+    }
+    if (spinOn) {
+      const metrics = aimMetrics()
+      const previewY = metrics.wallBottom + 180
+      paintDie(spinLeftRef.current, metrics.width / 2 - PRECISION_SPIN_PREVIEW_PX * 0.55, previewY, PRECISION_SPIN_PREVIEW_PX, tilt)
+      paintDie(spinRightRef.current, metrics.width / 2 + PRECISION_SPIN_PREVIEW_PX * 0.55, previewY, PRECISION_SPIN_PREVIEW_PX, tilt)
+    }
+  }
+
+  useLayoutEffect(() => {
+    if (!active) return
+    const last = { current: performance.now() }
+    paintRef.current(performance.now(), performance.now(), last)
+  })
 
   useEffect(() => {
-    if (!showSpin && !showArc) return undefined
-    let last = performance.now()
+    if (!active) return undefined
+    const started = performance.now()
+    const last = { current: started }
     let frame = 0
     const tick = (now: number) => {
-      const dt = (now - last) / 1000
-      last = now
-      spinDegRef.current += spin * DIE_FORWARD_SPIN_SCALE * dt * RAD_TO_DEG
-      setSpinDeg(spinDegRef.current)
+      paintRef.current(now, started, last)
       frame = window.requestAnimationFrame(tick)
     }
     frame = window.requestAnimationFrame(tick)
     return () => window.cancelAnimationFrame(frame)
-  }, [showArc, showSpin, spin])
+  }, [active])
 
   if (!active) return null
-
-  const arc = precisionArc(launch, target, angle)
-  const tip = arrowTip(arc)
-  const ghost = bezierPoint(arc, ghostT)
-  const size = ghostSize(arc.start.y, arc.end.y, ghost.y, ghostT)
-  const metrics = aimMetrics()
-  const previewY = metrics.wallBottom + 180
-  const tilt = DIE_LAUNCH_TILT_DEG + (showSpin || showArc ? spinDeg : 0)
 
   return (
     <div className="precision-overlay">
@@ -157,7 +185,7 @@ export const PrecisionOverlay = ({
             </marker>
           </defs>
           <path
-            d={`M ${arc.start.x} ${arc.start.y} Q ${arc.control.x} ${arc.control.y} ${tip.x} ${tip.y}`}
+            ref={arcPathRef}
             fill="none"
             stroke={PRECISION_AIM_COLOR}
             strokeWidth={PRECISION_AIM_THICKNESS_PX}
@@ -168,26 +196,8 @@ export const PrecisionOverlay = ({
       ) : null}
       {showArc ? (
         <>
-          <DieMesh
-            x={ghost.x - size * 0.55}
-            y={ghost.y}
-            size={size}
-            tiltDeg={tilt}
-            transform=""
-            color={dieColor}
-            rainbowStep={rainbowStep}
-            opacity={0.5}
-          />
-          <DieMesh
-            x={ghost.x + size * 0.55}
-            y={ghost.y}
-            size={size}
-            tiltDeg={tilt}
-            transform=""
-            color={dieColor}
-            rainbowStep={rainbowStep}
-            opacity={0.5}
-          />
+          <DieMesh meshRef={ghostLeftRef} color={dieColor} opacity={0.5} />
+          <DieMesh meshRef={ghostRightRef} color={dieColor} opacity={0.5} />
           <svg
             className="precision-reticle"
             viewBox="0 0 64 64"
@@ -210,26 +220,8 @@ export const PrecisionOverlay = ({
       {phase === 'trajectory' ? <AngleGauge angle={angle} /> : null}
       {showSpin ? (
         <>
-          <DieMesh
-            x={metrics.width / 2 - PRECISION_SPIN_PREVIEW_PX * 0.55}
-            y={previewY}
-            size={PRECISION_SPIN_PREVIEW_PX}
-            tiltDeg={tilt}
-            transform=""
-            color={dieColor}
-            rainbowStep={rainbowStep}
-            opacity={0.85}
-          />
-          <DieMesh
-            x={metrics.width / 2 + PRECISION_SPIN_PREVIEW_PX * 0.55}
-            y={previewY}
-            size={PRECISION_SPIN_PREVIEW_PX}
-            tiltDeg={tilt}
-            transform=""
-            color={dieColor}
-            rainbowStep={rainbowStep}
-            opacity={0.85}
-          />
+          <DieMesh meshRef={spinLeftRef} color={dieColor} opacity={0.85} />
+          <DieMesh meshRef={spinRightRef} color={dieColor} opacity={0.85} />
         </>
       ) : null}
       <p className="precision-phase-label">{PRECISION_PHASE_LABEL[phase]}</p>

@@ -21,10 +21,8 @@ import {
   type ShooterBook,
 } from './shooterProfile'
 import {
-  ROLL_STREAK_COLORS,
+  ROLL_STREAK_COLOR_STEP_MS,
   formatRollStreak,
-  rollStreakColorIndex,
-  rollStreakColorStep,
   rollStreakNeedsRainbow,
   type RollStreakView,
 } from './rollStreak'
@@ -46,37 +44,18 @@ interface OverlayProps {
 
 const RollStreakLabel = ({ view }: { view: RollStreakView }) => {
   const rainbow = rollStreakNeedsRainbow(view.current)
-  const [step, setStep] = useState(0)
   const text = formatRollStreak(view.current, view.longest)
-
-  useEffect(() => {
-    if (!rainbow) return undefined
-    const startedAt = performance.now()
-    let frame = 0
-    const tick = (now: number) => {
-      const next = rollStreakColorStep(now - startedAt)
-      setStep((current) => (current === next ? current : next))
-      frame = window.requestAnimationFrame(tick)
-    }
-    setStep(0)
-    frame = window.requestAnimationFrame(tick)
-    return () => window.cancelAnimationFrame(frame)
-  }, [rainbow])
 
   return (
     <p
-      className={rainbow ? 'shooter-hud shooter-hud-pnl roll-streak' : 'shooter-hud roll-streak'}
+      className={rainbow ? 'shooter-hud shooter-hud-pnl roll-streak is-rainbow' : 'shooter-hud roll-streak'}
       style={{ fontSize: `${OI_LABEL_FONT_REM}rem` }}
     >
       {text.split('').map((char, index) => (
         <span
           key={`${text.length}-${index}`}
-          className="roll-streak-char"
-          style={
-            rainbow
-              ? { color: ROLL_STREAK_COLORS[rollStreakColorIndex(index, step, ROLL_STREAK_COLORS.length)] }
-              : undefined
-          }
+          className={rainbow ? 'roll-streak-char rainbow-letter' : 'roll-streak-char'}
+          style={rainbow ? { animationDelay: `${-index * ROLL_STREAK_COLOR_STEP_MS}ms` } : undefined}
         >
           {char}
         </span>

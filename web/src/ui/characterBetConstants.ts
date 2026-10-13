@@ -161,7 +161,7 @@ export const OLD_MAN_IRON_5_X = 330
 export const OLD_MAN_IRON_5_Y = 1500
 
 export const OLD_MAN_FIELD_X = 700
-export const OLD_MAN_FIELD_Y = 920
+export const OLD_MAN_FIELD_Y = 1000
 
 //WOLF
 

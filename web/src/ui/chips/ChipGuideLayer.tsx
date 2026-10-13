@@ -1,27 +1,25 @@
-import { BET_STACK_GUIDES_ON, STACK_GUIDE_FONT_PX } from '../characterBetConstants'
-import type { StackGuideView } from '../chipPhysics'
+import { memo, useEffect, useRef, type MutableRefObject } from 'react'
+import { GuidePresenter, type GuideFrameApply } from './guidePresenter'
 
-export const ChipGuideLayer = ({ guides }: { guides: readonly StackGuideView[] }) => {
-  if (!BET_STACK_GUIDES_ON || guides.length === 0) return null
-  return (
-    <div className="chip-guide-layer" aria-hidden>
-      {guides.map((guide) => (
-        <div
-          key={guide.label}
-          className="stack-guide"
-          style={{
-            left: guide.left,
-            top: guide.top,
-            width: guide.width,
-            height: guide.height,
-            borderColor: guide.color,
-            color: guide.color,
-            fontSize: STACK_GUIDE_FONT_PX,
-          }}
-        >
-          <span className="stack-guide-caption">{guide.label}</span>
-        </div>
-      ))}
-    </div>
-  )
+interface ChipGuideLayerProps {
+  applyRef: MutableRefObject<GuideFrameApply | null>
 }
+
+const ChipGuideLayerInner = ({ applyRef }: ChipGuideLayerProps) => {
+  const mountRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const mount = mountRef.current
+    if (!mount) return undefined
+    const presenter = new GuidePresenter(mount)
+    applyRef.current = (guides) => presenter.apply(guides)
+    return () => {
+      if (applyRef.current) applyRef.current = null
+      presenter.dispose()
+    }
+  }, [applyRef])
+
+  return <div ref={mountRef} className="chip-guide-layer" aria-hidden />
+}
+
+export const ChipGuideLayer = memo(ChipGuideLayerInner)

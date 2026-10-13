@@ -18,6 +18,8 @@ import {
   type CharacterPnlBook,
 } from './characterPnl'
 import { SPEECH_SHOW_MS } from './characterBetConstants'
+import { diceLaunchPoint, type DiceFrameApply, type LaunchPoint } from './dicePose'
+import type { GuideFrameApply } from './chips/guidePresenter'
 import type { ProfileBet } from './characterProfiles'
 import { composeTableBets, type PointHand } from './characterProfiles'
 import { isHardRoll } from './crapsPayouts'
@@ -235,6 +237,9 @@ export const useDiceThrow = (
   onDiceControlRoll?: (roll: DiceControlRoll) => void,
   precisionShotRef?: RefObject<Omit<PrecisionThrow, 'speed' | 'lean'> | null>,
   chipApplyRef?: MutableRefObject<ChipFrameApply | null>,
+  diceApplyRef?: MutableRefObject<DiceFrameApply | null>,
+  guideApplyRef?: MutableRefObject<GuideFrameApply | null>,
+  launchPointRef?: MutableRefObject<LaunchPoint>,
 ): DicePresentation | null => {
   const oi = useOpenInterest()
   const volume = useDiceVolumeWindow(market)
@@ -535,7 +540,6 @@ export const useDiceThrow = (
       if (worldRef.current?.restack) worldRef.current = tickRestack(worldRef.current, now)
       const chips = worldRef.current ? presentChips(worldRef.current, now, metrics) : []
       const guides = worldRef.current ? guideFrames(worldRef.current, metrics) : []
-      chipApplyRef?.current?.(chips)
       const next = present(
         stateRef.current,
         chips,
@@ -548,6 +552,10 @@ export const useDiceThrow = (
         now,
         displayRef.current,
       )
+      chipApplyRef?.current?.(chips)
+      if (launchPointRef) launchPointRef.current = diceLaunchPoint(next.dice)
+      diceApplyRef?.current?.({ dice: next.dice, shotClockMs: next.shotClockMs })
+      guideApplyRef?.current?.(guides)
       setPresentation((prev) => {
         if (prev && !dicePresentationReactChanged(prev, next)) return prev
         return { ...next, chips: [] }
@@ -558,8 +566,10 @@ export const useDiceThrow = (
     return () => {
       window.cancelAnimationFrame(frame)
       chipApplyRef?.current?.([])
+      diceApplyRef?.current?.({ dice: [], shotClockMs: null })
+      guideApplyRef?.current?.([])
     }
-  }, [chipApplyRef, enabled, streakView])
+  }, [chipApplyRef, diceApplyRef, enabled, guideApplyRef, launchPointRef, streakView])
 
   if (!enabled) return null
   return presentation

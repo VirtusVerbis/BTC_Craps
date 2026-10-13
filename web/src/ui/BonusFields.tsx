@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { REFERENCE_WIDTH } from '../config/constants'
 import {
   BONUS_ALL_X,
@@ -29,7 +30,7 @@ const FIELDS = [
   { id: 'tall', name: 'A_TAL', odds: '30-1', x: BONUS_TALL_X, y: BONUS_TALL_Y },
 ] as const
 
-export const BonusFields = () => {
+const BonusFieldsInner = () => {
   const fontPx = BONUS_FIELD_FONT_PX
   const radiusPx = BONUS_FIELD_SIZE_PX * BONUS_FIELD_RADIUS_RATIO
   return (
@@ -55,3 +56,5 @@ export const BonusFields = () => {
     </div>
   )
 }
+
+export const BonusFields = memo(BonusFieldsInner)

@@ -2,6 +2,11 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 export default defineConfig({
     plugins: [react()],
+    resolve: {
+        // Stale `web/src/**/*.js` twins sit beside the TypeScript sources.
+        // Vite's default order resolves `.js` first, which hid the chip presenter.
+        extensions: ['.mjs', '.mts', '.tsx', '.ts', '.jsx', '.js', '.json'],
+    },
     server: {
         proxy: {
             '/binance-api': {
