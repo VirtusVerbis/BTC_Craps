@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { diceControlCharts, type DiceControlBook, type DiceControlSettings } from './diceControl'
+import { DIE_COLOR_LABELS, DIE_COLOR_ORDER, type DieColorId } from './diceColor'
 import { DICE_SETS, diceSet, type DiceSetId } from './diceSets'
 import { DiceControlChart } from './DiceControlChart'
 
@@ -36,12 +37,16 @@ const SetSelect = ({
   </label>
 )
 
-export const DiceControlPanel = ({
+const DiceControlPanelInner = ({
   settings,
   onChange,
+  dieColor,
+  onDieColor,
 }: {
   settings: DiceControlSettings
   onChange: (patch: Partial<DiceControlSettings>) => void
+  dieColor: DieColorId
+  onDieColor: (color: DieColorId) => void
 }) => {
   const [open, setOpen] = useState(false)
   const [referencesOpen, setReferencesOpen] = useState(false)
@@ -79,6 +84,20 @@ export const DiceControlPanel = ({
             <span>Dice Stacking</span>
             <span>{settings.stacked ? 'On' : 'Off'}</span>
           </button>
+          <label className="dice-control-field" htmlFor="dice-control-color">
+            <span>Dice Color</span>
+            <select
+              id="dice-control-color"
+              value={dieColor}
+              onChange={(event) => onDieColor(event.target.value as DieColorId)}
+            >
+              {DIE_COLOR_ORDER.map((id) => (
+                <option key={id} value={id}>
+                  {DIE_COLOR_LABELS[id]}
+                </option>
+              ))}
+            </select>
+          </label>
           <div className="dice-control-references">
             <button
               className="dice-control-references-toggle"
@@ -106,7 +125,9 @@ export const DiceControlPanel = ({
   )
 }
 
-export const DiceControlHistogram = ({
+export const DiceControlPanel = memo(DiceControlPanelInner)
+
+const DiceControlHistogramInner = ({
   settings,
   book,
 }: {
@@ -170,3 +191,5 @@ export const DiceControlHistogram = ({
     </section>
   )
 }
+
+export const DiceControlHistogram = memo(DiceControlHistogramInner)

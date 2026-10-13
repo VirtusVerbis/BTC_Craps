@@ -1,15 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState, type Ref } from 'react'
+import { ROLL_STREAK_COLOR_STEP_MS } from './rollStreak'
 import {
   LIQ_LABEL_Y,
   LIQ_TICKER_FONT_PX,
   LIQ_TICKER_HEIGHT_PX,
   LIQ_TICKER_SPEED_PX_PER_SEC,
 } from './overlayConstants'
-import {
-  ROLL_STREAK_COLORS,
-  rollStreakColorIndex,
-  rollStreakColorStep,
-} from './rollStreak'
 import { HOT_SHOOTER_MS, HOT_SHOOTER_TEXT, openHotShooterGate, stepHotShooterGate, type HotShooterGate } from './hotShooter'
 import { tickerPass, type TickerPass } from './tickerPass'
 
@@ -18,19 +14,14 @@ const BOX_FIRST_MS = 400
 
 const RainbowPhrase = ({
   text,
-  step,
   phraseRef,
 }: {
   text: string
-  step: number
   phraseRef?: Ref<HTMLSpanElement>
 }) => (
   <span ref={phraseRef} className="liq-ticker-phrase">
     {Array.from(text).map((char, index) => (
-      <span
-        key={index}
-        style={{ color: ROLL_STREAK_COLORS[rollStreakColorIndex(index, step, ROLL_STREAK_COLORS.length)] }}
-      >
+      <span key={index} className="rainbow-letter" style={{ animationDelay: `${-index * ROLL_STREAK_COLOR_STEP_MS}ms` }}>
         {char}
       </span>
     ))}
@@ -40,7 +31,6 @@ const RainbowPhrase = ({
 const HotShooterPass = ({ onDone }: { onDone: () => void }) => {
   const [scrolling, setScrolling] = useState(false)
   const [pass, setPass] = useState<TickerPass | null>(null)
-  const [step, setStep] = useState(0)
   const finishAfterPass = useRef(false)
   const boxRef = useRef<HTMLDivElement>(null)
   const phraseRef = useRef<HTMLSpanElement>(null)
@@ -72,18 +62,6 @@ const HotShooterPass = ({ onDone }: { onDone: () => void }) => {
     return () => window.clearTimeout(id)
   }, [scrolling])
 
-  useEffect(() => {
-    const startedAt = performance.now()
-    let frame = 0
-    const tick = (now: number) => {
-      const next = rollStreakColorStep(now - startedAt)
-      setStep((current) => (current === next ? current : next))
-      frame = window.requestAnimationFrame(tick)
-    }
-    frame = window.requestAnimationFrame(tick)
-    return () => window.cancelAnimationFrame(frame)
-  }, [])
-
   const finishPass = () => {
     if (!finishAfterPass.current) return
     finishAfterPass.current = false
@@ -109,7 +87,7 @@ const HotShooterPass = ({ onDone }: { onDone: () => void }) => {
         }}
         onAnimationIteration={finishPass}
       >
-        <RainbowPhrase text={HOT_SHOOTER_TEXT} step={step} phraseRef={phraseRef} />
+        <RainbowPhrase text={HOT_SHOOTER_TEXT} phraseRef={phraseRef} />
       </div>
     </div>
   )

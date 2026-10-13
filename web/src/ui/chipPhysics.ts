@@ -488,8 +488,8 @@ const bounceOffPuck = (
   puck: PuckObstacle,
 ): { x: number; z: number; vx: number; vz: number } | null => {
   if (h >= PUCK_COLLISION_HEIGHT_PX) return null
-  let dx = x - puck.x
-  let dz = z - puck.z
+  const dx = x - puck.x
+  const dz = z - puck.z
   let dist = Math.hypot(dx, dz)
   const minDist = bodyRadius + puck.radius
   if (dist >= minDist) return null

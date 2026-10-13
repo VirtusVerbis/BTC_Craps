@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MutableRefObject,
+  type RefObject,
+} from 'react'
 import type { MarketSnapshot } from '../game/types'
 import { useOpenInterest } from '../data/openInterest'
 import {
@@ -10,6 +18,8 @@ import {
   type CharacterPnlBook,
 } from './characterPnl'
 import { SPEECH_SHOW_MS } from './characterBetConstants'
+import { diceLaunchPoint, type DiceFrameApply, type LaunchPoint } from './dicePose'
+import type { GuideFrameApply } from './chips/guidePresenter'
 import type { ProfileBet } from './characterProfiles'
 import { composeTableBets, type PointHand } from './characterProfiles'
 import { isHardRoll } from './crapsPayouts'
@@ -58,6 +68,8 @@ import { DEFAULT_DICE_CONTROL, holdFor, type DiceControlRoll, type DiceControlSe
 import type { GestureStroke } from './gestureThrow'
 import type { PrecisionThrow } from './precisionAim'
 import type { ChipCharacter } from './chipConstants'
+import type { ChipFrameApply } from './chips/ChipPresenterHost'
+import { dicePresentationReactChanged } from './chips/presentationReactUpdate'
 import { useDiceVolumeWindow } from './useDiceVolumeWindow'
 import { emptyBonusHand, type BonusHand } from './bonusCraps'
 import {
@@ -224,6 +236,10 @@ export const useDiceThrow = (
   diceControlRef?: RefObject<DiceControlSettings>,
   onDiceControlRoll?: (roll: DiceControlRoll) => void,
   precisionShotRef?: RefObject<Omit<PrecisionThrow, 'speed' | 'lean'> | null>,
+  chipApplyRef?: MutableRefObject<ChipFrameApply | null>,
+  diceApplyRef?: MutableRefObject<DiceFrameApply | null>,
+  guideApplyRef?: MutableRefObject<GuideFrameApply | null>,
+  launchPointRef?: MutableRefObject<LaunchPoint>,
 ): DicePresentation | null => {
   const oi = useOpenInterest()
   const volume = useDiceVolumeWindow(market)
@@ -524,25 +540,36 @@ export const useDiceThrow = (
       if (worldRef.current?.restack) worldRef.current = tickRestack(worldRef.current, now)
       const chips = worldRef.current ? presentChips(worldRef.current, now, metrics) : []
       const guides = worldRef.current ? guideFrames(worldRef.current, metrics) : []
-      setPresentation(
-        present(
-          stateRef.current,
-          chips,
-          guides,
-          liveSpeech(speechRef.current, now),
-          pnlRef.current,
-          shooterRef.current,
-          bonusStakeDollars(betsRef.current),
-          streakView(),
-          now,
-          displayRef.current,
-        ),
+      const next = present(
+        stateRef.current,
+        chips,
+        guides,
+        liveSpeech(speechRef.current, now),
+        pnlRef.current,
+        shooterRef.current,
+        bonusStakeDollars(betsRef.current),
+        streakView(),
+        now,
+        displayRef.current,
       )
+      chipApplyRef?.current?.(chips)
+      if (launchPointRef) launchPointRef.current = diceLaunchPoint(next.dice)
+      diceApplyRef?.current?.({ dice: next.dice, shotClockMs: next.shotClockMs })
+      guideApplyRef?.current?.(guides)
+      setPresentation((prev) => {
+        if (prev && !dicePresentationReactChanged(prev, next)) return prev
+        return { ...next, chips: [] }
+      })
       frame = window.requestAnimationFrame(loop)
     }
     frame = window.requestAnimationFrame(loop)
-    return () => window.cancelAnimationFrame(frame)
-  }, [enabled, streakView])
+    return () => {
+      window.cancelAnimationFrame(frame)
+      chipApplyRef?.current?.([])
+      diceApplyRef?.current?.({ dice: [], shotClockMs: null })
+      guideApplyRef?.current?.([])
+    }
+  }, [chipApplyRef, diceApplyRef, enabled, guideApplyRef, launchPointRef, streakView])
 
   if (!enabled) return null
   return presentation

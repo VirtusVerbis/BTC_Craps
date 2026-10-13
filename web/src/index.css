@@ -275,10 +275,24 @@ body {
 }
 
 /* Above the P/L labels (3), under the dice (5), speech (6), meme (7), and candle chart (8). */
-.chip-stack {
+.chip-presenter-host {
   position: absolute;
   inset: 0;
   z-index: 4;
+  pointer-events: none;
+}
+
+.chip-guide-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.chip-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
   pointer-events: none;
 }
 
@@ -331,68 +345,6 @@ body {
   overflow: hidden;
 }
 
-.chip {
-  position: absolute;
-  border-radius: 50%;
-}
-
-.chip-wall {
-  background: repeating-conic-gradient(var(--chip-spot) 0deg 16deg, var(--chip-edge) 16deg 72deg);
-}
-
-.chip-top {
-  background:
-    radial-gradient(circle closest-side at center, #d0d0d0 70%, transparent 70%),
-    repeating-conic-gradient(var(--chip-spot) 0deg 16deg, var(--chip-face) 16deg 72deg);
-}
-
-/* Inner circle is 70% of the face. The mark fills 80% of that circle on its tall side. */
-.chip-mark {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 42.56%;
-  height: 56%;
-  background: url("./ui/bitcoin-mark.svg") center / contain no-repeat;
-  pointer-events: none;
-}
-
-/* Sampled from the rack under the characters in craps-scene-layout_onepiece.png. */
-.chip-white {
-  --chip-highlight: #f4d3a0;
-  --chip-face: #e2c48a;
-  --chip-edge: #a8844c;
-  --chip-spot: #f7e6c4;
-}
-
-.chip-red {
-  --chip-highlight: #f1a082;
-  --chip-face: #9a2e18;
-  --chip-edge: #5c1408;
-  --chip-spot: #f2c9be;
-}
-
-.chip-green {
-  --chip-highlight: #b0c487;
-  --chip-face: #3a6824;
-  --chip-edge: #1e3a10;
-  --chip-spot: #8fb56a;
-}
-
-.chip-blue {
-  --chip-highlight: #c5ced4;
-  --chip-face: #2c5368;
-  --chip-edge: #0e2433;
-  --chip-spot: #8aa0ae;
-}
-
-.chip-black {
-  --chip-highlight: #9f8166;
-  --chip-face: #362112;
-  --chip-edge: #0c0804;
-  --chip-spot: #947458;
-}
-
 .puck {
   position: absolute;
   z-index: 10;
@@ -404,9 +356,16 @@ body {
 .die {
   position: absolute;
   z-index: 11;
+  left: 0;
+  top: 0;
+  transform-origin: center center;
   transform-style: preserve-3d;
   perspective: 1600px;
   perspective-origin: center;
+}
+
+.die:not([data-posed]) {
+  visibility: hidden;
 }
 
 .die-spin {
@@ -464,6 +423,92 @@ body {
   transform: rotateX(-90deg) translateZ(calc(var(--die-half, 40px)));
 }
 
+/* 50ms per color, seven ROLL_STREAK_COLORS. steps(7) holds each stop for one step. */
+.die.is-rainbow .die-face {
+  background-image: linear-gradient(
+    180deg,
+    var(--die-light, rgba(255, 122, 114, 0.65)) 0%,
+    var(--die-mid, rgba(255, 59, 48, 0.65)) 46%,
+    var(--die-dark, rgba(168, 39, 32, 0.65)) 100%
+  );
+  animation: die-rainbow-pigment 350ms steps(7, end) infinite;
+}
+
+@keyframes die-rainbow-pigment {
+  0% {
+    --die-light: rgba(255, 122, 114, 0.65);
+    --die-mid: rgba(255, 59, 48, 0.65);
+    --die-dark: rgba(168, 39, 32, 0.65);
+    --die-shade: 168, 39, 32;
+  }
+  14.285714% {
+    --die-light: rgba(255, 183, 82, 0.65);
+    --die-mid: rgba(255, 149, 0, 0.65);
+    --die-dark: rgba(168, 98, 0, 0.65);
+    --die-shade: 168, 98, 0;
+  }
+  28.571429% {
+    --die-light: rgba(255, 220, 82, 0.65);
+    --die-mid: rgba(255, 204, 0, 0.65);
+    --die-dark: rgba(168, 135, 0, 0.65);
+    --die-shade: 168, 135, 0;
+  }
+  42.857143% {
+    --die-light: rgba(117, 217, 142, 0.65);
+    --die-mid: rgba(52, 199, 89, 0.65);
+    --die-dark: rgba(34, 131, 59, 0.65);
+    --die-shade: 34, 131, 59;
+  }
+  57.142857% {
+    --die-light: rgba(116, 199, 238, 0.65);
+    --die-mid: rgba(50, 173, 230, 0.65);
+    --die-dark: rgba(33, 114, 152, 0.65);
+    --die-shade: 33, 114, 152;
+  }
+  71.428571% {
+    --die-light: rgba(141, 140, 227, 0.65);
+    --die-mid: rgba(88, 86, 214, 0.65);
+    --die-dark: rgba(58, 57, 141, 0.65);
+    --die-shade: 58, 57, 141;
+  }
+  85.714286%,
+  100% {
+    --die-light: rgba(201, 137, 233, 0.65);
+    --die-mid: rgba(175, 82, 222, 0.65);
+    --die-dark: rgba(116, 54, 147, 0.65);
+    --die-shade: 116, 54, 147;
+  }
+}
+
+.rainbow-letter {
+  animation: roll-streak-rainbow 350ms steps(7, end) infinite;
+}
+
+@keyframes roll-streak-rainbow {
+  0% {
+    color: #ff3b30;
+  }
+  14.285714% {
+    color: #ff9500;
+  }
+  28.571429% {
+    color: #ffcc00;
+  }
+  42.857143% {
+    color: #34c759;
+  }
+  57.142857% {
+    color: #32ade6;
+  }
+  71.428571% {
+    color: #5856d6;
+  }
+  85.714286%,
+  100% {
+    color: #af52de;
+  }
+}
+
 .die-pip {
   position: absolute;
   z-index: 2;
@@ -476,6 +521,81 @@ body {
   box-shadow:
     inset 0 -1px 1px rgba(0, 0, 0, 0.28),
     0 0 0 0.5px rgba(var(--die-shade, 90, 40, 0), 0.28);
+}
+
+.die.is-midnight .die-face {
+  box-shadow: none;
+}
+
+.die.is-midnight .die-face::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background-image: linear-gradient(
+    105deg,
+    transparent 0%,
+    transparent 40%,
+    rgba(255, 255, 255, 0.08) 46%,
+    rgba(255, 255, 255, 0.72) 50%,
+    rgba(255, 255, 255, 0.08) 54%,
+    transparent 60%,
+    transparent 100%
+  );
+  background-size: 220% 100%;
+  background-repeat: no-repeat;
+  animation: die-midnight-shimmer var(--die-shimmer, 2400ms) linear infinite;
+}
+
+.die.is-midnight .die-face::after {
+  border: 0;
+  border-image: none;
+  /* Seam color runs light-to-dark along the edge. The mask keeps that gradient on the seam and feathers it in by --die-rim. */
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.2) 0%, #000 100%);
+  mask-image:
+    linear-gradient(to right, #000 0%, transparent var(--die-rim, 3%)),
+    linear-gradient(to left, #000 0%, transparent var(--die-rim, 3%)),
+    linear-gradient(to bottom, #000 0%, transparent var(--die-rim, 3%)),
+    linear-gradient(to top, #000 0%, transparent var(--die-rim, 3%));
+  mask-repeat: no-repeat;
+  mask-mode: alpha;
+  mask-composite: add, add, add;
+}
+
+@keyframes die-midnight-shimmer {
+  from {
+    background-position: 130% 0;
+  }
+  to {
+    background-position: -130% 0;
+  }
+}
+
+.die.is-midnight .die-pip {
+  background: radial-gradient(circle at 35% 32%, #3a3a3a 0%, #000 62%, #000 100%);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.22),
+    0 0 0 0.5px rgba(0, 0, 0, 0.55);
+}
+
+.die-mark {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--die-mark-scale, 0.6) * 100%);
+  height: calc(var(--die-mark-scale, 0.6) * 100%);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.die-mark svg,
+.die-mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .dice-result {
@@ -516,6 +636,11 @@ body {
     0 2px 0 rgba(0, 0, 0, 0.95),
     0 4px 10px rgba(0, 0, 0, 0.95),
     0 0 16px rgba(0, 0, 0, 0.85);
+}
+
+/* `display: flex` above beats the browser's `[hidden]` rule, which left the label up. */
+.shot-clock[hidden] {
+  display: none;
 }
 
 .shot-clock-label {

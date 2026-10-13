@@ -14,6 +14,7 @@ import {
   PRECISION_ARROW_GAP_PX,
   PRECISION_DEFAULT_ANGLE_DEG,
   PRECISION_DRAG_MIN_PX,
+  PRECISION_RETICLE_LEAD_SCREEN_PX,
   PRECISION_SPIN_DEFAULT,
   PRECISION_SPIN_FULL_PX_PER_S,
   PRECISION_SPIN_MAX,
@@ -206,6 +207,18 @@ export const arrowTip = (arc: PrecisionArc, gap: number = PRECISION_ARROW_GAP_PX
 }
 
 export const dragQualified = (dx: number, dy: number): boolean => Math.hypot(dx, dy) >= PRECISION_DRAG_MIN_PX
+
+/** Stage pixels that match the on-screen lead on a table of this rendered height. */
+export const reticleLeadStagePx = (stageScreenHeight: number): number => {
+  if (!(stageScreenHeight > 0)) return 0
+  return (PRECISION_RETICLE_LEAD_SCREEN_PX * REFERENCE_HEIGHT) / stageScreenHeight
+}
+
+/** Aim point while a target drag is down. The crosshair sits up-table of the contact. */
+export const targetAheadOfContact = (contact: StagePoint, stageScreenHeight: number): StagePoint => ({
+  x: Math.min(REFERENCE_WIDTH, Math.max(0, contact.x)),
+  y: Math.min(REFERENCE_HEIGHT, Math.max(0, contact.y - reticleLeadStagePx(stageScreenHeight))),
+})
 
 /** Upward drag raises the loft. The result stays inside 0° to 90°. */
 export const angleFromDrag = (startAngle: number, dy: number): number =>

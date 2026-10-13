@@ -10,8 +10,17 @@ export const DIE_LAUNCH_STACK_MARGIN_PX = 18
 /** Size at the back wall, relative to `DIE_LAUNCH_SIZE_PX`. */
 export const DIE_DEPTH_SCALE = 0.6//0.6//0.50
 
-/** Face opacity. Pips stay opaque. */
+/** Face opacity. Pips stay opaque. Midnight faces ignore this and stay solid. */
 export const DIE_FACE_ALPHA = 0.65//0.55
+
+/** Midnight 1-face mark, as a fraction of the face. The mark sits in a square of this size. */
+export const DIE_MIDNIGHT_MARK_SCALE = 0.8
+
+/** How far the seam feather reaches in from the edge where two faces meet, as a fraction of the face. */
+export const DIE_MIDNIGHT_RIM_FRACTION = 0.03
+
+/** Time for one midnight shimmer sweep. The sweep repeats. Raise it to slow the sweep. */
+export const DIE_MIDNIGHT_SHIMMER_MS = 2_400
 
 /**
  * How long one rainbow die color stays before the next.
@@ -144,6 +153,9 @@ export const PRECISION_ANGLE_DRAG_PX = 8
 
 /** Movement below this, in stage pixels, does not commit a phase. */
 export const PRECISION_DRAG_MIN_PX = 12
+
+/** On-screen pixels the target reticle sits up-table from a drag. */
+export const PRECISION_RETICLE_LEAD_SCREEN_PX = 25
 
 /**
  * Over-the-top spin before `DIE_FORWARD_SPIN_SCALE`. Positive rolls the top toward the back wall.

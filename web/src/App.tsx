@@ -5,7 +5,7 @@ import { BlockHeightService, type BlockState } from './data/blockHeight'
 import { MarketDataService, type MarketFeedUpdate } from './data/marketData'
 import { emptyCharacterPnl } from './ui/characterPnl'
 import { emptyBonusStakes, loadShooterBook } from './ui/shooterProfile'
-import { loadDieColor, nextDieColor, saveDieColor } from './ui/diceColor'
+import { loadDieColor, nextDieColor, saveDieColor, type DieColorId } from './ui/diceColor'
 import { emptyRollStreakView } from './ui/rollStreak'
 import { CrapsScene } from './ui/CrapsScene'
 import { Overlay } from './ui/Overlay'
@@ -19,6 +19,9 @@ import { applyBonusRoll, bonusFlashTotals, emptyBonusHand } from './ui/bonusCrap
 import { bonusTestHand, isBonusTestSeed, type BonusTestSeed } from './ui/bonusTest'
 import type { ThrowResult } from './ui/dicePhysics'
 import { loadHistogramRolls, pushRoll, saveHistogramRolls } from './ui/histogramModel'
+import type { ChipFrameApply } from './ui/chips/ChipPresenterHost'
+import type { GuideFrameApply } from './ui/chips/guidePresenter'
+import type { DiceFrameApply, LaunchPoint } from './ui/dicePose'
 import { useDiceThrow, type ShooterControls } from './ui/useDiceThrow'
 import {
   loadDiceControlBook,
@@ -80,14 +83,6 @@ const GitHubMark = () => (
     <path fill="currentColor" d={GITHUB_MARK_PATH} />
   </svg>
 )
-
-const precisionLaunch = (dice: { dice: ReadonlyArray<{ visible: boolean; x: number; y: number }> } | null) => {
-  const pair = dice?.dice
-  if (!pair || pair.length < 2 || !pair[0].visible) {
-    return { x: REFERENCE_WIDTH / 2, y: REFERENCE_HEIGHT - 48 }
-  }
-  return { x: (pair[0].x + pair[1].x) / 2, y: (pair[0].y + pair[1].y) / 2 }
-}
 
 const ReleaseNote = ({ wideTop = false }: { wideTop?: boolean }) => (
   <p className={wideTop ? 'repo-release-note repo-release-note-top' : 'repo-release-note'}>
@@ -170,6 +165,10 @@ function App() {
       return next
     })
   }, [])
+  const onDieColor = useCallback((color: DieColorId) => {
+    saveDieColor(color)
+    setDieColor(color)
+  }, [])
   const [rolls, setRolls] = useState(loadHistogramRolls)
   useEffect(() => {
     saveHistogramRolls(rolls)
@@ -227,6 +226,10 @@ function App() {
   }, [armBonusTest])
   const histogram = useHistogramVisibility(splashDone, histogramBoost)
   const precisionShotRef = useRef<Omit<PrecisionThrow, 'speed' | 'lean'> | null>(null)
+  const chipApplyRef = useRef<ChipFrameApply | null>(null)
+  const diceApplyRef = useRef<DiceFrameApply | null>(null)
+  const guideApplyRef = useRef<GuideFrameApply | null>(null)
+  const launchPointRef = useRef<LaunchPoint>({ x: REFERENCE_WIDTH / 2, y: REFERENCE_HEIGHT - 48 })
   const dice = useDiceThrow(
     feed.market,
     splashDone,
@@ -238,6 +241,10 @@ function App() {
     diceControlRef,
     onDiceControlRoll,
     precisionShotRef,
+    chipApplyRef,
+    diceApplyRef,
+    guideApplyRef,
+    launchPointRef,
   )
   const gestureReady = manualShooter && dice?.phase === 'holding'
   const precisionOn = diceControl.precisionTargeting
@@ -307,6 +314,9 @@ function App() {
               fg3Width={fg3.width}
               fg3Height={fg3.height}
               dice={dice}
+              chipApplyRef={chipApplyRef}
+              diceApplyRef={diceApplyRef}
+              guideApplyRef={guideApplyRef}
               rolls={rolls}
               histogramReveal={histogram.reveal}
               histogramAnimate={histogram.animate}
@@ -333,7 +343,7 @@ function App() {
               target={precision.target}
               angle={precision.angle}
               spin={precision.spin}
-              launch={precisionLaunch(dice)}
+              launchPointRef={launchPointRef}
               dieColor={dieColor}
               onOk={precision.accept}
             />
@@ -390,7 +400,12 @@ function App() {
               </button>
             </div>
           ) : null}
-          <DiceControlPanel settings={diceControl} onChange={onDiceControl} />
+          <DiceControlPanel
+            settings={diceControl}
+            onChange={onDiceControl}
+            dieColor={dieColor}
+            onDieColor={onDieColor}
+          />
           <DiceControlHistogram settings={diceControl} book={diceControlBook} />
           <aside className="repo-links-panel" aria-label="Source repositories">
           <div className="repo-link-lnurl" aria-label="LNURL address">

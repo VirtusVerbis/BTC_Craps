@@ -1,6 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { DIE_RAINBOW_STEP_MS } from './diceConstants'
-import { DIE_COLOR_ORDER, dieRainbowStep, loadDieColor, nextDieColor, saveDieColor, type DieColorId } from './diceColor'
+import { DIE_FACE_ALPHA, DIE_RAINBOW_STEP_MS } from './diceConstants'
+import {
+  DIE_COLOR_LABELS,
+  DIE_COLOR_ORDER,
+  dieFaceAlpha,
+  diePigment,
+  dieRainbowStep,
+  loadDieColor,
+  nextDieColor,
+  saveDieColor,
+  type DieColorId,
+} from './diceColor'
 import { ROLL_STREAK_COLOR_STEP_MS } from './rollStreak'
 
 describe('die color', () => {
@@ -8,14 +18,29 @@ describe('die color', () => {
     vi.unstubAllGlobals()
   })
 
-  it('starts on Bitcoin orange and walks the list back to orange', () => {
+  it('starts on midnight and walks the list back to midnight', () => {
     let color: DieColorId = DIE_COLOR_ORDER[0]
     const seen: DieColorId[] = [color]
     for (let i = 0; i < DIE_COLOR_ORDER.length; i += 1) {
       color = nextDieColor(color)
       seen.push(color)
     }
-    expect(seen).toEqual([...DIE_COLOR_ORDER, 'orange'])
+    expect(seen).toEqual([...DIE_COLOR_ORDER, 'midnight'])
+  })
+
+  it('paints midnight with the orange pigment at full cover', () => {
+    expect(dieFaceAlpha('midnight')).toBe(1)
+    expect(dieFaceAlpha('orange')).toBe(DIE_FACE_ALPHA)
+    expect(diePigment('midnight')).toEqual(diePigment('orange'))
+    expect(DIE_COLOR_ORDER.map((id) => DIE_COLOR_LABELS[id])).toEqual([
+      'Midnight',
+      'Orange',
+      'Red',
+      'Blue',
+      'Green',
+      'Purple',
+      'Rainbow',
+    ])
   })
 
   it('steps the rainbow on its own clock, matching the roll streak at the default', () => {
@@ -34,9 +59,12 @@ describe('die color', () => {
         memory.set(key, value)
       },
     })
+    expect(loadDieColor()).toBe('midnight')
+    saveDieColor('orange')
+    expect(loadDieColor()).toBe('orange')
     saveDieColor('purple')
     expect(loadDieColor()).toBe('purple')
     memory.set('btc-craps.die-color', 'nope')
-    expect(loadDieColor()).toBe('orange')
+    expect(loadDieColor()).toBe('midnight')
   })
 })

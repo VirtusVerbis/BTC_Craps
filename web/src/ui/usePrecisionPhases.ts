@@ -9,6 +9,7 @@ import {
   dragQualified,
   spinFromSwipe,
   spinFromTravel,
+  targetAheadOfContact,
   type PrecisionPhase,
   type PrecisionThrow,
   type StagePoint,
@@ -120,7 +121,7 @@ export const usePrecisionPhases = (
       }
       if (!dragQualified(dx, dy)) return
       qualified = true
-      if (current === 'target') setTarget(point)
+      if (current === 'target') setTarget(targetAheadOfContact(point, stage.getBoundingClientRect().height))
       else if (current === 'trajectory') setAngle(angleFromDrag(angleAtDown, dy))
     }
 
@@ -140,7 +141,7 @@ export const usePrecisionPhases = (
           if (tap) setPhase('trajectory')
           return
         }
-        if (point) setTarget(point)
+        if (stage && point) setTarget(targetAheadOfContact(point, stage.getBoundingClientRect().height))
         setPhase('trajectory')
         return
       }

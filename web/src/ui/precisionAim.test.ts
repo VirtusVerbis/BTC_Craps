@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { DIE_GRAVITY_PX_PER_S2, GESTURE_SPEED_MIN_PX_PER_S, GESTURE_SPEED_NO_ROLL_PX_PER_S, GESTURE_SPEED_WALL_PX_PER_S } from './diceConstants'
+import { REFERENCE_HEIGHT } from '../config/constants'
+import { DIE_GRAVITY_PX_PER_S2, GESTURE_SPEED_MIN_PX_PER_S, GESTURE_SPEED_NO_ROLL_PX_PER_S, GESTURE_SPEED_WALL_PX_PER_S, PRECISION_RETICLE_LEAD_SCREEN_PX } from './diceConstants'
 import {
   aimDepth,
   aimMetrics,
@@ -10,6 +11,7 @@ import {
   precisionVelocity,
   spinFromSwipe,
   spinFromTravel,
+  targetAheadOfContact,
 } from './precisionAim'
 
 describe('precision aim', () => {
@@ -56,6 +58,19 @@ describe('precision aim', () => {
     expect(arc.start).toEqual(launch)
     expect(arc.end).toEqual(target)
     expect(arc.control.y).toBeLessThan(launch.y)
+  })
+
+  it('sits the reticle 25 screen pixels up-table from a target drag', () => {
+    const contact = { x: 400, y: 800 }
+    expect(targetAheadOfContact(contact, REFERENCE_HEIGHT)).toEqual({
+      x: 400,
+      y: 800 - PRECISION_RETICLE_LEAD_SCREEN_PX,
+    })
+    expect(targetAheadOfContact(contact, REFERENCE_HEIGHT / 2).y).toBe(800 - PRECISION_RETICLE_LEAD_SCREEN_PX * 2)
+  })
+
+  it('keeps a lead reticle inside the stage when the contact is near the top', () => {
+    expect(targetAheadOfContact({ x: -10, y: 10 }, REFERENCE_HEIGHT)).toEqual({ x: 0, y: 0 })
   })
 
   it('raises the loft when the finger moves up and stays inside 0 to 90', () => {
