@@ -274,18 +274,46 @@ body {
   }
 }
 
-/* Above the P/L labels (3), under the dice (5), speech (6), meme (7), and candle chart (8). */
-.chip-presenter-host {
+/*
+ * One stacking context for chips, the puck, guides, and dice.
+ * Bands are z 1 / 3 / 5, dice z 2 / 4, so felt depth can put a die between stacks.
+ * Speech (6) and the result banner stay above this group.
+ */
+.felt-depth {
   position: absolute;
   inset: 0;
-  z-index: 4;
+  z-index: 5;
   pointer-events: none;
 }
 
+.chip-presenter-host {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.chip-band {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.chip-band[data-band='behind'] {
+  z-index: 1;
+}
+
+.chip-band[data-band='between'] {
+  z-index: 3;
+}
+
+.chip-band[data-band='front'] {
+  z-index: 5;
+}
+
+/* No z-index of its own, so each guide joins the band of its stack. */
 .chip-guide-layer {
   position: absolute;
   inset: 0;
-  z-index: 4;
   pointer-events: none;
 }
 
@@ -296,11 +324,10 @@ body {
   pointer-events: none;
 }
 
-/* Above the chips (4) and the P/L labels (3), under the speech (6), meme (7), and candle chart (8). */
+/* No z-index of its own. Each die is placed at z 2 or 4 inside `.felt-depth`. */
 .dice-layer {
   position: absolute;
   inset: 0;
-  z-index: 5;
   pointer-events: none;
 }
 
@@ -355,7 +382,6 @@ body {
 
 .die {
   position: absolute;
-  z-index: 11;
   left: 0;
   top: 0;
   transform-origin: center center;

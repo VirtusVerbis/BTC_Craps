@@ -447,6 +447,8 @@ describe('chip depth scale', () => {
     expect(loose.length).toBe(chipThickness())
     expect(standing.every((disc) => disc.scale === chipDepthFactor(stack.z, metrics))).toBe(true)
     expect(loose.every((disc) => disc.scale === chipDepthFactor(0, metrics))).toBe(true)
+    expect(standing.every((disc) => disc.feltZ === stack.z)).toBe(true)
+    expect(loose.every((disc) => disc.feltZ === 0)).toBe(true)
     const face = loose.find((disc) => disc.face)
     expect(face?.lift).toBe(-(chipThickness() - 1))
   })

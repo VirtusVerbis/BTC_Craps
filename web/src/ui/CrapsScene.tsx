@@ -23,7 +23,7 @@ import { ChipGuideLayer } from './chips/ChipGuideLayer'
 import type { GuideFrameApply } from './chips/guidePresenter'
 import { ChipPresenterHost, type ChipFrameApply } from './chips/ChipPresenterHost'
 import type { DiceFrameApply } from './dicePose'
-import { DiceLayer } from './DiceLayer'
+import { DiceLayer, DiceResult } from './DiceLayer'
 import type { DieColorId } from './diceColor'
 import { SpeechLayer } from './SpeechLayer'
 import { RollHistogram } from './RollHistogram'
@@ -221,12 +221,15 @@ const CrapsSceneInner = ({
           draggable={false}
         />
       ) : null}
-      <ChipPresenterHost applyRef={chipApplyRef} />
-      <ChipGuideLayer applyRef={guideApplyRef} />
       <SpeechLayer speech={dice?.speech ?? []} />
-      {dice ? (
-        <DiceLayer presentation={dice} bonusLines={bonusLines} dieColor={dieColor} applyRef={diceApplyRef} />
-      ) : null}
+      <div className="felt-depth">
+        <ChipPresenterHost applyRef={chipApplyRef} />
+        <ChipGuideLayer applyRef={guideApplyRef} />
+        {dice ? (
+          <DiceLayer presentation={dice} dieColor={dieColor} applyRef={diceApplyRef} />
+        ) : null}
+      </div>
+      {dice ? <DiceResult presentation={dice} bonusLines={bonusLines} /> : null}
     </div>
   )
 }

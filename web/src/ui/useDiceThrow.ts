@@ -56,6 +56,7 @@ import {
   spreadPairX,
   stageMetrics,
   syncArcDisplay,
+  viewTiltDeg,
   visualDieSize,
   type ArcDisplay,
   type Die,
@@ -69,6 +70,8 @@ import type { GestureStroke } from './gestureThrow'
 import type { PrecisionThrow } from './precisionAim'
 import type { ChipCharacter } from './chipConstants'
 import type { ChipFrameApply } from './chips/ChipPresenterHost'
+import { dieDepthKey } from './feltDepth'
+import { puckPlacement } from './puckState'
 import { dicePresentationReactChanged } from './chips/presentationReactUpdate'
 import { useDiceVolumeWindow } from './useDiceVolumeWindow'
 import { emptyBonusHand, type BonusHand } from './bonusCraps'
@@ -100,6 +103,11 @@ export interface DieView {
   size: number
   /** 0 at the launch rail, 1 at the back wall. */
   depth: number
+  /**
+   * Felt depth minus the airborne rise. Smaller is closer to the camera.
+   * Canvas bands and the die z-index sort on this.
+   */
+  depthKey: number
   transform: string
 }
 
@@ -158,6 +166,7 @@ const toView = (die: Die, id: 'left' | 'right', x: number, display: ArcDisplay):
     // A stacked die is resting above the felt. The arc swell is for flight.
     size: visualDieSize(die.z, die.resting ? 0 : die.h, metrics),
     depth,
+    depthKey: dieDepthKey(die.z, die.h, viewTiltDeg(depth)),
     transform: quatToCssMatrix(airborne ? display.q : die.q),
   }
 }
@@ -556,10 +565,15 @@ export const useDiceThrow = (
         now,
         displayRef.current,
       )
-      chipApplyRef?.current?.(chips)
+      const dieKeys = next.dice.filter((die) => die.visible).map((die) => die.depthKey)
+      chipApplyRef?.current?.({
+        discs: chips,
+        dieKeys,
+        puck: puckPlacement(stateRef.current.point),
+      })
       if (launchPointRef) launchPointRef.current = diceLaunchPoint(next.dice)
       diceApplyRef?.current?.({ dice: next.dice, shotClockMs: next.shotClockMs })
-      guideApplyRef?.current?.(guides)
+      guideApplyRef?.current?.(guides, dieKeys)
       setPresentation((prev) => {
         if (prev && !dicePresentationReactChanged(prev, next)) return prev
         return { ...next, chips: [] }
@@ -569,7 +583,7 @@ export const useDiceThrow = (
     frame = window.requestAnimationFrame(loop)
     return () => {
       window.cancelAnimationFrame(frame)
-      chipApplyRef?.current?.([])
+      chipApplyRef?.current?.({ discs: [], dieKeys: [] })
       diceApplyRef?.current?.({ dice: [], shotClockMs: null })
       guideApplyRef?.current?.([])
     }

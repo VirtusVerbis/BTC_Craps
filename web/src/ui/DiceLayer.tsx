@@ -4,12 +4,10 @@ import {
   DIE_MIDNIGHT_MARK_SCALE,
   DIE_MIDNIGHT_RIM_FRACTION,
   DIE_MIDNIGHT_SHIMMER_MS,
-  PUCK_IMAGE_WIDTH_PX,
 } from './diceConstants'
 import { dieFaceAlpha, dieFaceGradient, diePigment, dieShade, type DieColorId } from './diceColor'
 import { BitcoinMark, FawkesMark } from './diceMarks'
 import { paintDiceFrame, type DiceFrameApply, type DicePoseFrame } from './dicePose'
-import { puckPlacement } from './puckState'
 import type { DicePresentation } from './useDiceThrow'
 
 const PIP_LAYOUT: Record<number, Array<[number, number]>> = {
@@ -143,18 +141,15 @@ export const DieMesh = ({
 
 export const DiceLayer = ({
   presentation,
-  bonusLines = [],
   dieColor = 'midnight',
   applyRef,
 }: {
   presentation: DicePresentation
-  bonusLines?: readonly string[]
   dieColor?: DieColorId
   applyRef: MutableRefObject<DiceFrameApply | null>
 }) => {
   const rootRef = useRef<HTMLDivElement>(null)
   const poseRef = useRef<DicePoseFrame | null>(null)
-  const puck = puckPlacement(presentation.point)
   const result = presentation.result
 
   useEffect(() => {
@@ -173,40 +168,42 @@ export const DiceLayer = ({
   })
 
   return (
-    <>
-      <div ref={rootRef} className="dice-layer" data-die-color={dieColor} aria-hidden={result == null}>
-        <img
-          className="puck"
-          src={puck.src}
-          alt=""
-          draggable={false}
-          style={{ left: puck.x, top: puck.y, width: PUCK_IMAGE_WIDTH_PX * puck.scale }}
-        />
-        {presentation.dice.map((die) =>
-          die.visible ? <DieMesh key={die.id} dieId={die.id} color={dieColor} /> : null,
-        )}
-        <div className="shot-clock" hidden>
-          <div className="shot-clock-label">Shot Clock</div>
-          <div className="shot-clock-time" />
-        </div>
+    <div ref={rootRef} className="dice-layer" data-die-color={dieColor} aria-hidden={result == null}>
+      {presentation.dice.map((die) =>
+        die.visible ? <DieMesh key={die.id} dieId={die.id} color={dieColor} /> : null,
+      )}
+      <div className="shot-clock" hidden>
+        <div className="shot-clock-label">Shot Clock</div>
+        <div className="shot-clock-time" />
       </div>
-      {result ? (
-        <div className="dice-result">
-          {'noRoll' in result ? (
-            <div className="dice-result-total">No Roll!</div>
-          ) : (
-            <>
-              <div className="dice-result-total">{result.total}</div>
-              {result.label ? <div className="dice-result-label">{result.label}</div> : null}
-              {bonusLines.map((line) => (
-                <div className="dice-result-bonus" key={line}>
-                  {line}
-                </div>
-              ))}
-            </>
-          )}
-        </div>
-      ) : null}
-    </>
+    </div>
+  )
+}
+
+export const DiceResult = ({
+  presentation,
+  bonusLines = [],
+}: {
+  presentation: DicePresentation
+  bonusLines?: readonly string[]
+}) => {
+  const result = presentation.result
+  if (!result) return null
+  return (
+    <div className="dice-result">
+      {'noRoll' in result ? (
+        <div className="dice-result-total">No Roll!</div>
+      ) : (
+        <>
+          <div className="dice-result-total">{result.total}</div>
+          {result.label ? <div className="dice-result-label">{result.label}</div> : null}
+          {bonusLines.map((line) => (
+            <div className="dice-result-bonus" key={line}>
+              {line}
+            </div>
+          ))}
+        </>
+      )}
+    </div>
   )
 }

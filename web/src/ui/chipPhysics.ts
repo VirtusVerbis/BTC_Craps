@@ -119,6 +119,9 @@ export interface ChipDisc {
   /** Draw size at this felt depth. 1 at the near rail. */
   scale: number
   face: boolean
+  /** Felt depth. 0 at the near rail, larger toward the back wall. Plates of one chip share it. */
+  feltZ: number
+  /** Plate order within one felt depth. Does not move an object across a felt gap. */
   zIndex: number
 }
 
@@ -842,6 +845,7 @@ const disc = (
   lift,
   scale: chipDepthFactor(z, metrics),
   face,
+  feltZ: z,
   zIndex,
 })
 
@@ -918,6 +922,8 @@ export interface StackGuideView {
   top: number
   width: number
   height: number
+  /** Closest felt depth in the group. Smaller is nearer the rail. */
+  feltZ: number
 }
 
 /** One box around every column that shares a strategy label, after the current lean. */
@@ -936,15 +942,18 @@ export const guideFrames = (world: ChipWorld, metrics: StageMetrics = stageMetri
     let maxX = Number.NEGATIVE_INFINITY
     let minTop = Number.POSITIVE_INFINITY
     let maxBottom = Number.NEGATIVE_INFINITY
+    let feltZ = Number.POSITIVE_INFINITY
     for (const stack of columns) {
       const scale = chipDepthFactor(stack.z, metrics)
       const diameter = chipDiameter() * scale
       const thick = chipThickness() * scale
       const plates = Math.max(1, stack.colors.length)
       for (let index = 0; index < plates; index += 1) {
+        const chipZ = stack.z + (stack.offsets[index]?.z ?? 0)
         const x = stack.x + (stack.offsets[index]?.x ?? 0)
-        const y = metrics.height - (stack.z + (stack.offsets[index]?.z ?? 0))
+        const y = metrics.height - chipZ
         const top = y - index * thick - diameter / 2
+        feltZ = Math.min(feltZ, chipZ)
         minX = Math.min(minX, x - diameter / 2)
         maxX = Math.max(maxX, x + diameter / 2)
         minTop = Math.min(minTop, top)
@@ -958,6 +967,7 @@ export const guideFrames = (world: ChipWorld, metrics: StageMetrics = stageMetri
       top: minTop,
       width: Math.max(0, maxX - minX),
       height: Math.max(0, maxBottom - minTop),
+      feltZ,
     })
   }
   return frames

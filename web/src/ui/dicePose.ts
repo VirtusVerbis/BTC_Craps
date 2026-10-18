@@ -1,5 +1,6 @@
 import { REFERENCE_HEIGHT, REFERENCE_WIDTH } from '../config/constants'
 import { DIE_LAUNCH_SIZE_PX } from './diceConstants'
+import { FAR_DIE_Z, NEAR_DIE_Z } from './feltDepth'
 import { viewTiltDeg } from './dicePhysics'
 import { formatShotClock } from './gestureThrow'
 import type { DieView } from './useDiceThrow'
@@ -55,6 +56,10 @@ export const paintDie = (
 }
 
 export const paintDiceFrame = (root: HTMLElement, frame: DicePoseFrame): void => {
+  const ranked = frame.dice.filter((die) => die.visible).sort((a, b) => b.depthKey - a.depthKey)
+  const zIndex = new Map<string, string>()
+  if (ranked.length >= 1) zIndex.set(ranked[0].id, FAR_DIE_Z)
+  if (ranked.length >= 2) zIndex.set(ranked[1].id, NEAR_DIE_Z)
   for (const die of frame.dice) {
     const el = root.querySelector(`[data-die-id="${die.id}"]`)
     if (!(el instanceof HTMLElement)) continue
@@ -62,6 +67,7 @@ export const paintDiceFrame = (root: HTMLElement, frame: DicePoseFrame): void =>
       el.style.visibility = 'hidden'
       continue
     }
+    el.style.zIndex = zIndex.get(die.id) ?? FAR_DIE_Z
     paintDie(el, die.x, die.y, die.size, viewTiltDeg(die.depth), die.transform, die.z)
   }
   const clock = root.querySelector('.shot-clock')

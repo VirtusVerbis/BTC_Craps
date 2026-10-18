@@ -12,6 +12,7 @@ const die = (id: DieView['id'], patch: Partial<DieView> = {}): DieView => ({
   z: 0,
   size: 40,
   depth: 0,
+  depthKey: 0,
   transform: 'matrix3d(1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1)',
   ...patch,
 })
@@ -41,7 +42,7 @@ describe('dicePresentationReactChanged', () => {
     const next = frame({
       dice: [die('left', { x: 80, y: 90, size: 22, transform: 'matrix3d(0,1,0,0,-1,0,0,0,0,0,1,0,0,0,0,1)' }), die('right')],
       shotClockMs: 1200,
-      guides: [{ label: 'Pass', color: '#fff', left: 1, top: 2, width: 3, height: 4 }],
+      guides: [{ label: 'Pass', color: '#fff', left: 1, top: 2, width: 3, height: 4, feltZ: 0 }],
     })
     expect(dicePresentationReactChanged(prev, next)).toBe(false)
   })

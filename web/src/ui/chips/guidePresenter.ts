@@ -1,7 +1,8 @@
 import { BET_STACK_GUIDES_ON, STACK_GUIDE_FONT_PX } from '../characterBetConstants'
 import type { StackGuideView } from '../chipPhysics'
+import { BAND_Z, depthBand } from '../feltDepth'
 
-export type GuideFrameApply = (guides: readonly StackGuideView[]) => void
+export type GuideFrameApply = (guides: readonly StackGuideView[], dieKeys?: readonly number[]) => void
 
 /** Imperative stack-guide boxes. Positions change every frame during a topple. */
 export class GuidePresenter {
@@ -13,7 +14,7 @@ export class GuidePresenter {
     this.apply([])
   }
 
-  apply(guides: readonly StackGuideView[]): void {
+  apply(guides: readonly StackGuideView[], dieKeys: readonly number[] = []): void {
     const next = new Set<string>()
     if (BET_STACK_GUIDES_ON) {
       for (const guide of guides) {
@@ -36,6 +37,7 @@ export class GuidePresenter {
         el.style.height = `${guide.height}px`
         el.style.borderColor = guide.color
         el.style.color = guide.color
+        el.style.zIndex = BAND_Z[depthBand(guide.feltZ, dieKeys)]
       }
     }
     for (const [label, el] of this.pool) {

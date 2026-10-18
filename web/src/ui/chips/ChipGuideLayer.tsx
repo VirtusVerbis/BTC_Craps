@@ -12,7 +12,7 @@ const ChipGuideLayerInner = ({ applyRef }: ChipGuideLayerProps) => {
     const mount = mountRef.current
     if (!mount) return undefined
     const presenter = new GuidePresenter(mount)
-    applyRef.current = (guides) => presenter.apply(guides)
+    applyRef.current = (guides, dieKeys) => presenter.apply(guides, dieKeys)
     return () => {
       if (applyRef.current) applyRef.current = null
       presenter.dispose()

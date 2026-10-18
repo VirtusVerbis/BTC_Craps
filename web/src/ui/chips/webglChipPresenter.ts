@@ -1,19 +1,27 @@
 import {
   CanvasTexture,
   CircleGeometry,
+  DataTexture,
   DoubleSide,
   InstancedBufferAttribute,
   InstancedMesh,
   LinearFilter,
   LinearSRGBColorSpace,
   Matrix4,
+  Mesh,
   OrthographicCamera,
+  PlaneGeometry,
   Scene,
   ShaderMaterial,
+  Texture,
   WebGLRenderer,
 } from 'three'
+import { REFERENCE_HEIGHT } from '../../config/constants'
 import type { ChipColor } from '../chipConstants'
+import { PUCK_IMAGE_WIDTH_PX } from '../diceConstants'
+import { compareDepth, PUCK_PLATE } from '../feltDepth'
 import { chipDrawSize, type ChipDisc } from '../chipPhysics'
+import type { PuckPlacement } from '../puckState'
 import { CHIP_PALETTE } from './chipPalette'
 import {
   CHIP_CAMERA_BOTTOM,
@@ -143,14 +151,24 @@ const COLOR_INDEX: Record<ChipColor, number> = {
   black: 4,
 }
 
-const ordered: ChipDisc[] = []
 const tempMatrix = new Matrix4()
 
-const sortDiscs = (discs: readonly ChipDisc[]): ChipDisc[] => {
-  ordered.length = 0
-  for (let i = 0; i < discs.length; i += 1) ordered.push(discs[i])
-  ordered.sort((a, b) => a.zIndex - b.zIndex)
-  return ordered
+interface DrawEntry {
+  feltZ: number
+  plate: number
+  disc?: ChipDisc
+  puck?: PuckPlacement
+}
+
+const drawEntries = (discs: readonly ChipDisc[], puck: PuckPlacement | null): DrawEntry[] => {
+  const entries: DrawEntry[] = []
+  for (let i = 0; i < discs.length; i += 1) {
+    const disc = discs[i]
+    entries.push({ feltZ: disc.feltZ, plate: disc.zIndex, disc })
+  }
+  if (puck) entries.push({ feltZ: REFERENCE_HEIGHT - puck.y, plate: PUCK_PLATE, puck })
+  entries.sort(compareDepth)
+  return entries
 }
 
 const VERTEX = `
@@ -165,6 +183,23 @@ void main() {
 `
 
 const FRAGMENT = `
+uniform sampler2D map;
+varying vec2 vUv;
+void main() {
+  gl_FragColor = texture2D(map, vUv);
+}
+`
+
+const PUCK_VERTEX = `
+varying vec2 vUv;
+void main() {
+  vUv = uv;
+  vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+  gl_Position = projectionMatrix * mvPosition;
+}
+`
+
+const PUCK_FRAGMENT = `
 uniform sampler2D map;
 varying vec2 vUv;
 void main() {
@@ -191,6 +226,14 @@ export class WebGLChipPresenter {
   private readonly mesh: InstancedMesh
 
   private readonly uvRect: InstancedBufferAttribute
+
+  private readonly puckGeometry: PlaneGeometry
+
+  private readonly puckMaterial: ShaderMaterial
+
+  private readonly puckMesh: Mesh
+
+  private readonly puckTextures = new Map<string, Texture>()
 
   private disposed = false
 
@@ -250,6 +293,25 @@ export class WebGLChipPresenter {
     this.mesh.count = 0
     this.scene.add(this.mesh)
 
+    const puckPlaceholder = new DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1)
+    puckPlaceholder.needsUpdate = true
+    puckPlaceholder.colorSpace = LinearSRGBColorSpace
+    this.puckGeometry = new PlaneGeometry(1, 1)
+    this.puckMaterial = new ShaderMaterial({
+      uniforms: { map: { value: puckPlaceholder } },
+      vertexShader: PUCK_VERTEX,
+      fragmentShader: PUCK_FRAGMENT,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      side: DoubleSide,
+    })
+    this.puckMesh = new Mesh(this.puckGeometry, this.puckMaterial)
+    this.puckMesh.frustumCulled = false
+    this.puckMesh.visible = false
+    this.scene.add(this.puckMesh)
+    this.renderer.autoClear = false
+
     this.handleContextLoss()
     this.resize(maxDpr)
   }
@@ -285,22 +347,48 @@ export class WebGLChipPresenter {
     if (this.disposed) return
     this.disposed = true
     this.scene.remove(this.mesh)
+    this.scene.remove(this.puckMesh)
     this.geometry.dispose()
     this.material.dispose()
     this.texture.dispose()
+    this.puckGeometry.dispose()
+    this.puckMaterial.dispose()
+    for (const tex of this.puckTextures.values()) tex.dispose()
+    this.puckTextures.clear()
     this.renderer.dispose()
     this.canvas.remove()
   }
 
-  apply(discs: readonly ChipDisc[]): void {
-    if (this.disposed) return
-    const draw = sortDiscs(discs)
-    const count = Math.min(draw.length, this.capacity)
+  private puckTexture(src: string): Texture | null {
+    let tex = this.puckTextures.get(src)
+    if (!tex) {
+      const image = new Image()
+      const created = new Texture(image)
+      // This camera's +Y points down the screen, so the PNG must not get the usual Y-up flip.
+      created.flipY = false
+      created.colorSpace = LinearSRGBColorSpace
+      created.magFilter = LinearFilter
+      created.minFilter = LinearFilter
+      created.generateMipmaps = false
+      image.onload = () => {
+        created.needsUpdate = true
+      }
+      image.src = src
+      if (image.complete && image.naturalWidth > 0) created.needsUpdate = true
+      tex = created
+      this.puckTextures.set(src, tex)
+    }
+    const image = tex.image as HTMLImageElement | undefined
+    if (!image?.complete || image.naturalWidth <= 0) return null
+    return tex
+  }
+
+  private uploadDiscs(discs: readonly ChipDisc[]): void {
+    const count = Math.min(discs.length, this.capacity)
     const radiusOf = chipDrawSize().width / 2
     const uv = this.uvRect.array as Float32Array
-
     for (let i = 0; i < count; i += 1) {
-      const disc = draw[i]
+      const disc = discs[i]
       chipDiscMatrix(disc, radiusOf * disc.scale, tempMatrix)
       this.mesh.setMatrixAt(i, tempMatrix)
       const rect = atlasRect(COLOR_INDEX[disc.color], disc.face)
@@ -310,10 +398,54 @@ export class WebGLChipPresenter {
       uv[offset + 2] = rect[2]
       uv[offset + 3] = rect[3]
     }
-
     this.mesh.count = count
     this.mesh.instanceMatrix.needsUpdate = true
     this.uvRect.needsUpdate = true
+  }
+
+  private renderDiscs(discs: readonly ChipDisc[]): void {
+    if (discs.length === 0) return
+    this.uploadDiscs(discs)
+    this.mesh.visible = true
+    this.puckMesh.visible = false
     this.renderer.render(this.scene, this.camera)
+    this.mesh.visible = false
+  }
+
+  private renderPuck(puck: PuckPlacement): void {
+    const tex = this.puckTexture(puck.src)
+    if (!tex) return
+    const image = tex.image as HTMLImageElement
+    const width = PUCK_IMAGE_WIDTH_PX * puck.scale
+    const height = width * (image.naturalHeight / image.naturalWidth)
+    this.puckMaterial.uniforms.map.value = tex
+    this.puckMesh.position.set(puck.x, puck.y, 0)
+    this.puckMesh.scale.set(width, height, 1)
+    this.mesh.visible = false
+    this.puckMesh.visible = true
+    this.renderer.render(this.scene, this.camera)
+    this.puckMesh.visible = false
+  }
+
+  apply(discs: readonly ChipDisc[], puck: PuckPlacement | null = null): void {
+    if (this.disposed) return
+    const entries = drawEntries(discs, puck)
+    this.renderer.clear()
+    this.mesh.visible = false
+    this.puckMesh.visible = false
+    let batch: ChipDisc[] = []
+    const flush = () => {
+      this.renderDiscs(batch)
+      batch = []
+    }
+    for (let i = 0; i < entries.length; i += 1) {
+      const entry = entries[i]
+      if (entry.disc) batch.push(entry.disc)
+      else if (entry.puck) {
+        flush()
+        this.renderPuck(entry.puck)
+      }
+    }
+    flush()
   }
 }
