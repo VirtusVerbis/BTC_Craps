@@ -125,6 +125,34 @@ describe('character stakes and running total', () => {
     const comeOut = emptyCharacterPnl()
     expect(applyCharacterPnl(comeOut, null, 6, stakes, [hard], true)).toBe(comeOut)
   })
+
+  it('nets a horn high yo, a one-white hit, and a miss', () => {
+    const horn = (number: 2 | 3 | 11 | 12, dollars: number): ProfileBet => ({
+      id: `oldMan-horn-${number}`,
+      character: 'oldMan',
+      role: 'horn',
+      number,
+      dollars,
+      fundedFrom: 'pass',
+      label: 'OLD_MAN_HORN',
+      x: 0,
+      y: 0,
+    })
+    const yo = [horn(2, 500_000), horn(3, 500_000), horn(11, 1_000_000), horn(12, 500_000)]
+    const hit = applyCharacterPnl(emptyCharacterPnl(), 6, 11, stakes, yo)
+    expect(hit.oldMan.usd).toBeCloseTo(13_500_000)
+    expect(hit.oldMan.btc).toBeCloseTo(13_500_000 / 60_000)
+
+    const side = applyCharacterPnl(emptyCharacterPnl(), 6, 2, stakes, yo)
+    expect(side.oldMan.usd).toBeCloseTo(13_000_000)
+
+    const miss = applyCharacterPnl(emptyCharacterPnl(), 6, 5, stakes, yo)
+    expect(miss.oldMan.usd).toBeCloseTo(-2_500_000)
+
+    const comeOut = applyCharacterPnl(emptyCharacterPnl(), null, 11, stakes, yo)
+    const lineOnly = applyCharacterPnl(emptyCharacterPnl(), null, 11, stakes)
+    expect(comeOut.oldMan.btc - lineOnly.oldMan.btc).toBeCloseTo(11_000_000 / 60_000)
+  })
 })
 
 const memoryStorage = (): Storage => {

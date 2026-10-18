@@ -29,6 +29,14 @@ import {
   OLD_LADY_PROFILE_ON,
   OLD_MAN_FIELD_X,
   OLD_MAN_FIELD_Y,
+  OLD_MAN_HORN_HIGH_ACE_X,
+  OLD_MAN_HORN_HIGH_ACE_Y,
+  OLD_MAN_HORN_HIGH_ACE_DEUCE_X,
+  OLD_MAN_HORN_HIGH_ACE_DEUCE_Y,
+  OLD_MAN_HORN_HIGH_MIDNIGHT_X,
+  OLD_MAN_HORN_HIGH_MIDNIGHT_Y,
+  OLD_MAN_HORN_HIGH_YO_X,
+  OLD_MAN_HORN_HIGH_YO_Y,
   OLD_MAN_IRON_5_X,
   OLD_MAN_IRON_5_Y,
   OLD_MAN_IRON_6_X,
@@ -113,7 +121,15 @@ import {
   WOLF_PROFILE_ON,
 } from './characterBetConstants'
 import { betDollars, chipsForDollars, denominationScale, splitColumns, type ChipBet } from './chipBets'
-import { bookDollars, isPointNumber, LAY_ODDS_PAY, PLACE_PAY, type PointNumber } from './crapsPayouts'
+import {
+  bookDollars,
+  isHornNumber,
+  isPointNumber,
+  LAY_ODDS_PAY,
+  PLACE_PAY,
+  type HornNumber,
+  type PointNumber,
+} from './crapsPayouts'
 
 /** One red chip. Place 4, 5, 9, 10, the field, and a lay of 4 or 10. */
 export const PROFILE_RED = 2_500_000
@@ -121,11 +137,17 @@ export const PROFILE_RED = 2_500_000
 /** One red plus one white. Place 6 and 8, and a lay of 5, 6, 8, or 9. */
 export const PROFILE_SIX = 3_000_000
 
+/** One white. Five whites are the horn-high minimum, one red. */
+export const HORN_UNIT = PROFILE_RED / 5
+
 const MIN_HISTOGRAM_ROLLS = 3
+const MIN_HORN_COUNT = 3
+const MIN_POINT_ROLLS = 3
+const HORN_ORDER: readonly HornNumber[] = [2, 3, 11, 12]
 const PLACE_NUMBERS: readonly PointNumber[] = [4, 5, 6, 8, 9, 10]
 const CHARACTERS: readonly ChipCharacter[] = ['wolf', 'oldLady', 'cat', 'oldMan']
 
-export type ProfileRole = 'place' | 'inside' | 'iron' | 'field' | 'across' | 'lay' | 'point-place' | 'point-lay' | 'hard'
+export type ProfileRole = 'place' | 'inside' | 'iron' | 'field' | 'across' | 'lay' | 'point-place' | 'point-lay' | 'hard' | 'horn'
 
 /** Same point still up. Hardways restart at one red when a new point is set. */
 export interface PointHand {
@@ -140,7 +162,7 @@ export interface ProfileBet {
   id: string
   character: ChipCharacter
   role: ProfileRole
-  number: PointNumber | null
+  number: PointNumber | HornNumber | null
   dollars: number
   fundedFrom: ChipSide
   label: string
@@ -192,6 +214,20 @@ const ironSpot: Record<5 | 6 | 8, Spot> = {
   5: { x: OLD_MAN_IRON_5_X, y: OLD_MAN_IRON_5_Y, label: 'OLD_MAN_IRON_5' },
   6: { x: OLD_MAN_IRON_6_X, y: OLD_MAN_IRON_6_Y, label: 'OLD_MAN_IRON_6' },
   8: { x: OLD_MAN_IRON_8_X, y: OLD_MAN_IRON_8_Y, label: 'OLD_MAN_IRON_8' },
+}
+
+const hornSpot: Record<HornNumber, Spot> = {
+  2: { x: OLD_MAN_HORN_HIGH_ACE_X, y: OLD_MAN_HORN_HIGH_ACE_Y, label: 'OLD_MAN_HORN_HIGH_ACE' },
+  3: { x: OLD_MAN_HORN_HIGH_ACE_DEUCE_X, y: OLD_MAN_HORN_HIGH_ACE_DEUCE_Y, label: 'OLD_MAN_HORN_HIGH_ACE_DEUCE' },
+  11: { x: OLD_MAN_HORN_HIGH_YO_X, y: OLD_MAN_HORN_HIGH_YO_Y, label: 'OLD_MAN_HORN_HIGH_YO' },
+  12: { x: OLD_MAN_HORN_HIGH_MIDNIGHT_X, y: OLD_MAN_HORN_HIGH_MIDNIGHT_Y, label: 'OLD_MAN_HORN_HIGH_MIDNIGHT' },
+}
+
+const HORN_NAME: Record<HornNumber, string> = {
+  2: 'ace',
+  3: 'ace-deuce',
+  11: 'yo',
+  12: 'midnight',
 }
 
 const acrossSpot: Record<PointNumber, Spot> = {
@@ -308,10 +344,25 @@ export const wolfLayNumbers = (rolls: readonly number[], point: PointNumber): Po
   return cold.filter((number) => counts[number] === lowest)
 }
 
+/** Hottest horn number once one of them has rolled at least 3 times. A tie stays put for this window. */
+export const hornHighNumber = (rolls: readonly number[]): HornNumber | null => {
+  const counts: Record<HornNumber, number> = { 2: 0, 3: 0, 11: 0, 12: 0 }
+  for (const roll of rolls) {
+    if (isHornNumber(roll)) counts[roll] += 1
+  }
+  const busiest = Math.max(...HORN_ORDER.map((number) => counts[number]))
+  if (busiest < MIN_HORN_COUNT) return null
+  const tied = HORN_ORDER.filter((number) => counts[number] === busiest)
+  if (tied.length === 1) return tied[0]
+  let hash = 0
+  for (const roll of rolls) hash = (Math.imul(hash, 33) + roll) >>> 0
+  return tied[hash % tied.length]
+}
+
 const bet = (
   character: ChipCharacter,
   role: ProfileRole,
-  number: PointNumber | null,
+  number: PointNumber | HornNumber | null,
   dollars: number,
   fundedFrom: ChipSide,
   spot: Spot,
@@ -362,6 +413,31 @@ const firstAffordable = (purse: LinePurse, side: ChipSide, quotes: readonly numb
   return null
 }
 
+const hornFunded = (placed: readonly ProfileBet[], pointUp: boolean): boolean => {
+  const iron = placed.some((item) => item.character === 'oldMan' && item.role === 'iron')
+  if (!iron) return false
+  if (!pointUp) return true
+  return placed.some((item) => item.character === 'oldMan' && item.role === 'field')
+}
+
+/** One red on the horn after the iron cross, the field, and any point bet already booked. */
+const placeHorn = (
+  purse: LinePurse,
+  placed: ProfileBet[],
+  rolls: readonly number[],
+  pointRolls: number,
+  pointUp: boolean,
+) => {
+  if (pointRolls < MIN_POINT_ROLLS || !hornFunded(placed, pointUp)) return
+  const high = hornHighNumber(rolls)
+  if (high == null || !canAfford(purse, 'pass', PROFILE_RED)) return
+  charge(purse, 'pass', PROFILE_RED)
+  for (const number of HORN_ORDER) {
+    const dollars = number === high ? HORN_UNIT * 2 : HORN_UNIT
+    placed.push(bet('oldMan', 'horn', number, dollars, 'pass', hornSpot[number]))
+  }
+}
+
 const freshWhilePoint = (
   point: PointNumber,
   rolls: readonly number[],
@@ -369,6 +445,7 @@ const freshWhilePoint = (
   switches: ProfileSwitches,
   previous: readonly ProfileBet[],
   hand: PointHand,
+  pointRolls: number,
 ): ProfileBet[] => {
   const placed: ProfileBet[] = []
 
@@ -490,6 +567,7 @@ const freshWhilePoint = (
 
   if (switches.oldMan) coverPoint('oldMan', point, purses.oldMan, placed)
   if (switches.wolf) coverPoint('wolf', point, purses.wolf, placed)
+  if (switches.oldMan) placeHorn(purses.oldMan, placed, rolls, pointRolls, true)
   return placed
 }
 
@@ -536,7 +614,7 @@ const fitKept = (kept: readonly ProfileBet[], purses: CharacterPurses, switches:
       }
     }
     take('place', (items) => items.map((item) => (
-      item.number == null ? item : { ...item, dollars: placeUnit(item.number) }
+      item.number == null || !isPointNumber(item.number) ? item : { ...item, dollars: placeUnit(item.number) }
     )))
     take('inside')
     take('iron')
@@ -610,6 +688,23 @@ export const calloutText = (added: readonly ProfileBet[]): string => {
   return lines.join('\n')
 }
 
+const hornHighOf = (bets: readonly ProfileBet[]): HornNumber | null => {
+  const mine = bets.filter((item) => item.character === 'oldMan' && item.role === 'horn')
+  const high = mine.reduce<ProfileBet | null>((best, item) => (best == null || item.dollars > best.dollars ? item : best), null)
+  const number = high?.number
+  return number != null && isHornNumber(number) ? number : null
+}
+
+/** Speaks when the extra white moves, or when the horn goes up. The same high stays quiet. */
+const hornCallout = (previous: readonly ProfileBet[], next: readonly ProfileBet[]): string | null => {
+  const high = hornHighOf(next)
+  if (high == null || high === hornHighOf(previous)) return null
+  const dollars = next
+    .filter((item) => item.character === 'oldMan' && item.role === 'horn')
+    .reduce((sum, item) => sum + item.dollars, 0)
+  return `Horn high ${HORN_NAME[high]} for ${formatCompactDollars(dollars)}`
+}
+
 const calloutsFor = (
   previous: readonly ProfileBet[],
   next: readonly ProfileBet[],
@@ -618,7 +713,9 @@ const calloutsFor = (
   const spoken: Partial<Record<ChipCharacter, string>> = {}
   for (const character of CHARACTERS) {
     const text = calloutText(added.filter((item) => item.character === character))
-    if (text) spoken[character] = text
+    const horn = character === 'oldMan' ? hornCallout(previous, next) : null
+    const lines = [text, horn].filter((line) => line)
+    if (lines.length > 0) spoken[character] = lines.join('\n')
   }
   return spoken
 }
@@ -631,12 +728,16 @@ export const allocateProfiles = (
   sevenOut: boolean,
   switches: ProfileSwitches = profileSwitches(),
   hand: PointHand = NO_HAND,
+  pointRolls = 0,
 ): ProfileAllocation => {
   const purses = emptyPurses(stakes)
   const established = workingPoint(point)
   const profiles = sevenOut || established == null
     ? (sevenOut ? [] : fitKept(previous, purses, switches))
-    : freshWhilePoint(established, rolls, purses, switches, previous, hand)
+    : freshWhilePoint(established, rolls, purses, switches, previous, hand, pointRolls)
+  if (!sevenOut && established == null && switches.oldMan) {
+    placeHorn(purses.oldMan, profiles, rolls, pointRolls, false)
+  }
   return { profiles, remainder: purses, callouts: calloutsFor(previous, profiles) }
 }
 
@@ -658,9 +759,14 @@ const literalColors = (dollars: number): ChipColor[] => {
   return colored.length > 0 ? colored : units
 }
 
+const hornColors = (dollars: number): ChipColor[] =>
+  Array.from({ length: Math.max(1, Math.round(dollars / HORN_UNIT)) }, () => 'white')
+
 export const strategyChipBet = (item: ProfileBet, scale: number): ChipBet => {
   const literal = item.role !== 'point-place' && item.role !== 'point-lay'
-  const colors = literal ? literalColors(item.dollars) : chipsForDollars(item.dollars, scale)
+  const colors = item.role === 'horn'
+    ? hornColors(item.dollars)
+    : literal ? literalColors(item.dollars) : chipsForDollars(item.dollars, scale)
   const columns = splitColumns(colors)
   return {
     id: item.id,
@@ -690,6 +796,7 @@ export const composeTableBets = (
   previous: readonly ProfileBet[],
   sevenOut: boolean,
   hand: PointHand = NO_HAND,
+  pointRolls = 0,
 ): TableBets => {
   const stakes = {} as CharacterPurses
   const drafts: Array<{ character: ChipCharacter; side: ChipSide; dollars: number }> = []
@@ -700,7 +807,7 @@ export const composeTableBets = (
     drafts.push({ character, side: 'pass', dollars: pass }, { character, side: 'dont', dollars: dont })
   }
   const largest = drafts.reduce((max, item) => Math.max(max, item.dollars), 0)
-  const allocated = allocateProfiles(stakes, rolls, point, previous, sevenOut, profileSwitches(), hand)
+  const allocated = allocateProfiles(stakes, rolls, point, previous, sevenOut, profileSwitches(), hand, pointRolls)
   const scale = denominationScale(largest)
   const line = drafts.flatMap((item) => {
     const dollars = allocated.remainder[item.character][item.side]

@@ -2,7 +2,7 @@ import { betDollars } from './chipBets'
 import type { ChipCharacter } from './chipConstants'
 import type { ProfileBet } from './characterProfiles'
 import { PL_FLAT_COLOR, PL_LOSS_COLOR, PL_PROFIT_COLOR } from './characterPnlConstants'
-import { settleDontPass, settleField, settleHard, settleLay, settlePassLine, settlePlace } from './crapsPayouts'
+import { settleDontPass, settleField, settleHard, settleHorn, settleLay, settlePassLine, settlePlace } from './crapsPayouts'
 
 /** Left to right along the rack. */
 export const PL_CHARACTERS: readonly ChipCharacter[] = ['wolf', 'oldLady', 'cat', 'oldMan']
@@ -158,6 +158,7 @@ const stakePrice = (stake: CharacterStakePair): number => {
 
 const profileProfit = (point: number | null, total: number, bet: ProfileBet, hard: boolean): number => {
   if (bet.role === 'field') return settleField(point, total, bet.dollars).profit
+  if (bet.role === 'horn') return bet.number == null ? 0 : settleHorn(total, bet.number, bet.dollars).profit
   if (bet.number == null) return 0
   if (bet.role === 'lay' || bet.role === 'point-lay') return settleLay(point, total, bet.number, bet.dollars).profit
   if (bet.role === 'hard') return settleHard(point, total, bet.number, bet.dollars, hard).profit

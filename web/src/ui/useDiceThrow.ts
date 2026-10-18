@@ -284,6 +284,7 @@ export const useDiceThrow = (
   const profilePointRef = useRef<number | null>(null)
   const pressRollRef = useRef<number | null>(null)
   const sevenOutRef = useRef(false)
+  const pointRollsRef = useRef(0)
   const speechRef = useRef<Partial<Record<ChipCharacter, { text: string; until: number }>>>({})
   const streakRef = useRef<RollStreak>({ longest: loadRollStreakLongest(), current: 0 })
   const streakView = useCallback(
@@ -352,6 +353,7 @@ export const useDiceThrow = (
     profilePointRef.current = null
     pressRollRef.current = null
     sevenOutRef.current = false
+    pointRollsRef.current = 0
     speechRef.current = {}
     streakRef.current = { longest: loadRollStreakLongest(), current: 0 }
     setPresentation(
@@ -391,6 +393,7 @@ export const useDiceThrow = (
         profilesRef.current,
         sevenOutRef.current,
         hand,
+        pointRollsRef.current,
       )
       sevenOutRef.current = false
       pressRollRef.current = null
@@ -506,7 +509,12 @@ export const useDiceThrow = (
             )
             saveCharacterPnl(pnlRef.current)
           }
-          if (pointBefore != null && result.total === 7) sevenOutRef.current = true
+          if (pointBefore != null && result.total === 7) {
+            sevenOutRef.current = true
+            pointRollsRef.current = 0
+          } else if (pointBefore != null) {
+            pointRollsRef.current += 1
+          }
           const samePoint = pointBefore != null && stateRef.current.point === pointBefore
           pressRollRef.current = samePoint && (result.total === 6 || result.total === 8) ? result.total : null
           const nextShooter = applyShooterRoll(

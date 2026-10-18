@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest'
 import {
   PROFILE_RED,
   PROFILE_SIX,
+  HORN_UNIT,
   allocateProfiles,
   calloutText,
   formatCompactDollars,
   catExtraNumbers,
+  hornHighNumber,
   strategyChipBet,
   wolfLayNumbers,
   type CharacterPurses,
@@ -237,6 +239,74 @@ describe('callouts', () => {
     expect(formatCompactDollars(2_400)).toBe('$2.4K')
     expect(formatCompactDollars(13_500_000)).toBe('$13.5M')
     expect(formatCompactDollars(1_200_000_000)).toBe('$1.2B')
+  })
+})
+
+describe('horn high', () => {
+  const hand = { continued: false, pressRoll: null }
+  const onlyMan: ProfileSwitches = { ...on, cat: false, oldLady: false, wolf: false, wolfLay: false }
+  const yo = [11, 11, 11]
+  const dollars = (bets: readonly ProfileBet[], id: string) => bets.find((bet) => bet.id === id)?.dollars
+
+  it('names the hottest horn number and keeps a tie on the same window', () => {
+    expect(hornHighNumber([11, 11])).toBeNull()
+    expect(hornHighNumber([11, 11, 11])).toBe(11)
+    expect(hornHighNumber([3, 3, 3, 11, 11])).toBe(3)
+    expect(hornHighNumber([2, 2, 2, 12, 12, 12])).toBe(2)
+    expect(hornHighNumber([2, 2, 2, 3, 3, 3])).toBe(3)
+    const tied = [2, 2, 2, 3, 3, 3]
+    expect(hornHighNumber(tied)).toBe(hornHighNumber(tied))
+  })
+
+  it('waits for 3 point rolls and a hot horn number', () => {
+    const early = allocateProfiles(purses(500_000_000), yo, 9, [], false, onlyMan, hand, 2)
+    expect(early.profiles.some((bet) => bet.role === 'horn')).toBe(false)
+    const cold = allocateProfiles(purses(500_000_000), [4, 4, 4], 9, [], false, onlyMan, hand, 3)
+    expect(cold.profiles.some((bet) => bet.role === 'horn')).toBe(false)
+  })
+
+  it('books four whites after the iron cross, the field, and the point bet', () => {
+    const placed = allocateProfiles(purses(80_000_000, 100_000_000), yo, 4, [], false, onlyMan, hand, 3)
+    expect(placed.profiles.find((bet) => bet.role === 'point-place')).toMatchObject({ dollars: 31_000_000 })
+    expect(dollars(placed.profiles, 'oldMan-horn-11')).toBe(HORN_UNIT * 2)
+    expect(dollars(placed.profiles, 'oldMan-horn-2')).toBe(HORN_UNIT)
+    expect(dollars(placed.profiles, 'oldMan-horn-3')).toBe(HORN_UNIT)
+    expect(dollars(placed.profiles, 'oldMan-horn-12')).toBe(HORN_UNIT)
+    expect(placed.remainder.oldMan).toEqual({ pass: 66_500_000, dont: 69_000_000 })
+    expect(placed.callouts.oldMan).toContain('Horn high yo for $2.5M')
+    expect(strategyChipBet(placed.profiles.find((bet) => bet.id === 'oldMan-horn-11')!, 1).columns).toEqual([['white', 'white']])
+    expect(strategyChipBet(placed.profiles.find((bet) => bet.id === 'oldMan-horn-2')!, 1).columns).toEqual([['white']])
+  })
+
+  it('leaves the point lay whole and skips the horn when Pass has less than one red left', () => {
+    const laid = allocateProfiles(purses(15_000_000, 1_000_000), yo, 4, [], false, onlyMan, hand, 3)
+    expect(laid.profiles.find((bet) => bet.role === 'point-lay')).toMatchObject({ dollars: 3_000_000, fundedFrom: 'pass' })
+    expect(laid.profiles.some((bet) => bet.role === 'horn')).toBe(false)
+    expect(laid.remainder.oldMan.pass).toBe(1_000_000)
+  })
+
+  it('stays down when the iron cross does not fit', () => {
+    const short = allocateProfiles(purses(10_000_000), yo, 9, [], false, onlyMan, hand, 3)
+    expect(short.profiles.some((bet) => bet.role === 'iron' || bet.role === 'horn' || bet.role === 'field')).toBe(false)
+  })
+
+  it('buys the horn on a come-out once the watch is on, and stops repeating the same callout', () => {
+    const up = allocateProfiles(purses(500_000_000, 489_000_000), yo, 9, [], false, onlyMan, hand, 3)
+    expect(up.callouts.oldMan).toBe('Iron cross for $8.5M\nField for $2.5M\nHorn high yo for $2.5M')
+    const comeOut = allocateProfiles(purses(500_000_000, 489_000_000), yo, null, up.profiles, false, onlyMan, hand, 3)
+    expect(comeOut.profiles.some((bet) => bet.role === 'field')).toBe(false)
+    expect(comeOut.profiles.some((bet) => bet.role === 'iron')).toBe(true)
+    expect(dollars(comeOut.profiles, 'oldMan-horn-11')).toBe(HORN_UNIT * 2)
+    expect(comeOut.callouts.oldMan).toBeUndefined()
+
+    const waiting = allocateProfiles(purses(500_000_000, 489_000_000), yo, null, up.profiles, false, onlyMan, hand, 2)
+    expect(waiting.profiles.some((bet) => bet.role === 'horn')).toBe(false)
+
+    const aces = allocateProfiles(purses(500_000_000, 489_000_000), [2, 2, 2], 9, up.profiles, false, onlyMan, hand, 3)
+    expect(aces.callouts.oldMan).toBe('Horn high ace for $2.5M')
+
+    const cleared = allocateProfiles(purses(500_000_000), yo, null, up.profiles, true, onlyMan, hand, 5)
+    expect(cleared.profiles).toEqual([])
   })
 })
 

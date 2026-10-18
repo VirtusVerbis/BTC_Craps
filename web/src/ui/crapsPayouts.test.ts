@@ -11,6 +11,7 @@ import {
   isHardRoll,
   settleField,
   settleHard,
+  settleHorn,
   settleLay,
   settlePassLine,
   settlePassOdds,
@@ -134,6 +135,25 @@ describe('field', () => {
 
   it('is off on the come-out', () => {
     expect(settleField(null, 2, 10)).toMatchObject({ outcome: 'none', booked: 0, profit: 0, staysUp: false })
+  })
+})
+
+describe('horn', () => {
+  it('pays 30 to 1 on 2 and 12, and 15 to 1 on 3 and 11', () => {
+    expect(settleHorn(2, 2, 1_000_000)).toMatchObject({ outcome: 'win', profit: 30_000_000, staysUp: false })
+    expect(settleHorn(12, 12, 500_000)).toMatchObject({ outcome: 'win', profit: 15_000_000, staysUp: false })
+    expect(settleHorn(3, 3, 1_000_000)).toMatchObject({ outcome: 'win', profit: 15_000_000, staysUp: false })
+    expect(settleHorn(11, 11, 500_000)).toMatchObject({ outcome: 'win', profit: 7_500_000, staysUp: false })
+  })
+
+  it('loses the stake on any other total, including a come-out', () => {
+    expect(settleHorn(7, 11, 1_000_000)).toMatchObject({ outcome: 'lose', profit: -1_000_000, staysUp: false })
+    expect(settleHorn(4, 2, 500_000)).toMatchObject({ outcome: 'lose', profit: -500_000, staysUp: false })
+    expect(settleHorn(11, 2, 500_000)).toMatchObject({ outcome: 'lose', profit: -500_000, staysUp: false })
+  })
+
+  it('ignores a number outside the horn', () => {
+    expect(settleHorn(6, 6, 500_000)).toMatchObject({ outcome: 'none', booked: 0, profit: 0 })
   })
 })
 

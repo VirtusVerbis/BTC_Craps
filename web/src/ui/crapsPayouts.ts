@@ -265,6 +265,32 @@ export const settleField = (point: number | null, total: number, stake: number):
   )
 }
 
+/** Horn 2 and 12 pay 30:1. Horn 3 and 11 pay 15:1. */
+export const HORN_NUMBERS = [2, 3, 11, 12] as const
+
+export type HornNumber = (typeof HORN_NUMBERS)[number]
+
+export const HORN_PAY: Record<HornNumber, WholeDollarPay> = {
+  2: { unit: 1, profit: 30 },
+  12: { unit: 1, profit: 30 },
+  3: { unit: 1, profit: 15 },
+  11: { unit: 1, profit: 15 },
+}
+
+export const isHornNumber = (value: number): value is HornNumber =>
+  (HORN_NUMBERS as readonly number[]).includes(value)
+
+/**
+ * One roll on a single horn number. Working on the come-out and while a point is up.
+ * The stake comes down whether it wins or loses.
+ */
+export const settleHorn = (total: number, number: number, stake: number): BetSettlement => {
+  if (!isHornNumber(number)) return noBet(stake)
+  const { booked, unbooked } = bookDollars(stake, HORN_PAY[number].unit)
+  const hit = total === number
+  return settleBooked(booked, unbooked, hit, !hit, false, false, HORN_PAY[number])
+}
+
 /**
  * A lay wins when a 7 beats the number, and loses when the number rolls.
  * True odds, no commission, no line-odds cap. Off on the come-out.
