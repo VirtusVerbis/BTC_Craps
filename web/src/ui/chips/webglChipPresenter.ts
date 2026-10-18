@@ -160,13 +160,16 @@ interface DrawEntry {
   puck?: PuckPlacement
 }
 
-const drawEntries = (discs: readonly ChipDisc[], puck: PuckPlacement | null): DrawEntry[] => {
+const drawEntries = (discs: readonly ChipDisc[], pucks: readonly PuckPlacement[]): DrawEntry[] => {
   const entries: DrawEntry[] = []
   for (let i = 0; i < discs.length; i += 1) {
     const disc = discs[i]
     entries.push({ feltZ: disc.feltZ, plate: disc.zIndex, disc })
   }
-  if (puck) entries.push({ feltZ: REFERENCE_HEIGHT - puck.y, plate: PUCK_PLATE, puck })
+  for (let i = 0; i < pucks.length; i += 1) {
+    const puck = pucks[i]
+    entries.push({ feltZ: REFERENCE_HEIGHT - puck.y, plate: PUCK_PLATE, puck })
+  }
   entries.sort(compareDepth)
   return entries
 }
@@ -427,9 +430,9 @@ export class WebGLChipPresenter {
     this.puckMesh.visible = false
   }
 
-  apply(discs: readonly ChipDisc[], puck: PuckPlacement | null = null): void {
+  apply(discs: readonly ChipDisc[], pucks: readonly PuckPlacement[] = []): void {
     if (this.disposed) return
-    const entries = drawEntries(discs, puck)
+    const entries = drawEntries(discs, pucks)
     this.renderer.clear()
     this.mesh.visible = false
     this.puckMesh.visible = false

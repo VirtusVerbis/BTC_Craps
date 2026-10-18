@@ -1,9 +1,9 @@
 import type { ChipCharacter } from './chipConstants'
 
 /** New place, lay, and field bets. Pass and Don't Pass stay up either way. */
-export const CAT_PROFILE_ON = true//false
-export const OLD_LADY_PROFILE_ON = true//false
-export const OLD_MAN_PROFILE_ON = true//false
+export const CAT_PROFILE_ON = false
+export const OLD_LADY_PROFILE_ON = false
+export const OLD_MAN_PROFILE_ON = false
 export const WOLF_PROFILE_ON = true//false
 
 /** Fixed one-red Pass, Don't Pass, and Make 'Em All. Off hides the chips and both labels. */
@@ -41,6 +41,16 @@ export const SHOOTER_ALL_Y = 980
 export const WOLF_LAY_ON = false
 
 
+
+/**
+ * Paints a marker stack on every chip x,y constant, and every puck, so those
+ * spots can be tuned without waiting for a bet. Live bets still resolve, and the
+ * markers are not in the physics.
+ */
+export const STACK_POSITION_PREVIEW_ON = false
+
+/** Chips in each preview stack. */
+export const STACK_POSITION_PREVIEW_HEIGHT = 10
 
 /** Outlines and constant captions on strategy stacks. Turn off after positioning. */
 export const BET_STACK_GUIDES_ON = true
@@ -206,9 +216,9 @@ export const WOLF_POINT_4_Y = 1630
 
 // LAY
 
-export const WOLF_LAY_10_X = 120
+export const WOLF_LAY_10_X = 100  
 export const WOLF_LAY_10_Y = 1000
-export const WOLF_LAY_9_X = 120
+export const WOLF_LAY_9_X = 100
 export const WOLF_LAY_9_Y = 1110
 
 export const WOLF_LAY_8_X = 110

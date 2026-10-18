@@ -1,4 +1,4 @@
-import { BET_STACK_GUIDES_ON, STACK_GUIDE_FONT_PX } from '../characterBetConstants'
+import { BET_STACK_GUIDES_ON, STACK_GUIDE_FONT_PX, STACK_POSITION_PREVIEW_ON } from '../characterBetConstants'
 import type { StackGuideView } from '../chipPhysics'
 import { BAND_Z, depthBand } from '../feltDepth'
 
@@ -16,7 +16,7 @@ export class GuidePresenter {
 
   apply(guides: readonly StackGuideView[], dieKeys: readonly number[] = []): void {
     const next = new Set<string>()
-    if (BET_STACK_GUIDES_ON) {
+    if (BET_STACK_GUIDES_ON || STACK_POSITION_PREVIEW_ON) {
       for (const guide of guides) {
         next.add(guide.label)
         let el = this.pool.get(guide.label)

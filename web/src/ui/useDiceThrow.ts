@@ -17,7 +17,7 @@ import {
   saveCharacterPnl,
   type CharacterPnlBook,
 } from './characterPnl'
-import { SPEECH_SHOW_MS } from './characterBetConstants'
+import { SPEECH_SHOW_MS, STACK_POSITION_PREVIEW_ON } from './characterBetConstants'
 import { diceLaunchPoint, type DiceFrameApply, type LaunchPoint } from './dicePose'
 import type { GuideFrameApply } from './chips/guidePresenter'
 import type { ProfileBet } from './characterProfiles'
@@ -71,7 +71,8 @@ import type { PrecisionThrow } from './precisionAim'
 import type { ChipCharacter } from './chipConstants'
 import type { ChipFrameApply } from './chips/ChipPresenterHost'
 import { dieDepthKey } from './feltDepth'
-import { puckPlacement } from './puckState'
+import { allPuckPlacements, puckPlacement } from './puckState'
+import { stackPositionPreviewWorld } from './stackPositionPreview'
 import { dicePresentationReactChanged } from './chips/presentationReactUpdate'
 import { useDiceVolumeWindow } from './useDiceVolumeWindow'
 import { emptyBonusHand, type BonusHand } from './bonusCraps'
@@ -551,8 +552,9 @@ export const useDiceThrow = (
         worldRef.current = driftLooseChips(worldRef.current, dt, metrics, puckObstacle(stateRef.current.point))
       }
       if (worldRef.current?.restack) worldRef.current = tickRestack(worldRef.current, now)
-      const chips = worldRef.current ? presentChips(worldRef.current, now, metrics) : []
-      const guides = worldRef.current ? guideFrames(worldRef.current, metrics) : []
+      const felt = STACK_POSITION_PREVIEW_ON ? stackPositionPreviewWorld() : worldRef.current
+      const chips = felt ? presentChips(felt, now, metrics) : []
+      const guides = felt ? guideFrames(felt, metrics) : []
       const next = present(
         stateRef.current,
         chips,
@@ -569,7 +571,7 @@ export const useDiceThrow = (
       chipApplyRef?.current?.({
         discs: chips,
         dieKeys,
-        puck: puckPlacement(stateRef.current.point),
+        pucks: STACK_POSITION_PREVIEW_ON ? allPuckPlacements() : [puckPlacement(stateRef.current.point)],
       })
       if (launchPointRef) launchPointRef.current = diceLaunchPoint(next.dice)
       diceApplyRef?.current?.({ dice: next.dice, shotClockMs: next.shotClockMs })

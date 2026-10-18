@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { REFERENCE_HEIGHT } from '../config/constants'
+import { compareDepth } from './feltDepth'
 import { backEdgeZ, backRailContact } from './backWall'
 import { createHoldingDice, dieSize, stageMetrics, type Die } from './dicePhysics'
 import {
@@ -148,6 +149,44 @@ describe('chip topples', () => {
     const lean = (offset: { x: number; z: number } | undefined) => Math.hypot(offset?.x ?? 0, offset?.z ?? 0)
     expect(lean(offsets[offsets.length - 1])).toBeGreaterThan(lean(offsets[0]))
     expect(lean(offsets[0])).toBe(0)
+    const faces = presentChips(world, 0, metrics).filter((disc) => disc.face)
+    const bottom = faces[0]
+    const top = faces[faces.length - 1]
+    expect(bottom).toBeDefined()
+    expect(top).toBeDefined()
+    expect(faces.every((disc) => disc.feltZ === stack.z)).toBe(true)
+    expect(top.zIndex).toBeGreaterThan(bottom.zIndex)
+    expect(top.y).not.toBe(bottom.y)
+    expect(compareDepth({ feltZ: bottom.feltZ, plate: bottom.zIndex }, { feltZ: top.feltZ, plate: top.zIndex })).toBeLessThan(0)
+  })
+
+  it('keeps a restacking column in plate order while the chips are still apart', () => {
+    const columnZ = 800
+    const world: ChipWorld = {
+      stacks: [],
+      loose: [],
+      restack: {
+        startedMs: 0,
+        nextStacks: [stackOf(2, 200, columnZ)],
+        chips: [
+          { id: 'bottom', color: 'black', fromX: 40, fromZ: 200, fromH: 0, toX: 200, toZ: columnZ, toH: 0, spin: 0 },
+          { id: 'top', color: 'white', fromX: 700, fromZ: 1400, fromH: 30, toX: 200, toZ: columnZ, toH: chipThickness(), spin: 10 },
+        ],
+      },
+    }
+    const faces = presentChips(world, CHIP_RESTACK_MS / 2, metrics).filter((disc) => disc.face)
+    const bottom = faces.find((disc) => disc.key.startsWith('bottom'))
+    const top = faces.find((disc) => disc.key.startsWith('top'))
+    expect(bottom).toBeDefined()
+    expect(top).toBeDefined()
+    expect(bottom?.feltZ).toBe(columnZ)
+    expect(top?.feltZ).toBe(columnZ)
+    expect(top && bottom && top.zIndex).toBeGreaterThan(bottom.zIndex)
+    expect(top?.y).not.toBe(bottom?.y)
+    expect(top?.x).not.toBe(bottom?.x)
+    if (bottom && top) {
+      expect(compareDepth({ feltZ: bottom.feltZ, plate: bottom.zIndex }, { feltZ: top.feltZ, plate: top.zIndex })).toBeLessThan(0)
+    }
   })
 
   it('restacks only after a chip has fallen', () => {

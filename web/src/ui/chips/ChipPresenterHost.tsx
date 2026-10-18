@@ -8,9 +8,9 @@ import { WebGLChipPresenter } from './webglChipPresenter'
 
 export interface ChipDepthFrame {
   discs: readonly ChipDisc[]
-  /** Depth keys of the visible dice. Empty puts every disc and the puck in front. */
+  /** Depth keys of the visible dice. Empty puts every disc and the pucks in front. */
   dieKeys: readonly number[]
-  puck?: PuckPlacement | null
+  pucks?: readonly PuckPlacement[]
 }
 
 export type ChipFrameApply = (frame: ChipDepthFrame) => void
@@ -41,14 +41,18 @@ const ChipPresenterHostInner = ({ applyRef }: ChipPresenterHostProps) => {
     }
     const apply: ChipFrameApply = (frame) => {
       const grouped: Record<DepthBand, ChipDisc[]> = { behind: [], between: [], front: [] }
+      const pucks: Record<DepthBand, PuckPlacement[]> = { behind: [], between: [], front: [] }
       for (let i = 0; i < frame.discs.length; i += 1) {
         const disc = frame.discs[i]
         grouped[depthBand(disc.feltZ, frame.dieKeys)].push(disc)
       }
-      const puck = frame.puck ?? null
-      const puckBand = puck ? depthBand(REFERENCE_HEIGHT - puck.y, frame.dieKeys) : null
+      const framePucks = frame.pucks ?? []
+      for (let i = 0; i < framePucks.length; i += 1) {
+        const puck = framePucks[i]
+        pucks[depthBand(REFERENCE_HEIGHT - puck.y, frame.dieKeys)].push(puck)
+      }
       for (const band of BANDS) {
-        presenters[band].apply(grouped[band], puckBand === band ? puck : null)
+        presenters[band].apply(grouped[band], pucks[band])
       }
     }
     applyRef.current = apply

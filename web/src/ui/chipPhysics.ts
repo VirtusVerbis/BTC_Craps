@@ -119,7 +119,12 @@ export interface ChipDisc {
   /** Draw size at this felt depth. 1 at the near rail. */
   scale: number
   face: boolean
-  /** Felt depth. 0 at the near rail, larger toward the back wall. Plates of one chip share it. */
+  /**
+   * Felt depth used for draw order. 0 at the near rail, larger toward the back wall.
+   * Every plate in a standing column shares the column depth, so a lean slides the
+   * chips without letting a lower plate paint over a higher one. A restack flight
+   * uses the destination column depth for the same reason.
+   */
   feltZ: number
   /** Plate order within one felt depth. Does not move an object across a felt gap. */
   zIndex: number
@@ -836,6 +841,7 @@ const disc = (
   face: boolean,
   zIndex: number,
   metrics: StageMetrics,
+  feltZ = z,
 ): ChipDisc => ({
   key,
   color,
@@ -845,7 +851,7 @@ const disc = (
   lift,
   scale: chipDepthFactor(z, metrics),
   face,
-  feltZ: z,
+  feltZ,
   zIndex,
 })
 
@@ -859,11 +865,12 @@ const plateDiscs = (
   bottom: number,
   zIndex: number,
   metrics: StageMetrics,
+  feltZ = z,
 ): ChipDisc[] => {
   const layers = chipThickness()
   const discs: ChipDisc[] = []
   for (let layer = 0; layer < layers; layer += 1) {
-    discs.push(disc(`${id}-${layer}`, color, x, z, spin, -(bottom + layer), layer === layers - 1, zIndex + layer, metrics))
+    discs.push(disc(`${id}-${layer}`, color, x, z, spin, -(bottom + layer), layer === layers - 1, zIndex + layer, metrics, feltZ))
   }
   return discs
 }
@@ -880,6 +887,7 @@ const standingDiscs = (stack: StandingStack, metrics: StageMetrics): ChipDisc[] 
       index * layers,
       index * layers,
       metrics,
+      stack.z,
     ),
   )
 }
@@ -898,6 +906,7 @@ export const presentChips = (world: ChipWorld, nowMs: number, metrics: StageMetr
         lerp(chip.fromH, chip.toH, t),
         500 + index * chipThickness(),
         metrics,
+        chip.toZ,
       ),
     )
     return [...standing, ...flying]

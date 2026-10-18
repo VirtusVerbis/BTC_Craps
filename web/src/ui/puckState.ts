@@ -66,3 +66,9 @@ export const puckPlacement = (point: number | null): PuckPlacement => {
   }
   return { src: '/On_Puck.png', ...ON_SPOTS[point] }
 }
+
+/** Every puck constant: OFF, then ON for 10, 9, 8, 6, 5, and 4. */
+export const allPuckPlacements = (): PuckPlacement[] => [
+  puckPlacement(null),
+  ...([10, 9, 8, 6, 5, 4] as const).map((point) => puckPlacement(point)),
+]
