@@ -9,6 +9,7 @@ const die = (id: DieView['id'], patch: Partial<DieView> = {}): DieView => ({
   visible: true,
   x: 10,
   y: 20,
+  z: 0,
   size: 40,
   depth: 0,
   transform: 'matrix3d(1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1)',

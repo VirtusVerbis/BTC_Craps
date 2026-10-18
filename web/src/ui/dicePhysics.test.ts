@@ -10,6 +10,8 @@ import {
   DIE_FORWARD_SPIN_SCALE,
   DIE_LAUNCH_DELAY_MS,
   DIE_LAUNCH_SIZE_PX,
+  DIE_LAUNCH_TILT_DEG,
+  DIE_NEAR_EDGE_CLEARANCE_PX,
   GESTURE_MID_FELT_FRACTION,
   GESTURE_SPEED_MIN_PX_PER_S,
   GESTURE_SPEED_NO_ROLL_PX_PER_S,
@@ -42,6 +44,8 @@ import {
   createThrowState,
   dieScreenCenter,
   dieSize,
+  tiltedNearDrop,
+  viewTiltDeg,
   gestureLaunchSpeeds,
   launchGestureThrow,
   launchHeldAuto,
@@ -86,11 +90,41 @@ describe('die size', () => {
     expect(mid).toBeLessThan(DIE_LAUNCH_SIZE_PX)
   })
 
-  it('sits fully above the bottom edge while holding', () => {
-    const [left] = createHoldingDice(540)
-    const screen = dieScreenCenter(left, metrics)
-    expect(screen.y + screen.size / 2).toBeCloseTo(metrics.height)
-    expect(screen.y - screen.size / 2).toBeGreaterThan(metrics.wallBottom)
+  it('keeps the tilted near edge inside the stage while holding', () => {
+    const [left, right] = createHoldingDice(540)
+    const drop = tiltedNearDrop(DIE_LAUNCH_SIZE_PX / 2, viewTiltDeg(0))
+    for (const die of [left, right]) {
+      const screen = dieScreenCenter(die, metrics)
+      expect(screen.y + drop).toBeCloseTo(metrics.height - DIE_NEAR_EDGE_CLEARANCE_PX)
+      expect(screen.z).toBe(0)
+      expect(screen.y - screen.size / 2).toBeGreaterThan(metrics.wallBottom)
+    }
+    expect(dieScreenCenter(left, metrics).y).toBeCloseTo(dieScreenCenter(right, metrics).y)
+  })
+
+  it('leaves a die up the felt on its contact line', () => {
+    const [die] = createHoldingDice(540)
+    die.z = 200
+    const screen = dieScreenCenter(die, metrics)
+    expect(screen.y).toBeCloseTo(metrics.height - die.z - dieSize(die.z, metrics) / 2)
+    expect(screen.z).toBe(0)
+  })
+
+  it('lifts a stacked die along the camera lean, on the same felt depth', () => {
+    const set = diceSet('all-sevens')
+    const held = reseatHeldDice(createThrowState(0, 540), { setId: set.id, stacked: true, quats: set.quats })
+    const [bottom, top] = held.dice
+    expect(bottom.z).toBe(top.z)
+    const low = dieScreenCenter(bottom, metrics)
+    const high = dieScreenCenter(top, metrics)
+    const tiltRad = (DIE_LAUNCH_TILT_DEG * Math.PI) / 180
+    expect(high.x).toBeCloseTo(low.x)
+    expect(high.y).toBeCloseTo(low.y - top.h * Math.cos(tiltRad))
+    expect(high.z).toBeCloseTo(-top.h * Math.sin(tiltRad))
+    expect(low.z).toBe(0)
+    const drop = tiltedNearDrop(low.size / 2, DIE_LAUNCH_TILT_DEG)
+    expect(low.y + drop).toBeCloseTo(metrics.height - DIE_NEAR_EDGE_CLEARANCE_PX)
+    expect(high.y + drop).toBeLessThan(metrics.height - DIE_NEAR_EDGE_CLEARANCE_PX)
   })
 })
 

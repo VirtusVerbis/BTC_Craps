@@ -22,9 +22,12 @@ import {
   GESTURE_SPEED_NO_ROLL_PX_PER_S,
   GESTURE_SPEED_WALL_PX_PER_S,
   DIE_GRAVITY_PX_PER_S2,
+  DIE_BACK_WALL_TILT_DEG,
   DIE_LAUNCH_DELAY_MS,
   DIE_LAUNCH_SIZE_PX,
+  DIE_LAUNCH_TILT_DEG,
   DIE_MAX_FLIGHT_MS,
+  DIE_NEAR_EDGE_CLEARANCE_PX,
   DIE_MAX_SPIN_RAD_PER_S,
   DIE_MIN_REACH_FRACTION,
   DIE_NO_ROLL_PAUSE_MS,
@@ -167,11 +170,43 @@ export const dieSize = (z: number, metrics: StageMetrics = stageMetrics()): numb
   return DIE_LAUNCH_SIZE_PX * (DIE_DEPTH_SCALE + (1 - DIE_DEPTH_SCALE) * (1 - depth))
 }
 
-/** Screen center of a die. Y grows downward. The felt contact sits on `height - z`. */
-export const dieScreenCenter = (die: Die, metrics: StageMetrics = stageMetrics()): { x: number; y: number; size: number } => {
+/** Camera lean. 0 is the launch rail, 1 is the back wall. */
+export const viewTiltDeg = (depth: number): number =>
+  DIE_LAUNCH_TILT_DEG + depth * (DIE_BACK_WALL_TILT_DEG - DIE_LAUNCH_TILT_DEG)
+
+/**
+ * How far a cube leaned by `rotateX(tiltDeg)` extends below its center.
+ * The near edge is the face toward the shooter.
+ */
+export const tiltedNearDrop = (half: number, tiltDeg: number): number => {
+  const tiltRad = (tiltDeg * Math.PI) / 180
+  return half * (Math.abs(Math.cos(tiltRad)) + Math.abs(Math.sin(tiltRad)))
+}
+
+/**
+ * Screen center of a die. Y grows downward. The felt contact sits on `height - z`.
+ * Height follows the camera lean: `cos` up the screen, `-sin` toward the camera.
+ * `z` is that toward-camera shift. At the rail, the center rises so the near edge
+ * stays inside the stage. Both dice of a pair share that rise.
+ */
+export const dieScreenCenter = (
+  die: Die,
+  metrics: StageMetrics = stageMetrics(),
+): { x: number; y: number; z: number; size: number } => {
   const size = dieSize(die.z, metrics)
+  const depth = clamp(metrics.wallZ > 0 ? die.z / metrics.wallZ : 0, 0, 1)
+  const tiltDeg = viewTiltDeg(depth)
+  const tiltRad = (tiltDeg * Math.PI) / 180
   const contactY = metrics.height - die.z
-  return { x: die.x, y: contactY - size / 2 - die.h, size }
+  const half = size / 2
+  const drop = tiltedNearDrop(half, tiltDeg)
+  const railLift = Math.max(0, contactY - half + drop - (metrics.height - DIE_NEAR_EDGE_CLEARANCE_PX))
+  return {
+    x: die.x,
+    y: contactY - half - railLift - die.h * Math.cos(tiltRad),
+    z: -die.h * Math.sin(tiltRad),
+    size,
+  }
 }
 
 /** 0 on the felt, 1 at and above the gesture crest. Flat at both ends. */

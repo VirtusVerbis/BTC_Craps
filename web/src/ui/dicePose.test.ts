@@ -5,13 +5,16 @@ import { diceLaunchPoint, dieOuterTransform } from './dicePose'
 describe('dieOuterTransform', () => {
   it('keeps the cube center on the physics point', () => {
     expect(dieOuterTransform(100, 240, DIE_LAUNCH_SIZE_PX)).toBe(
-      'translate3d(100px, 240px, 0) translate(-50%, -50%) scale(1)',
+      'translate3d(100px, 240px, 0px) translate(-50%, -50%) scale(1)',
     )
   })
 
   it('scales around that same center when the die changes size', () => {
     expect(dieOuterTransform(100, 240, DIE_LAUNCH_SIZE_PX / 2)).toBe(
-      'translate3d(100px, 240px, 0) translate(-50%, -50%) scale(0.5)',
+      'translate3d(100px, 240px, 0px) translate(-50%, -50%) scale(0.5)',
+    )
+    expect(dieOuterTransform(100, 240, DIE_LAUNCH_SIZE_PX, 12)).toBe(
+      'translate3d(100px, 240px, 12px) translate(-50%, -50%) scale(1)',
     )
   })
 })

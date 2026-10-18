@@ -32,7 +32,14 @@ export const DIE_RAINBOW_STEP_MS = 50
 export const DIE_LAUNCH_TILT_DEG = -55
 
 /** Camera lean at the back wall. Positive tips the opposite way from the launch rail. */
-export const DIE_BACK_WALL_TILT_DEG = -20 
+export const DIE_BACK_WALL_TILT_DEG = -20
+
+/**
+ * Stage pixels between the tilted near edge and the bottom of the table.
+ * `.stage` is border-box with a 2px border, so 4px of the 1920-tall space is
+ * already past the clip. The rest is air so the face toward the shooter stays visible.
+ */
+export const DIE_NEAR_EDGE_CLEARANCE_PX = 6
 
 /** Hold on the bottom edge before a throw. */
 export const DIE_LAUNCH_DELAY_MS = 3000

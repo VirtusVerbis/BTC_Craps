@@ -95,6 +95,8 @@ export interface DieView {
   visible: boolean
   x: number
   y: number
+  /** Toward the camera. Stack height under the camera lean. */
+  z: number
   size: number
   /** 0 at the launch rail, 1 at the back wall. */
   depth: number
@@ -152,7 +154,9 @@ const toView = (die: Die, id: 'left' | 'right', x: number, display: ArcDisplay):
     visible: die.alive,
     x,
     y: screen.y,
-    size: visualDieSize(die.z, die.h, metrics),
+    z: screen.z,
+    // A stacked die is resting above the felt. The arc swell is for flight.
+    size: visualDieSize(die.z, die.resting ? 0 : die.h, metrics),
     depth,
     transform: quatToCssMatrix(airborne ? display.q : die.q),
   }
