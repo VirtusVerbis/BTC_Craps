@@ -1,9 +1,9 @@
 import type { ChipCharacter } from './chipConstants'
 
 /** New place, lay, and field bets. Pass and Don't Pass stay up either way. */
-export const CAT_PROFILE_ON = false
-export const OLD_LADY_PROFILE_ON = false
-export const OLD_MAN_PROFILE_ON = false
+export const CAT_PROFILE_ON = true//false
+export const OLD_LADY_PROFILE_ON = true//false
+export const OLD_MAN_PROFILE_ON = true//false
 export const WOLF_PROFILE_ON = true//false
 
 /** Fixed one-red Pass, Don't Pass, and Make 'Em All. Off hides the chips and both labels. */
@@ -102,23 +102,23 @@ export const CAT_PLACE_8_Y = 1250
 export const CAT_PLACE_6_X = 280
 export const CAT_PLACE_6_Y = 1380
 
-export const CAT_PLACE_5_X = 280
+export const CAT_PLACE_5_X = 275
 export const CAT_PLACE_5_Y = 1500
-export const CAT_PLACE_4_X = 280
+export const CAT_PLACE_4_X = 270
 export const CAT_PLACE_4_Y = 1630
 
 //OLD LADY
 
 
-export const OLD_LADY_INSIDE_9_X = 220
+export const OLD_LADY_INSIDE_9_X = 230
 export const OLD_LADY_INSIDE_9_Y = 1110
 
-export const OLD_LADY_INSIDE_8_X = 220
+export const OLD_LADY_INSIDE_8_X = 225
 export const OLD_LADY_INSIDE_8_Y = 1250
 export const OLD_LADY_INSIDE_6_X = 220
 export const OLD_LADY_INSIDE_6_Y = 1380
 
-export const OLD_LADY_INSIDE_5_X = 220
+export const OLD_LADY_INSIDE_5_X = 210
 export const OLD_LADY_INSIDE_5_Y = 1500
 
 /** Player-side hard 6 (3-3, 9:1) and hard 8 (4-4, 9:1) in the center grid. */
@@ -146,19 +146,19 @@ export const OLD_MAN_POINT_5_Y = 1500
 export const OLD_MAN_POINT_4_X = 330
 export const OLD_MAN_POINT_4_Y = 1630
 
-export const OLD_MAN_POINT_LAY_10_X = 140
+export const OLD_MAN_POINT_LAY_10_X = 135
 export const OLD_MAN_POINT_LAY_10_Y = 1000
-export const OLD_MAN_POINT_LAY_9_X = 140
+export const OLD_MAN_POINT_LAY_9_X = 135
 export const OLD_MAN_POINT_LAY_9_Y = 1110
 
-export const OLD_MAN_POINT_LAY_8_X = 130
+export const OLD_MAN_POINT_LAY_8_X = 120
 export const OLD_MAN_POINT_LAY_8_Y = 1250
-export const OLD_MAN_POINT_LAY_6_X = 120
+export const OLD_MAN_POINT_LAY_6_X = 115
 export const OLD_MAN_POINT_LAY_6_Y = 1380
 
-export const OLD_MAN_POINT_LAY_5_X = 110
+export const OLD_MAN_POINT_LAY_5_X = 90
 export const OLD_MAN_POINT_LAY_5_Y = 1500
-export const OLD_MAN_POINT_LAY_4_X = 100
+export const OLD_MAN_POINT_LAY_4_X = 90
 export const OLD_MAN_POINT_LAY_4_Y = 1630
 
 
@@ -180,17 +180,17 @@ export const OLD_MAN_FIELD_Y = 1000
 
 export const WOLF_ACROSS_10_X = 185
 export const WOLF_ACROSS_10_Y = 1000
-export const WOLF_ACROSS_9_X = 175
+export const WOLF_ACROSS_9_X = 180
 export const WOLF_ACROSS_9_Y = 1110
 
-export const WOLF_ACROSS_8_X = 165
+export const WOLF_ACROSS_8_X = 170
 export const WOLF_ACROSS_8_Y = 1250
-export const WOLF_ACROSS_6_X = 160
+export const WOLF_ACROSS_6_X = 165
 export const WOLF_ACROSS_6_Y = 1380
 
-export const WOLF_ACROSS_5_X = 145
+export const WOLF_ACROSS_5_X = 150
 export const WOLF_ACROSS_5_Y = 1500
-export const WOLF_ACROSS_4_X = 140
+export const WOLF_ACROSS_4_X = 145
 export const WOLF_ACROSS_4_Y = 1630
 
 
@@ -199,55 +199,55 @@ export const WOLF_ACROSS_4_Y = 1630
 
 export const WOLF_POINT_10_X = 185
 export const WOLF_POINT_10_Y = 1000
-export const WOLF_POINT_9_X = 175
+export const WOLF_POINT_9_X = 180
 export const WOLF_POINT_9_Y = 1110
 
-export const WOLF_POINT_8_X = 165
+export const WOLF_POINT_8_X = 170
 export const WOLF_POINT_8_Y = 1250
-export const WOLF_POINT_6_X = 160
+export const WOLF_POINT_6_X = 165
 export const WOLF_POINT_6_Y = 1380
 
-export const WOLF_POINT_5_X = 145
+export const WOLF_POINT_5_X = 150
 export const WOLF_POINT_5_Y = 1500
-export const WOLF_POINT_4_X = 140
+export const WOLF_POINT_4_X = 145
 export const WOLF_POINT_4_Y = 1630
 
 
 
 // LAY
 
-export const WOLF_LAY_10_X = 100  
-export const WOLF_LAY_10_Y = 1000
-export const WOLF_LAY_9_X = 100
-export const WOLF_LAY_9_Y = 1110
+export const WOLF_LAY_10_X = 90 
+export const WOLF_LAY_10_Y = 1010
+export const WOLF_LAY_9_X = 90
+export const WOLF_LAY_9_Y = 1120
 
-export const WOLF_LAY_8_X = 110
-export const WOLF_LAY_8_Y = 1250
-export const WOLF_LAY_6_X = 100
-export const WOLF_LAY_6_Y = 1380
+export const WOLF_LAY_8_X = 70
+export const WOLF_LAY_8_Y = 1260
+export const WOLF_LAY_6_X = 60
+export const WOLF_LAY_6_Y = 1390
 
-export const WOLF_LAY_5_X = 90
-export const WOLF_LAY_5_Y = 1500
-export const WOLF_LAY_4_X = 90
-export const WOLF_LAY_4_Y = 1630
+export const WOLF_LAY_5_X = 40
+export const WOLF_LAY_5_Y = 1510//1500
+export const WOLF_LAY_4_X = 40
+export const WOLF_LAY_4_Y = 1640//1630
 
 
 //  point lay
 
-export const WOLF_POINT_LAY_10_X = 120
-export const WOLF_POINT_LAY_10_Y = 1000
-export const WOLF_POINT_LAY_9_X = 120
-export const WOLF_POINT_LAY_9_Y = 1110
+export const WOLF_POINT_LAY_10_X = 90
+export const WOLF_POINT_LAY_10_Y = 1010
+export const WOLF_POINT_LAY_9_X = 90
+export const WOLF_POINT_LAY_9_Y = 1120
 
-export const WOLF_POINT_LAY_8_X = 110
-export const WOLF_POINT_LAY_8_Y = 1250
-export const WOLF_POINT_LAY_6_X = 100
-export const WOLF_POINT_LAY_6_Y = 1380
+export const WOLF_POINT_LAY_8_X = 70
+export const WOLF_POINT_LAY_8_Y = 1260
+export const WOLF_POINT_LAY_6_X = 60
+export const WOLF_POINT_LAY_6_Y = 1390
 
-export const WOLF_POINT_LAY_5_X = 90
-export const WOLF_POINT_LAY_5_Y = 1500
-export const WOLF_POINT_LAY_4_X = 90
-export const WOLF_POINT_LAY_4_Y = 1630
+export const WOLF_POINT_LAY_5_X = 40
+export const WOLF_POINT_LAY_5_Y = 1510
+export const WOLF_POINT_LAY_4_X = 40
+export const WOLF_POINT_LAY_4_Y = 1640
 
 
 

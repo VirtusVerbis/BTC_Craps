@@ -5,7 +5,6 @@ import {
   OLD_LADY_PROFILE_ON,
   OLD_MAN_PROFILE_ON,
   WOLF_PROFILE_ON,
-  WOLF_LAY_ON,
   STACK_POSITION_PREVIEW_HEIGHT,
   CHARACTER_GUIDE_COLOR,
   SHOOTER_ALL_X,
@@ -238,13 +237,14 @@ const profileOn: Record<ChipCharacter, boolean> = {
   wolf: WOLF_PROFILE_ON,
 }
 
-/** Pass and Don't Pass stay up. Strategy spots follow that character's profile switch. */
+/**
+ * Pass and Don't Pass stay up. Strategy spots follow that character's profile switch.
+ * Wolf cold lays and point lays are drawn whenever the Wolf profile is on, so the
+ * spots can be tuned while WOLF_LAY_ON stays off for live betting.
+ */
 const profileSpotOn = (item: PreviewSpot): boolean => {
   if (item.character === 'shooter') return true
   if (item.label.endsWith(' pass') || item.label.endsWith(' dont')) return true
-  if (item.label.startsWith('WOLF_LAY_') || item.label.startsWith('WOLF_POINT_LAY_')) {
-    return WOLF_PROFILE_ON && WOLF_LAY_ON
-  }
   return profileOn[item.character]
 }
 

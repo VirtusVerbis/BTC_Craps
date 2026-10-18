@@ -95,7 +95,7 @@ export const CHIP_ANCHORS: readonly ChipAnchor[] = [
   { character: 'wolf', side: 'pass', x: WOLF_PASS_X, y: WOLF_PASS_Y },
   { character: 'oldLady', side: 'pass', x: 430, y: 835 },
   { character: 'cat', side: 'pass', x: 740, y: 870 },
-  { character: 'oldMan', side: 'pass', x: 880, y: 1000 },
+  { character: 'oldMan', side: 'pass', x: 880, y: 1020 },
   // donts
   { character: 'wolf', side: 'dont', x: 195, y: 880 },
   { character: 'oldLady', side: 'dont', x: 440, y: 880 },

@@ -6,7 +6,6 @@ import {
   SHOOTER_PASS_X,
   SHOOTER_PASS_Y,
   STACK_POSITION_PREVIEW_HEIGHT,
-  WOLF_LAY_ON,
   WOLF_PROFILE_ON,
   WOLF_ACROSS_10_X,
   WOLF_ACROSS_10_Y,
@@ -55,7 +54,8 @@ describe('stack position preview', () => {
     expect(has('OLD_LADY_INSIDE')).toBe(OLD_LADY_PROFILE_ON)
     expect(has('OLD_MAN_FIELD')).toBe(OLD_MAN_PROFILE_ON)
     expect(has('WOLF_ACROSS')).toBe(WOLF_PROFILE_ON)
-    expect(has('WOLF_LAY')).toBe(WOLF_PROFILE_ON && WOLF_LAY_ON)
+    expect(has('WOLF_LAY')).toBe(WOLF_PROFILE_ON)
+    expect(has('WOLF_POINT_LAY')).toBe(WOLF_PROFILE_ON)
     expect(has('wolf pass')).toBe(true)
     expect(has('cat dont')).toBe(true)
   })
