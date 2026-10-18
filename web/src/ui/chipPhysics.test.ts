@@ -4,6 +4,7 @@ import { compareDepth } from './feltDepth'
 import { backEdgeZ, backRailContact } from './backWall'
 import { createHoldingDice, dieSize, stageMetrics, type Die } from './dicePhysics'
 import {
+  chipBodyRadius,
   chipColumnStep,
   chipDepthFactor,
   chipDiameter,
@@ -24,7 +25,7 @@ import {
   type ChipWorld,
   type StandingStack,
 } from './chipPhysics'
-import { CHIP_COLUMN_GAP_PX, CHIP_DEPTH_SCALE, CHIP_RESTACK_MS, CHIP_WEIGHT } from './chipConstants'
+import { CHIP_COLUMN_GAP_PX, CHIP_DEPTH_SCALE, CHIP_RESTACK_MS, CHIP_WEIGHT, LAY_CHIP_DIAMETER_RATIO, chipRotationDeg } from './chipConstants'
 import { buildBets, placeBets } from './chipBets'
 import { DIE_LAUNCH_STACK_MARGIN_PX, PUCK_COLLISION_HEIGHT_PX, PUCK_OFF_X, PUCK_OFF_Y } from './diceConstants'
 import { puckPlacement } from './puckState'
@@ -53,6 +54,126 @@ const stackOf = (count: number, x: number, z: number): StandingStack => ({
 })
 
 const worldWith = (stacks: StandingStack[]): ChipWorld => ({ stacks, loose: [], restack: null })
+
+describe('lay chips', () => {
+  const layBet = {
+    id: 'wolf-lay-5',
+    character: 'wolf' as const,
+    side: 'dont' as const,
+    dollars: 1,
+    columns: [['red' as const], ['white' as const]],
+    lay: true,
+    anchor: { x: 120, y: 1500 },
+  }
+
+  it('seats a LAY chip on every column', () => {
+    const world = worldFromBets([layBet], 1)
+    expect(world.stacks).toHaveLength(2)
+    expect(world.stacks.every((stack) => stack.lay)).toBe(true)
+    const faces = presentChips(world, 0, metrics).filter((disc) => disc.face)
+    const caps = faces.filter((disc) => disc.lay)
+    expect(caps).toHaveLength(2)
+    for (const stack of world.stacks) {
+      const cap = caps.find((disc) => disc.key.startsWith(`${stack.id}-lay`))
+      const money = faces.find((disc) => disc.key.startsWith(`${stack.id}-0`))
+      expect(cap).toBeDefined()
+      expect(money).toBeDefined()
+      expect(cap && money && cap.zIndex).toBeGreaterThan(money.zIndex)
+      expect(cap?.spin).toBe(chipRotationDeg(stack.colors.length))
+      expect(cap?.scale).toBe(money?.scale)
+    }
+  })
+
+  it('peels the LAY chip off before the money chips', () => {
+    const stack = { ...stackOf(3, 400, 800), lay: true, offsets: zeroOffsets(4) }
+    const world = worldWith([stack])
+    const travel = 800
+    const die = flyingDie({ x: 400, z: 800, h: 0, vx: 0, vz: -travel, vh: 0 })
+    resolveDiceChips(world, [die, flyingDie({ alive: false, x: 10, z: 10 })], 1 / 60, metrics)
+    expect(world.loose).toHaveLength(1)
+    expect(world.loose[0]?.lay).toBe(true)
+    expect(world.loose[0]?.spin).not.toBe(chipRotationDeg(3))
+    expect(world.stacks[0]?.colors).toHaveLength(3)
+    expect(world.stacks[0]?.lay).toBe(false)
+  })
+
+  it('keeps a loose LAY chip smaller than a money chip', () => {
+    const world = emptyChipWorld()
+    world.loose.push(
+      { id: 'money', color: 'red', x: 100, z: 400, h: 0, vx: 0, vz: 0, vh: 0, spin: 0 },
+      { id: 'lay', color: 'blue', lay: true, x: 101, z: 400, h: 0, vx: 0, vz: 0, vh: 0, spin: 0 },
+    )
+    const next = driftLooseChips(world, 1 / 60, metrics)
+    const money = next.loose.find((chip) => chip.id === 'money')
+    const lay = next.loose.find((chip) => chip.lay)
+    expect(money).toBeDefined()
+    expect(lay).toBeDefined()
+    if (!money || !lay) return
+    const dist = Math.hypot(money.x - lay.x, money.z - lay.z)
+    expect(dist).toBeCloseTo(chipRadius() + chipBodyRadius(true), 0)
+    expect(chipBodyRadius(true)).toBeCloseTo(chipRadius() * LAY_CHIP_DIAMETER_RATIO)
+  })
+
+  it('restacks the LAY chip on top and leaves a blue money chip in the stack', () => {
+    const bet = {
+      id: 'oldMan-point-lay-6',
+      character: 'oldMan' as const,
+      side: 'pass' as const,
+      dollars: 1,
+      columns: [['blue' as const, 'red' as const]],
+      lay: true,
+      anchor: { x: 135, y: 1380 },
+    }
+    const world = worldFromBets([bet], 1)
+    const stack = world.stacks[0]
+    expect(stack?.lay).toBe(true)
+    if (!stack) return
+    stack.lay = false
+    stack.offsets = zeroOffsets(stack.colors.length)
+    world.loose.push(
+      {
+        id: `${stack.id}-loose-0-1`,
+        color: 'blue',
+        x: stack.x + 36,
+        z: stack.z,
+        h: 0,
+        vx: 0,
+        vz: 0,
+        vh: 0,
+        spin: 15,
+        homeX: stack.x,
+        homeZ: stack.z,
+      },
+      {
+        id: `${stack.id}-loose-2-2`,
+        color: 'blue',
+        lay: true,
+        x: stack.x + 20,
+        z: stack.z + 8,
+        h: chipThickness() * 2,
+        vx: 0,
+        vz: 0,
+        vh: 0,
+        spin: 40,
+        homeX: stack.x,
+        homeZ: stack.z,
+      },
+    )
+    world.stacks = []
+    const rebuilt = settleColumns(world, [bet], 0, 3)
+    const landing = rebuilt.restack?.nextStacks[0]
+    expect(landing?.lay).toBe(true)
+    expect(landing?.colors).toEqual(['blue', 'red'])
+    const flights = rebuilt.restack?.chips ?? []
+    const cap = flights.find((chip) => chip.lay)
+    expect(cap?.toH).toBe(chipThickness() * 2)
+    expect(cap?.color).toBe('blue')
+    expect(flights.filter((chip) => !chip.lay).every((chip) => chip.toH < (cap?.toH ?? 0))).toBe(true)
+    const drawn = presentChips(rebuilt, 0, metrics).filter((disc) => disc.face && disc.lay)
+    expect(drawn.length).toBeGreaterThan(0)
+    expect(drawn.every((disc) => disc.lay)).toBe(true)
+  })
+})
 
 describe('launch lanes', () => {
   it('blocks pass and dont columns and leaves the other bets alone', () => {

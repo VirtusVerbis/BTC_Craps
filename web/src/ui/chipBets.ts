@@ -47,6 +47,8 @@ export interface ChipBet {
   anchor?: { x: number; y: number }
   /** Testing outline. Absent on Pass and Don't Pass. */
   guide?: { label: string; color: string }
+  /** Every column carries a LAY chip on top. The chip is not part of `columns` and has no dollar value. */
+  lay?: boolean
 }
 
 export const btcPrice = (market: MarketSnapshot): number => {
@@ -166,6 +168,8 @@ export interface PlacedColumn {
   /** Snap back to the constant each restack. Pass and Don't Pass keep a nudged spot. */
   pinned?: boolean
   guide?: { label: string; color: string }
+  /** LAY chip on top of this column. */
+  lay?: boolean
 }
 
 /** Second column steps sideways by `columnStep(z)`. Stacks near the right rail step left. */
@@ -196,6 +200,7 @@ export const placeBets = (
         colors,
         pinned: anchored != null,
         guide: bet.guide,
+        lay: bet.lay,
       })
     })
   }

@@ -280,5 +280,8 @@ describe('strategy chips', () => {
     expect(strategyChipBet(place(10 * PROFILE_RED), 1).columns).toEqual([[...Array(10).fill('red')]])
     expect(strategyChipBet(place(11 * PROFILE_RED), 1).columns).toEqual([['blue', 'red']])
     expect(strategyChipBet(lay(6 * PROFILE_SIX), 1).columns).toEqual([['green', 'red', 'red', 'white']])
+    expect(strategyChipBet(lay(PROFILE_SIX), 1).lay).toBe(true)
+    expect(strategyChipBet(place(PROFILE_RED), 1).lay).toBe(false)
+    expect(strategyChipBet({ ...lay(PROFILE_SIX), role: 'point-lay' }, 1).lay).toBe(true)
   })
 })

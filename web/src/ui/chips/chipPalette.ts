@@ -11,3 +11,10 @@ export const CHIP_PALETTE: Record<
   blue: { face: 0x2c5368, edge: 0x0e2433, spot: 0x8aa0ae, mark: true },
   black: { face: 0x362112, edge: 0x0c0804, spot: 0x947458, mark: true },
 }
+
+/**
+ * Solid lay button. A step brighter than the blue denomination face `#2c5368`,
+ * with a plain edge and no spots.
+ */
+export const LAY_CHIP_FACE = 0x3b7b9b
+export const LAY_CHIP_EDGE = 0x1e4e68

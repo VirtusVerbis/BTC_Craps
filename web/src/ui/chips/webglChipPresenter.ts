@@ -17,12 +17,12 @@ import {
   WebGLRenderer,
 } from 'three'
 import { REFERENCE_HEIGHT } from '../../config/constants'
-import type { ChipColor } from '../chipConstants'
+import { LAY_CHIP_DIAMETER_RATIO, type ChipColor } from '../chipConstants'
 import { PUCK_IMAGE_WIDTH_PX } from '../diceConstants'
 import { compareDepth, PUCK_PLATE } from '../feltDepth'
 import { chipDrawSize, type ChipDisc } from '../chipPhysics'
 import type { PuckPlacement } from '../puckState'
-import { CHIP_PALETTE } from './chipPalette'
+import { CHIP_PALETTE, LAY_CHIP_EDGE, LAY_CHIP_FACE } from './chipPalette'
 import {
   CHIP_CAMERA_BOTTOM,
   CHIP_CAMERA_LEFT,
@@ -39,7 +39,8 @@ import {
 const COLORS: ChipColor[] = ['white', 'red', 'green', 'blue', 'black']
 
 const ATLAS_CELL = 256
-const ATLAS_COLS = COLORS.length
+const LAY_ATLAS_COL = COLORS.length
+const ATLAS_COLS = COLORS.length + 1
 const ATLAS_ROWS = 2
 
 /** View box of `bitcoin-mark.svg`. The mark sits in the gray center of a face. */
@@ -112,6 +113,39 @@ const paintCell = (
   ctx.restore()
 }
 
+/** Solid blue lammer. The edge has no spots. The face is bold white LAY and nothing else. */
+const paintLayCell = (
+  ctx: CanvasRenderingContext2D,
+  originX: number,
+  originY: number,
+  face: boolean,
+): void => {
+  const size = ATLAS_CELL
+  const cx = originX + size / 2
+  const cy = originY + size / 2
+  ctx.save()
+  ctx.beginPath()
+  ctx.arc(cx, cy, size / 2, 0, Math.PI * 2)
+  ctx.clip()
+  ctx.fillStyle = hex(face ? LAY_CHIP_FACE : LAY_CHIP_EDGE)
+  ctx.fillRect(originX, originY, size, size)
+  if (face) {
+    const maxWidth = size * 0.78
+    let fontPx = Math.round(size * 0.42)
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillStyle = '#ffffff'
+    ctx.font = `bold ${fontPx}px "Arial Black", Arial, sans-serif`
+    const measured = ctx.measureText('LAY').width
+    if (measured > maxWidth && measured > 0) {
+      fontPx = Math.round(fontPx * (maxWidth / measured))
+      ctx.font = `bold ${fontPx}px "Arial Black", Arial, sans-serif`
+    }
+    ctx.fillText('LAY', cx, cy)
+  }
+  ctx.restore()
+}
+
 /**
  * Wall row is the top of the canvas, face row the bottom.
  * With `flipY`, that is texture v 0.5–1 and 0–0.5.
@@ -128,6 +162,8 @@ const paintAtlas = (): HTMLCanvasElement => {
     paintCell(ctx, col * ATLAS_CELL, 0, spot, hex(palette.edge), false)
     paintCell(ctx, col * ATLAS_CELL, ATLAS_CELL, spot, hex(palette.face), true)
   })
+  paintLayCell(ctx, LAY_ATLAS_COL * ATLAS_CELL, 0, false)
+  paintLayCell(ctx, LAY_ATLAS_COL * ATLAS_CELL, ATLAS_CELL, true)
   return canvas
 }
 
@@ -392,9 +428,10 @@ export class WebGLChipPresenter {
     const uv = this.uvRect.array as Float32Array
     for (let i = 0; i < count; i += 1) {
       const disc = discs[i]
-      chipDiscMatrix(disc, radiusOf * disc.scale, tempMatrix)
+      const lay = disc.lay === true
+      chipDiscMatrix(disc, radiusOf * disc.scale * (lay ? LAY_CHIP_DIAMETER_RATIO : 1), tempMatrix)
       this.mesh.setMatrixAt(i, tempMatrix)
-      const rect = atlasRect(COLOR_INDEX[disc.color], disc.face)
+      const rect = atlasRect(lay ? LAY_ATLAS_COL : COLOR_INDEX[disc.color], disc.face)
       const offset = i * 4
       uv[offset] = rect[0]
       uv[offset + 1] = rect[1]

@@ -38,7 +38,7 @@ export const SHOOTER_ALL_X = 990
 export const SHOOTER_ALL_Y = 980
 
 /** Wolf's cold lays. The across bet does not need this. */
-export const WOLF_LAY_ON = false
+export const WOLF_LAY_ON = true//false
 
 
 
@@ -172,6 +172,20 @@ export const OLD_MAN_IRON_5_Y = 1500
 
 export const OLD_MAN_FIELD_X = 700
 export const OLD_MAN_FIELD_Y = 1000
+
+/**
+ * Horn high stacks in the center grid, on the red dice.
+ * Near row is Ace (2) then Ace-Deuce (3). Far row is Midnight (12) then Yo (11).
+ * Every horn high uses all four spots. The named spot is the one with the extra unit.
+ */
+export const OLD_MAN_HORN_HIGH_ACE_X = 776
+export const OLD_MAN_HORN_HIGH_ACE_Y = 1405
+export const OLD_MAN_HORN_HIGH_ACE_DEUCE_X = 874
+export const OLD_MAN_HORN_HIGH_ACE_DEUCE_Y = 1405
+export const OLD_MAN_HORN_HIGH_YO_X = 868
+export const OLD_MAN_HORN_HIGH_YO_Y = 1294
+export const OLD_MAN_HORN_HIGH_MIDNIGHT_X = 769
+export const OLD_MAN_HORN_HIGH_MIDNIGHT_Y = 1294
 
 //WOLF
 

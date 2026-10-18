@@ -9,6 +9,9 @@ export const CHIP_HEIGHT_PX = CHIP_WIDTH_PX
 /** Multiplier on diameter and chip thickness. */
 export const CHIP_SIZE_SCALAR = 3//3.2//3.25//1.6//1.2
 
+/** Lay button diameter as a fraction of the money chip under it. Casino lammers use 5:6. */
+export const LAY_CHIP_DIAMETER_RATIO = 5 / 6
+
 /**
  * Draw size at the back wall, as a fraction of `chipDiameter()` at the near rail.
  * 1 keeps every chip the current size. Lower it to shrink chips farther up the felt.
