@@ -22,6 +22,7 @@ import { loadHistogramRolls, pushRoll, saveHistogramRolls } from './ui/histogram
 import type { ChipFrameApply } from './ui/chips/ChipPresenterHost'
 import type { GuideFrameApply } from './ui/chips/guidePresenter'
 import type { DiceFrameApply, LaunchPoint } from './ui/dicePose'
+import type { EyeFrameApply } from './ui/EyeLayer'
 import { useDiceThrow, type ShooterControls } from './ui/useDiceThrow'
 import {
   loadDiceControlBook,
@@ -228,6 +229,7 @@ function App() {
   const precisionShotRef = useRef<Omit<PrecisionThrow, 'speed' | 'lean'> | null>(null)
   const chipApplyRef = useRef<ChipFrameApply | null>(null)
   const diceApplyRef = useRef<DiceFrameApply | null>(null)
+  const eyeApplyRef = useRef<EyeFrameApply | null>(null)
   const guideApplyRef = useRef<GuideFrameApply | null>(null)
   const launchPointRef = useRef<LaunchPoint>({ x: REFERENCE_WIDTH / 2, y: REFERENCE_HEIGHT - 48 })
   const dice = useDiceThrow(
@@ -243,6 +245,7 @@ function App() {
     precisionShotRef,
     chipApplyRef,
     diceApplyRef,
+    eyeApplyRef,
     guideApplyRef,
     launchPointRef,
   )
@@ -316,6 +319,7 @@ function App() {
               dice={dice}
               chipApplyRef={chipApplyRef}
               diceApplyRef={diceApplyRef}
+              eyeApplyRef={eyeApplyRef}
               guideApplyRef={guideApplyRef}
               rolls={rolls}
               histogramReveal={histogram.reveal}

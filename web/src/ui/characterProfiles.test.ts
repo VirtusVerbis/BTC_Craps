@@ -149,6 +149,9 @@ describe('old lady hard ways', () => {
     expect(dollars(first.profiles, 'oldLady-hard-8')).toBe(PROFILE_RED)
     expect(dollars(first.profiles, 'oldLady-inside-6')).toBe(PROFILE_SIX)
     expect(first.callouts.oldLady).toBe('Inside for $11M\nHard 6 for $2.5M\nHard 8 for $2.5M')
+    const ladyTargets = first.gazeTargets.oldLady ?? []
+    expect(ladyTargets.some((x) => x < 360)).toBe(true)
+    expect(ladyTargets.some((x) => x >= 360 && x < 720)).toBe(true)
 
     const pressed = allocateProfiles(purses(stake), [], 4, first.profiles, false, lady, {
       continued: true,
@@ -198,8 +201,11 @@ describe('callouts', () => {
     const stakes = purses(500_000_000)
     const cat = allocateProfiles(stakes, [], 9, [], false, { ...on, oldLady: false, oldMan: false, wolf: false, wolfLay: false })
     expect(cat.callouts.cat).toBe(`Place 6, 8 for $${PROFILE_SIX / 1_000_000}M`)
+    expect(cat.gazeTargets.cat?.every((x) => x < 360)).toBe(true)
     const wolf = allocateProfiles(stakes, [], 4, [], false, { ...on, cat: false, oldLady: false, oldMan: false, wolfLay: false })
     expect(wolf.callouts.wolf).toContain('Across for $13.5M')
+    expect(wolf.gazeTargets.wolf?.length).toBeGreaterThan(0)
+    expect(wolf.gazeTargets.wolf?.every((x) => x < 360)).toBe(true)
   })
 
   it('lists a different place price on its own line', () => {
@@ -293,6 +299,10 @@ describe('horn high', () => {
   it('calls the horn and the field again on the next roll', () => {
     const up = allocateProfiles(purses(500_000_000, 489_000_000), yo, 9, [], false, onlyMan, hand, 3)
     expect(up.callouts.oldMan).toBe('Iron cross for $8.5M\nField for $2.5M\nHorn high yo for $2.5M')
+    const manTargets = up.gazeTargets.oldMan ?? []
+    expect(manTargets.some((x) => x < 360)).toBe(true)
+    expect(manTargets.some((x) => x >= 360 && x < 720)).toBe(true)
+    expect(manTargets.some((x) => x >= 720)).toBe(true)
     const again = allocateProfiles(purses(500_000_000, 489_000_000), yo, 9, up.profiles, false, onlyMan, hand, 3)
     expect(again.callouts.oldMan).toBe('Field for $2.5M\nHorn high yo for $2.5M')
 

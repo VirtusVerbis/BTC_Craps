@@ -19,6 +19,8 @@ import {
 } from './characterPnl'
 import { SPEECH_SHOW_MS, STACK_POSITION_PREVIEW_ON } from './characterBetConstants'
 import { diceLaunchPoint, type DiceFrameApply, type LaunchPoint } from './dicePose'
+import type { EyeFrameApply } from './EyeLayer'
+import { columnsOf, glanceOffsetMs, resolveEyeGaze, type EyeColumn } from './eyeGaze'
 import type { GuideFrameApply } from './chips/guidePresenter'
 import type { ProfileBet } from './characterProfiles'
 import { composeTableBets, type PointHand } from './characterProfiles'
@@ -223,8 +225,15 @@ const aimClearLane = (state: ThrowState, world: ChipWorld, aimedKey: string): { 
   }
 }
 
+interface SpeechRow {
+  text: string
+  until: number
+  columns: EyeColumn[]
+  startedMs: number
+}
+
 const liveSpeech = (
-  speech: Partial<Record<ChipCharacter, { text: string; until: number }>>,
+  speech: Partial<Record<ChipCharacter, SpeechRow>>,
   now: number,
 ): SpeechView[] => {
   const live: SpeechView[] = []
@@ -252,6 +261,7 @@ export const useDiceThrow = (
   precisionShotRef?: RefObject<Omit<PrecisionThrow, 'speed' | 'lean'> | null>,
   chipApplyRef?: MutableRefObject<ChipFrameApply | null>,
   diceApplyRef?: MutableRefObject<DiceFrameApply | null>,
+  eyeApplyRef?: MutableRefObject<EyeFrameApply | null>,
   guideApplyRef?: MutableRefObject<GuideFrameApply | null>,
   launchPointRef?: MutableRefObject<LaunchPoint>,
 ): DicePresentation | null => {
@@ -285,7 +295,8 @@ export const useDiceThrow = (
   const pressRollRef = useRef<number | null>(null)
   const sevenOutRef = useRef(false)
   const pointRollsRef = useRef(0)
-  const speechRef = useRef<Partial<Record<ChipCharacter, { text: string; until: number }>>>({})
+  const speechRef = useRef<Partial<Record<ChipCharacter, SpeechRow>>>({})
+  const eyeStickyRef = useRef<[EyeColumn | null, EyeColumn | null]>([null, null])
   const streakRef = useRef<RollStreak>({ longest: loadRollStreakLongest(), current: 0 })
   const streakView = useCallback(
     (): RollStreakView => ({
@@ -355,6 +366,7 @@ export const useDiceThrow = (
     sevenOutRef.current = false
     pointRollsRef.current = 0
     speechRef.current = {}
+    eyeStickyRef.current = [null, null]
     streakRef.current = { longest: loadRollStreakLongest(), current: 0 }
     setPresentation(
       present(
@@ -401,7 +413,14 @@ export const useDiceThrow = (
       profilesRef.current = table.profiles
       for (const character of PL_CHARACTERS) {
         const text = table.callouts[character]
-        if (text) speechRef.current[character] = { text, until: now + SPEECH_SHOW_MS }
+        if (text) {
+          speechRef.current[character] = {
+            text,
+            until: now + SPEECH_SHOW_MS,
+            columns: columnsOf(table.gazeTargets[character] ?? []),
+            startedMs: now,
+          }
+        }
       }
       const bets = [...table.bets, ...shooter]
       betsRef.current = bets
@@ -583,6 +602,23 @@ export const useDiceThrow = (
       })
       if (launchPointRef) launchPointRef.current = diceLaunchPoint(next.dice)
       diceApplyRef?.current?.({ dice: next.dice, shotClockMs: next.shotClockMs })
+      const launched = stateRef.current.phase === 'flying' || stateRef.current.phase === 'result'
+      const glances = launched
+        ? []
+        : PL_CHARACTERS.flatMap((character) => {
+            const row = speechRef.current[character]
+            if (!row) return []
+            return [{ character, columns: row.columns, startedMs: row.startedMs, offsetMs: glanceOffsetMs(character) }]
+          })
+      const gaze = resolveEyeGaze(
+        next.dice.map((die) => ({ x: die.x, visible: die.visible })),
+        eyeStickyRef.current,
+        glances,
+        now,
+        launched,
+      )
+      eyeStickyRef.current = gaze.sticky
+      eyeApplyRef?.current?.({ strip: gaze.strip, patches: gaze.patches })
       guideApplyRef?.current?.(guides, dieKeys)
       setPresentation((prev) => {
         if (prev && !dicePresentationReactChanged(prev, next)) return prev
@@ -595,9 +631,10 @@ export const useDiceThrow = (
       window.cancelAnimationFrame(frame)
       chipApplyRef?.current?.({ discs: [], dieKeys: [] })
       diceApplyRef?.current?.({ dice: [], shotClockMs: null })
+      eyeApplyRef?.current?.({ strip: 'none', patches: {} })
       guideApplyRef?.current?.([])
     }
-  }, [chipApplyRef, diceApplyRef, enabled, guideApplyRef, launchPointRef, streakView])
+  }, [chipApplyRef, diceApplyRef, eyeApplyRef, enabled, guideApplyRef, launchPointRef, streakView])
 
   if (!enabled) return null
   return presentation

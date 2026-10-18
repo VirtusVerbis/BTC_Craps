@@ -181,6 +181,8 @@ export interface ProfileAllocation {
   profiles: ProfileBet[]
   remainder: CharacterPurses
   callouts: Partial<Record<ChipCharacter, string>>
+  /** Stage x of the bets that produced each callout, horn included. */
+  gazeTargets: Partial<Record<ChipCharacter, number[]>>
 }
 
 interface Spot {
@@ -709,19 +711,26 @@ const hornCallout = (next: readonly ProfileBet[]): string | null => {
   return `Horn high ${HORN_NAME[high]} for ${formatCompactDollars(dollars)}`
 }
 
-const calloutsFor = (
+const spokenBets = (
   previous: readonly ProfileBet[],
   next: readonly ProfileBet[],
-): Partial<Record<ChipCharacter, string>> => {
+): Pick<ProfileAllocation, 'callouts' | 'gazeTargets'> => {
   const added = addedPortion(previous, next)
-  const spoken: Partial<Record<ChipCharacter, string>> = {}
+  const callouts: Partial<Record<ChipCharacter, string>> = {}
+  const gazeTargets: Partial<Record<ChipCharacter, number[]>> = {}
   for (const character of CHARACTERS) {
-    const text = calloutText(added.filter((item) => item.character === character))
+    const mine = added.filter((item) => item.character === character)
+    const text = calloutText(mine)
     const horn = character === 'oldMan' ? hornCallout(next.filter((item) => item.character === character)) : null
     const lines = [text, horn].filter((line) => line)
-    if (lines.length > 0) spoken[character] = lines.join('\n')
+    if (lines.length === 0) continue
+    callouts[character] = lines.join('\n')
+    const hornSpots = horn
+      ? next.filter((item) => item.character === 'oldMan' && item.role === 'horn' && !mine.some((bet) => bet.id === item.id))
+      : []
+    gazeTargets[character] = [...mine, ...hornSpots].map((item) => item.x)
   }
-  return spoken
+  return { callouts, gazeTargets }
 }
 
 export const allocateProfiles = (
@@ -742,7 +751,7 @@ export const allocateProfiles = (
   if (!sevenOut && established == null && switches.oldMan) {
     placeHorn(purses.oldMan, profiles, rolls, pointRolls, false)
   }
-  return { profiles, remainder: purses, callouts: calloutsFor(previous, profiles) }
+  return { profiles, remainder: purses, ...spokenBets(previous, profiles) }
 }
 
 const unitChips = (dollars: number): ChipColor[] => {
@@ -788,6 +797,7 @@ export interface TableBets {
   bets: ChipBet[]
   profiles: ProfileBet[]
   callouts: Partial<Record<ChipCharacter, string>>
+  gazeTargets: Partial<Record<ChipCharacter, number[]>>
 }
 
 /** Line bets after the profile move, plus the strategy stacks. */
@@ -829,5 +839,10 @@ export const composeTableBets = (
   const strategy = allocated.profiles
     .map((item) => strategyChipBet(item, scale))
     .filter((item) => item.columns.some((column) => column.length > 0))
-  return { bets: [...(LINE_STACKS_ON ? line : []), ...strategy], profiles: allocated.profiles, callouts: allocated.callouts }
+  return {
+    bets: [...(LINE_STACKS_ON ? line : []), ...strategy],
+    profiles: allocated.profiles,
+    callouts: allocated.callouts,
+    gazeTargets: allocated.gazeTargets,
+  }
 }

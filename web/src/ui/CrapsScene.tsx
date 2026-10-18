@@ -25,6 +25,8 @@ import { ChipPresenterHost, type ChipFrameApply } from './chips/ChipPresenterHos
 import type { DiceFrameApply } from './dicePose'
 import { DiceLayer, DiceResult } from './DiceLayer'
 import type { DieColorId } from './diceColor'
+import { EyeLayer, type EyeFrameApply } from './EyeLayer'
+import { EYE_TABLE_SRC } from './eyeGaze'
 import { SpeechLayer } from './SpeechLayer'
 import { RollHistogram } from './RollHistogram'
 import type { DicePresentation } from './useDiceThrow'
@@ -74,6 +76,7 @@ interface CrapsSceneProps {
   dice: DicePresentation | null
   chipApplyRef: MutableRefObject<ChipFrameApply | null>
   diceApplyRef: MutableRefObject<DiceFrameApply | null>
+  eyeApplyRef: MutableRefObject<EyeFrameApply | null>
   guideApplyRef: MutableRefObject<GuideFrameApply | null>
   characterPnl: CharacterPnlBook
   rolls: readonly number[]
@@ -101,6 +104,7 @@ const CrapsSceneInner = ({
   dice,
   chipApplyRef,
   diceApplyRef,
+  eyeApplyRef,
   guideApplyRef,
   characterPnl,
   rolls,
@@ -166,11 +170,12 @@ const CrapsSceneInner = ({
   return (
     <div className="scene">
       <img
-        src="/craps-scene-layout_onepiece.png"
+        src={EYE_TABLE_SRC}
         alt=""
         className="scene-layer scene-craps"
         draggable={false}
       />
+      <EyeLayer applyRef={eyeApplyRef} />
       <BonusFields />
       <RollHistogram
         rolls={rolls}
