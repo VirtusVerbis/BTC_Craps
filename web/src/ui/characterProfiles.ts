@@ -636,9 +636,13 @@ export const formatCompactDollars = (dollars: number): string => {
   return `$${Math.round(abs)}`
 }
 
+/** One-roll bets are a new wager every roll, even at the same price. */
+const CALLED_EVERY_ROLL: readonly ProfileRole[] = ['field', 'horn']
+
 const addedPortion = (previous: readonly ProfileBet[], next: readonly ProfileBet[]): ProfileBet[] => {
   const prior = new Map(previous.map((item) => [item.id, item.dollars]))
   return next.flatMap((item) => {
+    if (CALLED_EVERY_ROLL.includes(item.role)) return [item]
     const extra = item.dollars - (prior.get(item.id) ?? 0)
     if (!(extra > 0.5)) return []
     return [{ ...item, dollars: extra }]
@@ -695,10 +699,10 @@ const hornHighOf = (bets: readonly ProfileBet[]): HornNumber | null => {
   return number != null && isHornNumber(number) ? number : null
 }
 
-/** Speaks when the extra white moves, or when the horn goes up. The same high stays quiet. */
-const hornCallout = (previous: readonly ProfileBet[], next: readonly ProfileBet[]): string | null => {
+/** One line for the horn high he just booked. A repeat of the same high still speaks. */
+const hornCallout = (next: readonly ProfileBet[]): string | null => {
   const high = hornHighOf(next)
-  if (high == null || high === hornHighOf(previous)) return null
+  if (high == null) return null
   const dollars = next
     .filter((item) => item.character === 'oldMan' && item.role === 'horn')
     .reduce((sum, item) => sum + item.dollars, 0)
@@ -713,7 +717,7 @@ const calloutsFor = (
   const spoken: Partial<Record<ChipCharacter, string>> = {}
   for (const character of CHARACTERS) {
     const text = calloutText(added.filter((item) => item.character === character))
-    const horn = character === 'oldMan' ? hornCallout(previous, next) : null
+    const horn = character === 'oldMan' ? hornCallout(next.filter((item) => item.character === character)) : null
     const lines = [text, horn].filter((line) => line)
     if (lines.length > 0) spoken[character] = lines.join('\n')
   }

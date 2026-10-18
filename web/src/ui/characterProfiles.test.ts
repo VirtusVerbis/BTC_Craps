@@ -290,20 +290,23 @@ describe('horn high', () => {
     expect(short.profiles.some((bet) => bet.role === 'iron' || bet.role === 'horn' || bet.role === 'field')).toBe(false)
   })
 
-  it('buys the horn on a come-out once the watch is on, and stops repeating the same callout', () => {
+  it('calls the horn and the field again on the next roll', () => {
     const up = allocateProfiles(purses(500_000_000, 489_000_000), yo, 9, [], false, onlyMan, hand, 3)
     expect(up.callouts.oldMan).toBe('Iron cross for $8.5M\nField for $2.5M\nHorn high yo for $2.5M')
+    const again = allocateProfiles(purses(500_000_000, 489_000_000), yo, 9, up.profiles, false, onlyMan, hand, 3)
+    expect(again.callouts.oldMan).toBe('Field for $2.5M\nHorn high yo for $2.5M')
+
     const comeOut = allocateProfiles(purses(500_000_000, 489_000_000), yo, null, up.profiles, false, onlyMan, hand, 3)
     expect(comeOut.profiles.some((bet) => bet.role === 'field')).toBe(false)
     expect(comeOut.profiles.some((bet) => bet.role === 'iron')).toBe(true)
     expect(dollars(comeOut.profiles, 'oldMan-horn-11')).toBe(HORN_UNIT * 2)
-    expect(comeOut.callouts.oldMan).toBeUndefined()
+    expect(comeOut.callouts.oldMan).toBe('Horn high yo for $2.5M')
 
     const waiting = allocateProfiles(purses(500_000_000, 489_000_000), yo, null, up.profiles, false, onlyMan, hand, 2)
     expect(waiting.profiles.some((bet) => bet.role === 'horn')).toBe(false)
 
     const aces = allocateProfiles(purses(500_000_000, 489_000_000), [2, 2, 2], 9, up.profiles, false, onlyMan, hand, 3)
-    expect(aces.callouts.oldMan).toBe('Horn high ace for $2.5M')
+    expect(aces.callouts.oldMan).toBe('Field for $2.5M\nHorn high ace for $2.5M')
 
     const cleared = allocateProfiles(purses(500_000_000), yo, null, up.profiles, true, onlyMan, hand, 5)
     expect(cleared.profiles).toEqual([])
