@@ -26,6 +26,7 @@ import type { DiceFrameApply } from './dicePose'
 import { DiceLayer, DiceResult } from './DiceLayer'
 import type { DieColorId } from './diceColor'
 import { EyeLayer, type EyeFrameApply } from './EyeLayer'
+import { BalanceDeltaLayer, type BalanceDeltaFrameApply } from './BalanceDeltaLayer'
 import { EYE_TABLE_SRC } from './eyeGaze'
 import { SpeechLayer } from './SpeechLayer'
 import { RollHistogram } from './RollHistogram'
@@ -78,6 +79,7 @@ interface CrapsSceneProps {
   diceApplyRef: MutableRefObject<DiceFrameApply | null>
   eyeApplyRef: MutableRefObject<EyeFrameApply | null>
   guideApplyRef: MutableRefObject<GuideFrameApply | null>
+  balanceDeltaApplyRef: MutableRefObject<BalanceDeltaFrameApply | null>
   characterPnl: CharacterPnlBook
   rolls: readonly number[]
   histogramReveal: number
@@ -106,6 +108,7 @@ const CrapsSceneInner = ({
   diceApplyRef,
   eyeApplyRef,
   guideApplyRef,
+  balanceDeltaApplyRef,
   characterPnl,
   rolls,
   histogramReveal,
@@ -209,6 +212,7 @@ const CrapsSceneInner = ({
           )
         })}
       </div>
+      <BalanceDeltaLayer applyRef={balanceDeltaApplyRef} />
       {showBg2Meme && bg2MemeSrc ? (
         <img src={bg2MemeSrc} alt="" className="scene-layer scene-bg2-meme" style={bg2Style} draggable={false} />
       ) : null}

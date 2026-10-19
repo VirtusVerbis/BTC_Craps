@@ -10,13 +10,16 @@ import {
 import type { MarketSnapshot } from '../game/types'
 import { useOpenInterest } from '../data/openInterest'
 import {
-  applyCharacterPnl,
+  applyRollDeltas,
+  characterRollDeltas,
   characterStakes,
   loadCharacterPnl,
   PL_CHARACTERS,
   saveCharacterPnl,
   type CharacterPnlBook,
 } from './characterPnl'
+import { spawnBalanceDeltas, tickBalanceDeltas, type BalanceDelta } from './balanceDelta'
+import type { BalanceDeltaFrameApply } from './BalanceDeltaLayer'
 import { SPEECH_SHOW_MS, STACK_POSITION_PREVIEW_ON } from './characterBetConstants'
 import { diceLaunchPoint, type DiceFrameApply, type LaunchPoint } from './dicePose'
 import type { EyeFrameApply } from './EyeLayer'
@@ -264,6 +267,7 @@ export const useDiceThrow = (
   eyeApplyRef?: MutableRefObject<EyeFrameApply | null>,
   guideApplyRef?: MutableRefObject<GuideFrameApply | null>,
   launchPointRef?: MutableRefObject<LaunchPoint>,
+  balanceDeltaApplyRef?: MutableRefObject<BalanceDeltaFrameApply | null>,
 ): DicePresentation | null => {
   const oi = useOpenInterest()
   const volume = useDiceVolumeWindow(market)
@@ -288,6 +292,8 @@ export const useDiceThrow = (
   ])
   const worldRef = useRef<ChipWorld | null>(null)
   const pnlRef = useRef<CharacterPnlBook>(loadCharacterPnl())
+  const balanceDeltasRef = useRef<BalanceDelta[]>([])
+  const balanceDeltaIdRef = useRef(1)
   const shooterRef = useRef<ShooterBook>(loadShooterBook())
   const betsRef = useRef<readonly ChipBet[]>([])
   const profilesRef = useRef<ProfileBet[]>([])
@@ -358,6 +364,9 @@ export const useDiceThrow = (
     displayRef.current = [arcDisplayFrom(stateRef.current.dice[0]), arcDisplayFrom(stateRef.current.dice[1])]
     worldRef.current = null
     pnlRef.current = loadCharacterPnl()
+    balanceDeltasRef.current = []
+    balanceDeltaIdRef.current = 1
+    balanceDeltaApplyRef?.current?.([])
     shooterRef.current = loadShooterBook()
     betsRef.current = []
     profilesRef.current = []
@@ -518,14 +527,17 @@ export const useDiceThrow = (
           const faces = stateRef.current.dice
           const hard = isHardRoll(faces[0].topFace, faces[1].topFace)
           if (snap && price > 0 && snap.openInterest > 0) {
-            pnlRef.current = applyCharacterPnl(
-              pnlRef.current,
+            const rollDeltas = characterRollDeltas(
               pointBefore,
               result.total,
               characterStakes(snap.openInterest, price, snap.longPct, snap.shortPct),
               profilesRef.current,
               hard,
             )
+            pnlRef.current = applyRollDeltas(pnlRef.current, rollDeltas)
+            const spawned = spawnBalanceDeltas(balanceDeltasRef.current, rollDeltas, now, balanceDeltaIdRef.current)
+            balanceDeltasRef.current = spawned.deltas
+            balanceDeltaIdRef.current = spawned.nextId
             saveCharacterPnl(pnlRef.current)
           }
           if (pointBefore != null && result.total === 7) {
@@ -620,6 +632,9 @@ export const useDiceThrow = (
       eyeStickyRef.current = gaze.sticky
       eyeApplyRef?.current?.({ strip: gaze.strip, patches: gaze.patches })
       guideApplyRef?.current?.(guides, dieKeys)
+      const rising = tickBalanceDeltas(balanceDeltasRef.current, now)
+      balanceDeltasRef.current = rising.deltas
+      balanceDeltaApplyRef?.current?.(rising.frames)
       setPresentation((prev) => {
         if (prev && !dicePresentationReactChanged(prev, next)) return prev
         return { ...next, chips: [] }
@@ -633,8 +648,10 @@ export const useDiceThrow = (
       diceApplyRef?.current?.({ dice: [], shotClockMs: null })
       eyeApplyRef?.current?.({ strip: 'none', patches: {} })
       guideApplyRef?.current?.([])
+      balanceDeltasRef.current = []
+      balanceDeltaApplyRef?.current?.([])
     }
-  }, [chipApplyRef, diceApplyRef, eyeApplyRef, enabled, guideApplyRef, launchPointRef, streakView])
+  }, [balanceDeltaApplyRef, chipApplyRef, diceApplyRef, eyeApplyRef, enabled, guideApplyRef, launchPointRef, streakView])
 
   if (!enabled) return null
   return presentation

@@ -165,6 +165,55 @@ const profileProfit = (point: number | null, total: number, bet: ProfileBet, har
   return settlePlace(point, total, bet.number, bet.dollars).profit
 }
 
+/** This roll's bitcoin and its dollar value at this roll's stake price. */
+export interface CharacterRollDelta {
+  character: ChipCharacter
+  btc: number
+  usd: number
+  /** Stake price used to reprice the standing stack. The floater uses `usd` instead. */
+  price: number
+}
+
+/**
+ * What each character won or lost on this roll.
+ * A zero bitcoin result is omitted. Dollars are this roll only, not a reprice of the old stack.
+ * Profile stakes are already off the line, so the line uses what is still on Pass and Don't Pass.
+ */
+export const characterRollDeltas = (
+  point: number | null,
+  total: number,
+  stakes: CharacterStakes,
+  profiles: readonly ProfileBet[] = [],
+  hard = false,
+): CharacterRollDelta[] => {
+  const deltas: CharacterRollDelta[] = []
+  for (const character of PL_CHARACTERS) {
+    const stake = stakes[character]
+    const price = stakePrice(stake)
+    const mine = profiles.filter((bet) => bet.character === character)
+    const passUsd = mine.filter((bet) => bet.fundedFrom === 'pass').reduce((sum, bet) => sum + bet.dollars, 0)
+    const dontUsd = mine.filter((bet) => bet.fundedFrom === 'dont').reduce((sum, bet) => sum + bet.dollars, 0)
+    const passBtc = price > 0 ? Math.max(0, stake.btc.pass - passUsd / price) : stake.btc.pass
+    const dontBtc = price > 0 ? Math.max(0, stake.btc.dont - dontUsd / price) : stake.btc.dont
+    const profileBtc = price > 0 ? mine.reduce((sum, bet) => sum + profileProfit(point, total, bet, hard), 0) / price : 0
+    const btc = lineDecisionPnl(point, total, passBtc, dontBtc) + profileBtc
+    if (btc === 0) continue
+    deltas.push({ character, btc, usd: btc * price, price })
+  }
+  return deltas
+}
+
+/** Fold already-computed roll deltas into the standing book. An empty list keeps the same book. */
+export const applyRollDeltas = (book: CharacterPnlBook, deltas: readonly CharacterRollDelta[]): CharacterPnlBook => {
+  if (deltas.length === 0) return book
+  const next: CharacterPnlBook = { ...book }
+  for (const delta of deltas) {
+    const totalBtc = book[delta.character].btc + delta.btc
+    next[delta.character] = { btc: totalBtc, usd: totalBtc * delta.price, shown: true }
+  }
+  return next
+}
+
 /**
  * Add this roll's bitcoin result. USD is that bitcoin total at the current price,
  * so a later roll that gives the coins back shows 0 BTC and 0 USD together.
@@ -177,26 +226,7 @@ export const applyCharacterPnl = (
   stakes: CharacterStakes,
   profiles: readonly ProfileBet[] = [],
   hard = false,
-): CharacterPnlBook => {
-  let changed = false
-  const next: CharacterPnlBook = { ...book }
-  for (const character of PL_CHARACTERS) {
-    const stake = stakes[character]
-    const price = stakePrice(stake)
-    const mine = profiles.filter((bet) => bet.character === character)
-    const passUsd = mine.filter((bet) => bet.fundedFrom === 'pass').reduce((sum, bet) => sum + bet.dollars, 0)
-    const dontUsd = mine.filter((bet) => bet.fundedFrom === 'dont').reduce((sum, bet) => sum + bet.dollars, 0)
-    const passBtc = price > 0 ? Math.max(0, stake.btc.pass - passUsd / price) : stake.btc.pass
-    const dontBtc = price > 0 ? Math.max(0, stake.btc.dont - dontUsd / price) : stake.btc.dont
-    const profileBtc = price > 0 ? mine.reduce((sum, bet) => sum + profileProfit(point, total, bet, hard), 0) / price : 0
-    const btc = lineDecisionPnl(point, total, passBtc, dontBtc) + profileBtc
-    if (btc === 0) continue
-    changed = true
-    const totalBtc = book[character].btc + btc
-    next[character] = { btc: totalBtc, usd: totalBtc * price, shown: true }
-  }
-  return changed ? next : book
-}
+): CharacterPnlBook => applyRollDeltas(book, characterRollDeltas(point, total, stakes, profiles, hard))
 
 export const pnlColor = (amount: PnlAmount): string => {
   if (amount.btc > 0) return PL_PROFIT_COLOR

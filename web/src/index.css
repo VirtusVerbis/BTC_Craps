@@ -1021,6 +1021,30 @@ body {
   white-space: nowrap;
 }
 
+/* Same band as the standing balance, painted after it so a new delta covers an older one. */
+.balance-delta-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.balance-delta {
+  position: absolute;
+  margin: 0;
+  transform: translateX(-50%);
+  text-align: center;
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: pre;
+  pointer-events: none;
+  text-shadow:
+    0 1px 0 #000,
+    0 2px 4px #000,
+    0 0 8px rgba(0, 0, 0, 1);
+}
+
 .feed-glyph {
   font-size: 1.21875em;
   line-height: 1;

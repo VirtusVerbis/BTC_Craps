@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   applyCharacterPnl,
+  applyRollDeltas,
+  characterRollDeltas,
   characterStakes,
   emptyCharacterPnl,
   formatPnlBtc,
@@ -152,6 +154,61 @@ describe('character stakes and running total', () => {
     const comeOut = applyCharacterPnl(emptyCharacterPnl(), null, 11, stakes, yo)
     const lineOnly = applyCharacterPnl(emptyCharacterPnl(), null, 11, stakes)
     expect(comeOut.oldMan.btc - lineOnly.oldMan.btc).toBeCloseTo(11_000_000 / 60_000)
+  })
+})
+
+describe('roll deltas', () => {
+  const stakes = characterStakes(1_000, 60_000, 50, 50)
+  const place: ProfileBet = {
+    id: 'cat-place-6',
+    character: 'cat',
+    role: 'place',
+    number: 6,
+    dollars: 6_000_000,
+    fundedFrom: 'pass',
+    label: 'CAT_PLACE_6',
+    x: 0,
+    y: 0,
+  }
+  const of = (deltas: ReturnType<typeof characterRollDeltas>, character: ProfileBet['character']) =>
+    deltas.find((delta) => delta.character === character)
+
+  it('pays the come-out win as this roll only', () => {
+    const deltas = characterRollDeltas(null, 7, stakes)
+    expect(of(deltas, 'cat')).toMatchObject({ btc: 150, usd: 9_000_000 })
+    expect(of(deltas, 'wolf')).toMatchObject({ btc: -150, usd: -9_000_000 })
+  })
+
+  it('pays the seven-out as this roll only', () => {
+    const deltas = characterRollDeltas(8, 7, stakes)
+    expect(of(deltas, 'cat')).toMatchObject({ btc: -150, usd: -9_000_000 })
+    expect(of(deltas, 'wolf')).toMatchObject({ btc: 150, usd: 9_000_000 })
+  })
+
+  it('returns nothing when a point is set', () => {
+    expect(characterRollDeltas(null, 6, stakes)).toEqual([])
+    expect(characterRollDeltas(null, 4, stakes)).toEqual([])
+  })
+
+  it('includes a place hit while the point is still up', () => {
+    const deltas = characterRollDeltas(9, 6, stakes, [place])
+    expect(deltas.map((delta) => delta.character)).toEqual(['cat'])
+    expect(deltas[0].btc).toBeCloseTo(116.666666)
+    expect(deltas[0].usd).toBeCloseTo(7_000_000)
+  })
+
+  it('prices this roll at the new stake and leaves the old stack out of the delta', () => {
+    const won = applyCharacterPnl(emptyCharacterPnl(), null, 7, stakes)
+    const nextStakes = characterStakes(500, 70_000, 50, 50)
+    const deltas = characterRollDeltas(null, 2, nextStakes)
+    const cat = of(deltas, 'cat')
+    const folded = applyRollDeltas(won, deltas)
+    expect(cat?.btc).toBeCloseTo(-75)
+    expect(cat?.usd).toBeCloseTo(-5_250_000)
+    expect(folded.cat.btc).toBeCloseTo(75)
+    expect(folded.cat.usd).toBeCloseTo(5_250_000)
+    expect(folded.cat.usd - won.cat.usd).not.toBeCloseTo(cat?.usd ?? 0)
+    expect(folded).toEqual(applyCharacterPnl(won, null, 2, nextStakes))
   })
 })
 

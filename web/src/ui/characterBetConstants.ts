@@ -53,7 +53,7 @@ export const STACK_POSITION_PREVIEW_ON = false
 export const STACK_POSITION_PREVIEW_HEIGHT = 10
 
 /** Outlines and constant captions on strategy stacks. Turn off after positioning. */
-export const BET_STACK_GUIDES_ON = true
+export const BET_STACK_GUIDES_ON = false//true
 
 export const STACK_GUIDE_FONT_PX = 12
 
@@ -69,7 +69,7 @@ export const SPEECH_SHOW_MS = 3000
 export const SPEECH_FONT_PX = 22
 export const SPEECH_FONT_MIN_PX = 14
 export const SPEECH_MAX_WIDTH_PX = 240
-export const SPEECH_MAX_HEIGHT_PX = 72
+export const SPEECH_MAX_HEIGHT_PX = 230//72
 export const SPEECH_RADIUS_PX = 10
 export const SPEECH_PAD_PX = 8
 
