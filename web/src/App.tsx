@@ -23,6 +23,7 @@ import type { ChipFrameApply } from './ui/chips/ChipPresenterHost'
 import type { GuideFrameApply } from './ui/chips/guidePresenter'
 import type { DiceFrameApply, LaunchPoint } from './ui/dicePose'
 import type { EyeFrameApply } from './ui/EyeLayer'
+import type { EyeMarkFrameApply } from './ui/EyeMarkLayer'
 import type { BalanceDeltaFrameApply } from './ui/BalanceDeltaLayer'
 import { useDiceThrow, type ShooterControls } from './ui/useDiceThrow'
 import {
@@ -231,6 +232,7 @@ function App() {
   const chipApplyRef = useRef<ChipFrameApply | null>(null)
   const diceApplyRef = useRef<DiceFrameApply | null>(null)
   const eyeApplyRef = useRef<EyeFrameApply | null>(null)
+  const eyeMarkApplyRef = useRef<EyeMarkFrameApply | null>(null)
   const guideApplyRef = useRef<GuideFrameApply | null>(null)
   const balanceDeltaApplyRef = useRef<BalanceDeltaFrameApply | null>(null)
   const launchPointRef = useRef<LaunchPoint>({ x: REFERENCE_WIDTH / 2, y: REFERENCE_HEIGHT - 48 })
@@ -251,6 +253,7 @@ function App() {
     guideApplyRef,
     launchPointRef,
     balanceDeltaApplyRef,
+    eyeMarkApplyRef,
   )
   const gestureReady = manualShooter && dice?.phase === 'holding'
   const precisionOn = diceControl.precisionTargeting
@@ -323,6 +326,7 @@ function App() {
               chipApplyRef={chipApplyRef}
               diceApplyRef={diceApplyRef}
               eyeApplyRef={eyeApplyRef}
+              eyeMarkApplyRef={eyeMarkApplyRef}
               guideApplyRef={guideApplyRef}
               balanceDeltaApplyRef={balanceDeltaApplyRef}
               rolls={rolls}

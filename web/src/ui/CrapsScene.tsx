@@ -26,6 +26,7 @@ import type { DiceFrameApply } from './dicePose'
 import { DiceLayer, DiceResult } from './DiceLayer'
 import type { DieColorId } from './diceColor'
 import { EyeLayer, type EyeFrameApply } from './EyeLayer'
+import { EyeMarkLayer, type EyeMarkFrameApply } from './EyeMarkLayer'
 import { BalanceDeltaLayer, type BalanceDeltaFrameApply } from './BalanceDeltaLayer'
 import { EYE_TABLE_SRC } from './eyeGaze'
 import { SpeechLayer } from './SpeechLayer'
@@ -78,6 +79,7 @@ interface CrapsSceneProps {
   chipApplyRef: MutableRefObject<ChipFrameApply | null>
   diceApplyRef: MutableRefObject<DiceFrameApply | null>
   eyeApplyRef: MutableRefObject<EyeFrameApply | null>
+  eyeMarkApplyRef: MutableRefObject<EyeMarkFrameApply | null>
   guideApplyRef: MutableRefObject<GuideFrameApply | null>
   balanceDeltaApplyRef: MutableRefObject<BalanceDeltaFrameApply | null>
   characterPnl: CharacterPnlBook
@@ -107,6 +109,7 @@ const CrapsSceneInner = ({
   chipApplyRef,
   diceApplyRef,
   eyeApplyRef,
+  eyeMarkApplyRef,
   guideApplyRef,
   balanceDeltaApplyRef,
   characterPnl,
@@ -179,6 +182,7 @@ const CrapsSceneInner = ({
         draggable={false}
       />
       <EyeLayer applyRef={eyeApplyRef} />
+      <EyeMarkLayer applyRef={eyeMarkApplyRef} />
       <BonusFields />
       <RollHistogram
         rolls={rolls}

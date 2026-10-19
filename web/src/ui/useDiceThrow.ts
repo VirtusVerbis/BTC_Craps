@@ -20,6 +20,8 @@ import {
 } from './characterPnl'
 import { spawnBalanceDeltas, tickBalanceDeltas, type BalanceDelta } from './balanceDelta'
 import type { BalanceDeltaFrameApply } from './BalanceDeltaLayer'
+import { displayedEyeMarks, emptyPhaseBtc, eyeMarksShouldClear, markedCharacters, stepPhaseBtc, type EyeMarkFrame, type PhaseBtc } from './eyeMarks'
+import type { EyeMarkFrameApply } from './EyeMarkLayer'
 import { SPEECH_SHOW_MS, STACK_POSITION_PREVIEW_ON } from './characterBetConstants'
 import { diceLaunchPoint, type DiceFrameApply, type LaunchPoint } from './dicePose'
 import type { EyeFrameApply } from './EyeLayer'
@@ -268,6 +270,7 @@ export const useDiceThrow = (
   guideApplyRef?: MutableRefObject<GuideFrameApply | null>,
   launchPointRef?: MutableRefObject<LaunchPoint>,
   balanceDeltaApplyRef?: MutableRefObject<BalanceDeltaFrameApply | null>,
+  eyeMarkApplyRef?: MutableRefObject<EyeMarkFrameApply | null>,
 ): DicePresentation | null => {
   const oi = useOpenInterest()
   const volume = useDiceVolumeWindow(market)
@@ -303,6 +306,9 @@ export const useDiceThrow = (
   const pointRollsRef = useRef(0)
   const speechRef = useRef<Partial<Record<ChipCharacter, SpeechRow>>>({})
   const eyeStickyRef = useRef<[EyeColumn | null, EyeColumn | null]>([null, null])
+  const phaseBtcRef = useRef<PhaseBtc>(emptyPhaseBtc())
+  const eyeMarksRef = useRef<EyeMarkFrame>({})
+  const markFloaterIdsRef = useRef<number[]>([])
   const streakRef = useRef<RollStreak>({ longest: loadRollStreakLongest(), current: 0 })
   const streakView = useCallback(
     (): RollStreakView => ({
@@ -376,6 +382,10 @@ export const useDiceThrow = (
     pointRollsRef.current = 0
     speechRef.current = {}
     eyeStickyRef.current = [null, null]
+    phaseBtcRef.current = emptyPhaseBtc()
+    eyeMarksRef.current = {}
+    markFloaterIdsRef.current = []
+    eyeMarkApplyRef?.current?.({})
     streakRef.current = { longest: loadRollStreakLongest(), current: 0 }
     setPresentation(
       present(
@@ -485,6 +495,7 @@ export const useDiceThrow = (
     }
 
     const loop = (now: number) => {
+      const phaseAtStart = stateRef.current.phase
       const dt = Math.min(0.05, (now - last) / 1000)
       last = now
       const metrics = stageMetrics()
@@ -526,8 +537,10 @@ export const useDiceThrow = (
           const price = btcPrice(marketRef.current)
           const faces = stateRef.current.dice
           const hard = isHardRoll(faces[0].topFace, faces[1].topFace)
+          let rollDeltas: ReturnType<typeof characterRollDeltas> = []
+          let decidedFloaterIds: number[] = []
           if (snap && price > 0 && snap.openInterest > 0) {
-            const rollDeltas = characterRollDeltas(
+            rollDeltas = characterRollDeltas(
               pointBefore,
               result.total,
               characterStakes(snap.openInterest, price, snap.longPct, snap.shortPct),
@@ -535,10 +548,22 @@ export const useDiceThrow = (
               hard,
             )
             pnlRef.current = applyRollDeltas(pnlRef.current, rollDeltas)
-            const spawned = spawnBalanceDeltas(balanceDeltasRef.current, rollDeltas, now, balanceDeltaIdRef.current)
+            const idBefore = balanceDeltaIdRef.current
+            const spawned = spawnBalanceDeltas(balanceDeltasRef.current, rollDeltas, now, idBefore)
             balanceDeltasRef.current = spawned.deltas
             balanceDeltaIdRef.current = spawned.nextId
             saveCharacterPnl(pnlRef.current)
+            if (pointBefore != null && stateRef.current.point !== pointBefore) {
+              decidedFloaterIds = spawned.deltas.filter((delta) => delta.id >= idBefore).map((delta) => delta.id)
+            }
+          }
+          if (pointBefore != null) {
+            const phaseStep = stepPhaseBtc(phaseBtcRef.current, pointBefore, stateRef.current.point, rollDeltas)
+            phaseBtcRef.current = phaseStep.phase
+            if (phaseStep.marks) {
+              eyeMarksRef.current = phaseStep.marks
+              markFloaterIdsRef.current = decidedFloaterIds
+            }
           }
           if (pointBefore != null && result.total === 7) {
             sevenOutRef.current = true
@@ -630,11 +655,28 @@ export const useDiceThrow = (
         launched,
       )
       eyeStickyRef.current = gaze.sticky
-      eyeApplyRef?.current?.({ strip: gaze.strip, patches: gaze.patches })
-      guideApplyRef?.current?.(guides, dieKeys)
       const rising = tickBalanceDeltas(balanceDeltasRef.current, now)
       balanceDeltasRef.current = rising.deltas
       balanceDeltaApplyRef?.current?.(rising.frames)
+      const throwStarted = phaseAtStart !== 'flying' && stateRef.current.phase === 'flying'
+      if (
+        markFloaterIdsRef.current.length > 0 ||
+        markedCharacters(eyeMarksRef.current).length > 0
+      ) {
+        const alive = new Set(rising.deltas.map((delta) => delta.id))
+        if (eyeMarksShouldClear(markFloaterIdsRef.current, alive, throwStarted)) {
+          eyeMarksRef.current = {}
+          markFloaterIdsRef.current = []
+        }
+      }
+      const shownMarks = displayedEyeMarks(eyeMarksRef.current)
+      eyeApplyRef?.current?.({
+        strip: gaze.strip,
+        patches: gaze.patches,
+        held: markedCharacters(shownMarks),
+      })
+      eyeMarkApplyRef?.current?.(shownMarks)
+      guideApplyRef?.current?.(guides, dieKeys)
       setPresentation((prev) => {
         if (prev && !dicePresentationReactChanged(prev, next)) return prev
         return { ...next, chips: [] }
@@ -646,12 +688,16 @@ export const useDiceThrow = (
       window.cancelAnimationFrame(frame)
       chipApplyRef?.current?.({ discs: [], dieKeys: [] })
       diceApplyRef?.current?.({ dice: [], shotClockMs: null })
-      eyeApplyRef?.current?.({ strip: 'none', patches: {} })
+      eyeApplyRef?.current?.({ strip: 'none', patches: {}, held: [] })
+      eyeMarksRef.current = {}
+      markFloaterIdsRef.current = []
+      phaseBtcRef.current = emptyPhaseBtc()
+      eyeMarkApplyRef?.current?.({})
       guideApplyRef?.current?.([])
       balanceDeltasRef.current = []
       balanceDeltaApplyRef?.current?.([])
     }
-  }, [balanceDeltaApplyRef, chipApplyRef, diceApplyRef, eyeApplyRef, enabled, guideApplyRef, launchPointRef, streakView])
+  }, [balanceDeltaApplyRef, chipApplyRef, diceApplyRef, eyeApplyRef, eyeMarkApplyRef, enabled, guideApplyRef, launchPointRef, streakView])
 
   if (!enabled) return null
   return presentation

@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, type MutableRefObject } from 'react'
+import type { ChipCharacter } from './chipConstants'
 import { EYE_FACE_RECT, EYE_STRIP_FRACTION } from './eyeConstants'
 import {
   EYE_CHARACTERS,
@@ -12,6 +13,8 @@ import {
 export interface EyeApplyFrame {
   strip: EyeStrip
   patches: Partial<Record<(typeof EYE_CHARACTERS)[number], EyeColumn>>
+  /** These faces stay on the center painting. Their glance and the dice strip do not move the pupils. */
+  held?: readonly ChipCharacter[]
 }
 
 export type EyeFrameApply = (frame: EyeApplyFrame) => void
@@ -20,15 +23,16 @@ const STRIPS: readonly Exclude<EyeStrip, 'none'>[] = ['left', 'right', 'split']
 const COLUMNS: readonly EyeColumn[] = ['left', 'center', 'right']
 
 const frameKey = (frame: EyeApplyFrame): string =>
-  `${frame.strip}|${EYE_CHARACTERS.map((character) => frame.patches[character] ?? '-').join('')}`
+  `${frame.strip}|${EYE_CHARACTERS.map((character) => frame.patches[character] ?? '-').join('')}|${(frame.held ?? []).join(',')}`
 
 const paintEyes = (root: HTMLElement, frame: EyeApplyFrame) => {
+  const held = new Set(frame.held ?? [])
   for (const strip of STRIPS) {
     const node = root.querySelector(`[data-eye-strip="${strip}"]`)
     if (node instanceof HTMLElement) node.classList.toggle('is-on', frame.strip === strip)
   }
   for (const character of EYE_CHARACTERS) {
-    const gaze = frame.patches[character]
+    const gaze = held.has(character) ? 'center' : frame.patches[character]
     for (const column of COLUMNS) {
       const node = root.querySelector(`[data-eye-patch="${character}-${column}"]`)
       if (node instanceof HTMLElement) node.classList.toggle('is-on', gaze === column)
@@ -38,7 +42,7 @@ const paintEyes = (root: HTMLElement, frame: EyeApplyFrame) => {
 
 export const EyeLayer = ({ applyRef }: { applyRef: MutableRefObject<EyeFrameApply | null> }) => {
   const rootRef = useRef<HTMLDivElement>(null)
-  const frameRef = useRef<EyeApplyFrame>({ strip: 'none', patches: {} })
+  const frameRef = useRef<EyeApplyFrame>({ strip: 'none', patches: {}, held: [] })
   const shownRef = useRef('')
 
   useEffect(() => {

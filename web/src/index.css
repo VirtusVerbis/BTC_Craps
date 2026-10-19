@@ -140,6 +140,34 @@ body {
   width: 100%;
 }
 
+/* Same level as the eyes, later in the scene so the covers sit on the pupils. */
+.eye-mark-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.eye-pupil-cover,
+.eye-mark-symbol {
+  position: absolute;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.eye-pupil-cover.is-on,
+.eye-mark-symbol.is-on {
+  visibility: visible;
+}
+
+.eye-pupil-cover {
+  border-radius: 50%;
+}
+
+.eye-mark-symbol {
+  object-fit: fill;
+}
+
 .scene-layer img {
   max-width: 100%;
   max-height: 100%;
