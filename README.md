@@ -1,3 +1,5 @@
+![BTC Craps table](docs/table.jpg)
+
 # BTC Craps (Bitcoin Midnight)
 
 **<a href="https://bitcoinmidnight.com" target="_blank" rel="noopener noreferrer">bitcoinmidnight.com</a>**
