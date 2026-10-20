@@ -17,8 +17,15 @@ export const dicePresentationReactChanged = (
   if (prev.bonusStakes.tall !== next.bonusStakes.tall || prev.bonusStakes.small !== next.bonusStakes.small) return true
   if (prev.rollStreak.current !== next.rollStreak.current) return true
   if (prev.rollStreak.longest !== next.rollStreak.longest) return true
+  if (prev.betClockSec !== next.betClockSec) return true
+  if (prev.purse !== next.purse) return true
+  if (prev.session.usd !== next.session.usd || prev.session.btc !== next.session.btc) return true
+  if (feltSignature(prev.felt) !== feltSignature(next.felt)) return true
   return false
 }
+
+const feltSignature = (felt: DicePresentation['felt']): string =>
+  felt.map((bet) => `${bet.id}:${bet.dollars}:${bet.number ?? ''}:${bet.spot ?? ''}`).join('|')
 
 const shallowSpeechEqual = (
   a: DicePresentation['speech'],

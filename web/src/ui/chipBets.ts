@@ -39,7 +39,7 @@ export interface ChipBet {
   /** Shooter is a fixed one-red bettor, not an open-interest character. */
   character: ChipCharacter | 'shooter'
   /** `all`, `tall`, and `small` are bonus-square bets. Open-interest bets stay on pass or don't. */
-  side: ChipSide | 'all' | 'tall' | 'small'
+  side: ChipSide | 'all' | 'tall' | 'small' | 'felt'
   dollars: number
   /** Bottom to top. At most two columns, each at most 20 high. */
   columns: ChipColor[][]

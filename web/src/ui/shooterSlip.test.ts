@@ -1,0 +1,201 @@
+import { describe, expect, it } from 'vitest'
+import { emptyBonusHand, applyBonusRoll } from './bonusCraps'
+import { CHIP_FACE_VALUE } from './chipBets'
+import {
+  SHOOTER_BANK,
+  SHOOTER_WHITE,
+  addChip,
+  applyStandingProfile,
+  beginRoll,
+  canClear,
+  clearBet,
+  defaultBetSettings,
+  deleteRule,
+  emptySlip,
+  minimumDollars,
+  oddsMinimumDollars,
+  addRule,
+  setRuleDollars,
+  setTableSide,
+  addSessionResult,
+  sessionAfterMode,
+  settleSlip,
+  syncComeOut,
+  undoLast,
+  withLockedRule,
+} from './shooterSlip'
+import { SHOOTER_RED } from './shooterProfile'
+
+const red = SHOOTER_RED
+
+describe('shooter minimums', () => {
+  it('requires one red on the line, come, field, and don\'t come', () => {
+    expect(minimumDollars('pass', null)).toBe(red)
+    expect(minimumDollars('dont', null)).toBe(red)
+    expect(minimumDollars('come', null)).toBe(red)
+    expect(minimumDollars('dontCome', null)).toBe(red)
+    expect(minimumDollars('field', null)).toBe(red)
+  })
+
+  it('uses one red plus one white where the booking unit is six', () => {
+    expect(minimumDollars('place', 6)).toBe(red + SHOOTER_WHITE)
+    expect(minimumDollars('place', 4)).toBe(red)
+    expect(minimumDollars('lay', 5)).toBe(red + SHOOTER_WHITE)
+    expect(minimumDollars('lay', 10)).toBe(red)
+  })
+
+  it('raises odds to a whole payout and at least one red', () => {
+    expect(oddsMinimumDollars(true, 6)).toBe(red)
+    expect(oddsMinimumDollars(true, 4)).toBe(red)
+    expect(oddsMinimumDollars(true, 5)).toBe(red + SHOOTER_WHITE)
+    expect(oddsMinimumDollars(false, 4)).toBe(red + SHOOTER_WHITE)
+    expect(oddsMinimumDollars(false, 6)).toBe(red + SHOOTER_WHITE)
+    expect(oddsMinimumDollars(false, 5)).toBe(red + SHOOTER_WHITE)
+  })
+})
+
+describe('shooter slip', () => {
+  it('opens a hand with one red on Pass, Don\'t Pass, and Make \'Em All', () => {
+    const slip = beginRoll(emptySlip(), defaultBetSettings(), null)
+    expect(slip.purse).toBe(SHOOTER_BANK - red * 3)
+    expect(slip.bets.map((bet) => bet.kind).sort()).toEqual(['all', 'dont', 'pass'])
+  })
+
+  it('opens dark side with one red on Don\'t Pass', () => {
+    const slip = beginRoll(emptySlip(), { ...defaultBetSettings(), darkSide: true }, null)
+    expect(slip.bets.map((bet) => bet.kind)).toEqual(['dont'])
+    expect(slip.bets[0].dollars).toBe(red)
+  })
+
+  it('does not undo a preset and will not drop the last line', () => {
+    const opened = beginRoll(emptySlip(), defaultBetSettings(), null)
+    expect(undoLast(opened, null)).toBe(opened)
+    const pass = opened.bets.find((bet) => bet.kind === 'pass')
+    expect(pass && canClear(opened, pass, null)).toBe(true)
+    const cleared = pass ? clearBet(opened, pass.id, null) : opened
+    expect(cleared.bets.some((bet) => bet.kind === 'pass')).toBe(false)
+    const dont = cleared.bets.find((bet) => bet.kind === 'dont')
+    expect(dont && canClear(cleared, dont, null)).toBe(false)
+  })
+
+  it('adds a user chip that undo removes without touching the preset', () => {
+    const opened = beginRoll(emptySlip(), defaultBetSettings(), null)
+    const added = addChip(opened, 'pass', null, null, 'white', null)
+    const pass = added.bets.find((bet) => bet.kind === 'pass')
+    expect(pass?.dollars).toBe(red + SHOOTER_WHITE)
+    const undone = undoLast(added, null)
+    expect(undone.bets.find((bet) => bet.kind === 'pass')?.dollars).toBe(red)
+  })
+
+  it('refuses a pass bet once a point is up and keeps the pass contract', () => {
+    const opened = beginRoll(emptySlip(), defaultBetSettings(), null)
+    const point = beginRoll(opened, defaultBetSettings(), 6)
+    expect(addChip(point, 'pass', null, null, 'red', 6)).toBe(point)
+    const pass = point.bets.find((bet) => bet.kind === 'pass')
+    expect(pass && canClear(point, pass, 6)).toBe(false)
+  })
+
+  it('moves a come bet onto its number and refuses to clear it there', () => {
+    let slip = beginRoll(emptySlip(), defaultBetSettings(), null)
+    slip = addChip(slip, 'come', null, null, 'red', null)
+    const moved = settleSlip(slip, 6, 8, false)
+    const come = moved.slip.bets.find((bet) => bet.kind === 'come')
+    expect(come).toMatchObject({ number: 8 })
+    expect(come && canClear(moved.slip, come, 6)).toBe(false)
+  })
+
+  it('pays the field on the come-out and refills the purse after a seven out', () => {
+    let slip = beginRoll(emptySlip(), defaultBetSettings(), null)
+    slip = addChip(slip, 'field', null, null, 'red', null)
+    const comeOut = settleSlip(slip, null, 2, false)
+    expect(comeOut.profit).toBe(red * 3)
+    const pointed = beginRoll(comeOut.slip, defaultBetSettings(), 6)
+    const out = settleSlip(pointed, 6, 7, false)
+    expect(out.slip.purse).toBe(SHOOTER_BANK)
+    expect(out.slip.bets).toEqual([])
+    expect(out.slip.handOpen).toBe(false)
+  })
+
+  it('returns come odds on a come-out seven', () => {
+    let slip = beginRoll(emptySlip(), defaultBetSettings(), 6)
+    slip = addChip(slip, 'come', null, null, 'red', 6)
+    const traveled = settleSlip(slip, 6, 5, false).slip
+    const withOdds = addChip(traveled, 'comeOdds', 5, null, 'red', null)
+    const comeOut = settleSlip(withOdds, null, 7, false)
+    expect(comeOut.slip.bets.some((bet) => bet.kind === 'comeOdds')).toBe(false)
+    expect(comeOut.slip.purse).toBeGreaterThan(withOdds.purse)
+  })
+
+  it('resets Pass or Don\'t Pass to one red when the table side toggles', () => {
+    const raised = setRuleDollars(defaultBetSettings(), 'locked-pass', red * 4)
+    const extra = addRule(raised, 'comeOut', 'field')
+    const dark = setTableSide(extra, true)
+    expect(dark.darkSide).toBe(true)
+    expect(dark.comeOut.filter((rule) => rule.kind === 'pass' || rule.kind === 'dont')).toEqual([
+      expect.objectContaining({ kind: 'dont', locked: true, dollars: red }),
+    ])
+    expect(dark.comeOut.some((rule) => rule.kind === 'field')).toBe(true)
+    const light = setTableSide(dark, false)
+    expect(light.comeOut.find((rule) => rule.locked)).toMatchObject({ kind: 'pass', dollars: red })
+    expect(setTableSide(raised, false)).toBe(raised)
+  })
+
+  it('locks the come-out rule for the selected side', () => {
+    const dark = withLockedRule({ ...defaultBetSettings(), darkSide: true, comeOut: [] })
+    expect(dark.comeOut.some((rule) => rule.locked && rule.kind === 'dont')).toBe(true)
+    const raised = setRuleDollars(dark, 'locked-dont', red * 3)
+    expect(raised.comeOut.find((rule) => rule.locked)?.dollars).toBe(red * 3)
+    expect(deleteRule(raised, 'locked-dont').comeOut.some((rule) => rule.locked)).toBe(true)
+  })
+
+  it('drops Make \'Em All on a seven without putting it back on that roll', () => {
+    const opened = beginRoll(emptySlip(), defaultBetSettings(), null)
+    const lost = settleSlip(opened, null, 7, false, emptyBonusHand())
+    expect(lost.slip.bets.some((bet) => bet.kind === 'all')).toBe(false)
+  })
+
+  it('pays Make \'Em All when the hand completes', () => {
+    const opened = beginRoll(emptySlip(), defaultBetSettings(), null)
+    let hand = emptyBonusHand()
+    for (const total of [8, 9, 10, 11, 12, 2, 3, 4, 5]) hand = applyBonusRoll(hand, total).hand
+    const paid = settleSlip(opened, 6, 6, true, hand)
+    expect(paid.profit).toBe(red * 150)
+  })
+
+  it('switches the standing profile when Dark Side flips before a point', () => {
+    const opened = beginRoll(emptySlip(), defaultBetSettings(), null)
+    const dark = applyStandingProfile(opened, true, null)
+    expect(dark.bets.map((bet) => bet.kind)).toEqual(['dont'])
+    expect(dark.purse + red).toBe(SHOOTER_BANK)
+  })
+
+  it('replaces the opening line when Same Bet turns on before a point', () => {
+    const opened = beginRoll(emptySlip(), defaultBetSettings(), null)
+    const same = syncComeOut(opened, withLockedRule({ ...defaultBetSettings(), sameBet: true, comeOut: [] }))
+    expect(same.bets.map((bet) => bet.kind)).toEqual(['pass'])
+    expect(same.purse).toBe(SHOOTER_BANK - red)
+  })
+
+  it('starts a session at zero on entry and ignores results after Auto returns', () => {
+    const entered = sessionAfterMode({ usd: 40, btc: 1 }, true, false)
+    expect(entered).toEqual({ usd: 0, btc: 0 })
+    const kept = addSessionResult(entered, false, red, 50_000)
+    expect(kept).toBe(entered)
+    expect(addSessionResult(entered, true, red, 50_000)).toEqual({ usd: red, btc: red / 50_000 })
+  })
+
+  it('keeps Pass through a point and moves to Don\'t Pass on the next come-out', () => {
+    const opened = beginRoll(emptySlip(), defaultBetSettings(), null)
+    const point = beginRoll(opened, { ...defaultBetSettings(), darkSide: true }, 8)
+    expect(point.bets.some((bet) => bet.kind === 'pass')).toBe(true)
+    const made = settleSlip(point, 8, 8, false).slip
+    const comeOut = beginRoll(made, { ...defaultBetSettings(), darkSide: true }, null)
+    expect(comeOut.bets.map((bet) => bet.kind)).toEqual(['dont'])
+  })
+
+  it('rejects a chip the purse cannot cover', () => {
+    const broke = { ...emptySlip(), purse: SHOOTER_WHITE }
+    expect(addChip(broke, 'pass', null, null, 'red', null)).toBe(broke)
+    expect(CHIP_FACE_VALUE.black * 10).toBe(SHOOTER_BANK)
+  })
+})

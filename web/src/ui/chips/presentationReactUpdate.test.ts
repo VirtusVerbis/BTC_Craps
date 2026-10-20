@@ -33,6 +33,10 @@ const frame = (patch: Partial<DicePresentation> = {}): DicePresentation => ({
   rollStreak: { current: 0, longest: 0 },
   phase: 'holding',
   shotClockMs: null,
+  betClockSec: null,
+  purse: 0,
+  session: { usd: 0, btc: 0 },
+  felt: [],
   ...patch,
 })
 

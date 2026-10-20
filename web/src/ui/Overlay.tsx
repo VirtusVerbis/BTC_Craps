@@ -36,6 +36,7 @@ interface OverlayProps {
   rollStreak: RollStreakView
   /** True while the Shooter button has switched the table into manual throws. */
   shooterMode: boolean
+  session: { usd: number; btc: number }
   status: {
     binance: FeedStatus
     coinbase: FeedStatus
@@ -161,6 +162,7 @@ export const Overlay = ({
   bonusStakes,
   rollStreak,
   shooterMode,
+  session,
   status,
 }: OverlayProps) => {
   const makeEmAll = SHOOTER_ON ? formatMakeEmAll(shooter.allWorking) : null
@@ -378,6 +380,14 @@ export const Overlay = ({
             </p>
           ) : null}
           {SHOOTER_ON ? <RollStreakLabel view={rollStreak} /> : null}
+          {SHOOTER_ON && shooterMode ? (
+            <p className="shooter-hud shooter-hud-pnl" style={{ fontSize: `${OI_LABEL_FONT_REM}rem` }}>
+              <span className="shooter-hud-tag">Session P/L </span>
+              <span style={{ color: shooterFigureColor({ allWorking: false, pnl: { btc: session.btc, usd: session.usd, shown: true } }) }}>
+                {formatShooterPnl({ allWorking: false, pnl: { btc: session.btc, usd: session.usd, shown: true } })}
+              </span>
+            </p>
+          ) : null}
         </div>
         <button className="time-button" type="button" onClick={onTimeClick}>
           <span className="overlay-label time-label">Time</span>

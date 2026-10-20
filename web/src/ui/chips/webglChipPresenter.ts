@@ -22,7 +22,8 @@ import { PUCK_IMAGE_WIDTH_PX } from '../diceConstants'
 import { compareDepth, PUCK_PLATE } from '../feltDepth'
 import { chipDrawSize, type ChipDisc } from '../chipPhysics'
 import type { PuckPlacement } from '../puckState'
-import { CHIP_PALETTE, LAY_CHIP_EDGE, LAY_CHIP_FACE } from './chipPalette'
+import { chipHex, paintChipCell, paintLayCell } from './chipFace'
+import { CHIP_PALETTE } from './chipPalette'
 import {
   CHIP_CAMERA_BOTTOM,
   CHIP_CAMERA_LEFT,
@@ -43,109 +44,6 @@ const LAY_ATLAS_COL = COLORS.length
 const ATLAS_COLS = COLORS.length + 1
 const ATLAS_ROWS = 2
 
-/** View box of `bitcoin-mark.svg`. The mark sits in the gray center of a face. */
-const MARK_VIEW_W = 273.6
-const MARK_VIEW_H = 360
-const MARK_D =
-  'M217.021,167.042c18.631-9.483,30.288-26.184,27.565-54.007c-3.667-38.023-36.526-50.773-78.006-54.404l-0.008-52.741h-32.139l-0.009,51.354c-8.456,0-17.076,0.166-25.657,0.338L108.76,5.897l-32.11-0.003l-0.006,52.728c-6.959,0.142-13.793,0.277-20.466,0.277v-0.156l-44.33-0.018l0.006,34.282c0,0,23.734-0.446,23.343-0.013c13.013,0.009,17.262,7.559,18.484,14.076l0.01,60.083v84.397c-0.573,4.09-2.984,10.625-12.083,10.637c0.414,0.364-23.379-0.004-23.379-0.004l-6.375,38.335h41.817c7.792,0.009,15.448,0.13,22.959,0.19l0.028,53.338l32.102,0.009l-0.009-52.779c8.832,0.18,17.357,0.258,25.684,0.247l-0.009,52.532h32.138l0.018-53.249c54.022-3.1,91.842-16.697,96.544-67.385C266.916,192.612,247.692,174.396,217.021,167.042z M109.535,95.321c18.126,0,75.132-5.767,75.14,32.064c-0.008,36.269-56.996,32.032-75.14,32.032V95.321z M109.521,262.447l0.014-70.672c21.778-0.006,90.085-6.261,90.094,35.32C199.638,266.971,131.313,262.431,109.521,262.447z'
-
-let markPath: Path2D | null = null
-
-const bitcoinPath = (): Path2D => {
-  if (!markPath) markPath = new Path2D(MARK_D)
-  return markPath
-}
-
-const hex = (n: number): string => `#${n.toString(16).padStart(6, '0')}`
-
-const wedge = (
-  ctx: CanvasRenderingContext2D,
-  cx: number,
-  cy: number,
-  radius: number,
-  start: number,
-  end: number,
-  color: string,
-): void => {
-  ctx.beginPath()
-  ctx.moveTo(cx, cy)
-  ctx.arc(cx, cy, radius, start, end)
-  ctx.closePath()
-  ctx.fillStyle = color
-  ctx.fill()
-}
-
-/** One atlas cell: rim spots, and on the face a gray center plus the Bitcoin mark. */
-const paintCell = (
-  ctx: CanvasRenderingContext2D,
-  originX: number,
-  originY: number,
-  spot: string,
-  body: string,
-  face: boolean,
-): void => {
-  const size = ATLAS_CELL
-  const cx = originX + size / 2
-  const cy = originY + size / 2
-  ctx.save()
-  ctx.beginPath()
-  ctx.arc(cx, cy, size / 2, 0, Math.PI * 2)
-  ctx.clip()
-  for (let i = 0; i < 5; i += 1) {
-    const start = -Math.PI / 2 + (i * 72 * Math.PI) / 180
-    const spotEnd = start + (16 * Math.PI) / 180
-    const end = start + (72 * Math.PI) / 180
-    wedge(ctx, cx, cy, size / 2, start, spotEnd, spot)
-    wedge(ctx, cx, cy, size / 2, spotEnd, end, body)
-  }
-  if (face) {
-    ctx.beginPath()
-    ctx.arc(cx, cy, size * 0.35, 0, Math.PI * 2)
-    ctx.fillStyle = '#d0d0d0'
-    ctx.fill()
-    const markW = size * 0.4256
-    const markH = size * 0.56
-    ctx.translate(cx - markW / 2, cy - markH / 2)
-    ctx.scale(markW / MARK_VIEW_W, markH / MARK_VIEW_H)
-    ctx.fillStyle = '#F7931A'
-    ctx.fill(bitcoinPath())
-  }
-  ctx.restore()
-}
-
-/** Solid blue lammer. The edge has no spots. The face is bold white LAY and nothing else. */
-const paintLayCell = (
-  ctx: CanvasRenderingContext2D,
-  originX: number,
-  originY: number,
-  face: boolean,
-): void => {
-  const size = ATLAS_CELL
-  const cx = originX + size / 2
-  const cy = originY + size / 2
-  ctx.save()
-  ctx.beginPath()
-  ctx.arc(cx, cy, size / 2, 0, Math.PI * 2)
-  ctx.clip()
-  ctx.fillStyle = hex(face ? LAY_CHIP_FACE : LAY_CHIP_EDGE)
-  ctx.fillRect(originX, originY, size, size)
-  if (face) {
-    const maxWidth = size * 0.78
-    let fontPx = Math.round(size * 0.42)
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillStyle = '#ffffff'
-    ctx.font = `bold ${fontPx}px "Arial Black", Arial, sans-serif`
-    const measured = ctx.measureText('LAY').width
-    if (measured > maxWidth && measured > 0) {
-      fontPx = Math.round(fontPx * (maxWidth / measured))
-      ctx.font = `bold ${fontPx}px "Arial Black", Arial, sans-serif`
-    }
-    ctx.fillText('LAY', cx, cy)
-  }
-  ctx.restore()
-}
-
 /**
  * Wall row is the top of the canvas, face row the bottom.
  * With `flipY`, that is texture v 0.5–1 and 0–0.5.
@@ -158,12 +56,12 @@ const paintAtlas = (): HTMLCanvasElement => {
   if (!ctx) return canvas
   COLORS.forEach((color, col) => {
     const palette = CHIP_PALETTE[color]
-    const spot = hex(palette.spot)
-    paintCell(ctx, col * ATLAS_CELL, 0, spot, hex(palette.edge), false)
-    paintCell(ctx, col * ATLAS_CELL, ATLAS_CELL, spot, hex(palette.face), true)
+    const spot = chipHex(palette.spot)
+    paintChipCell(ctx, col * ATLAS_CELL, 0, ATLAS_CELL, spot, chipHex(palette.edge), false)
+    paintChipCell(ctx, col * ATLAS_CELL, ATLAS_CELL, ATLAS_CELL, spot, chipHex(palette.face), true)
   })
-  paintLayCell(ctx, LAY_ATLAS_COL * ATLAS_CELL, 0, false)
-  paintLayCell(ctx, LAY_ATLAS_COL * ATLAS_CELL, ATLAS_CELL, true)
+  paintLayCell(ctx, LAY_ATLAS_COL * ATLAS_CELL, 0, ATLAS_CELL, false)
+  paintLayCell(ctx, LAY_ATLAS_COL * ATLAS_CELL, ATLAS_CELL, ATLAS_CELL, true)
   return canvas
 }
 

@@ -20,7 +20,7 @@ const blockedTarget = (target: EventTarget | null): boolean => {
   if (!(target instanceof Element)) return false
   return Boolean(
     target.closest(
-      '.shooter-mode-button, .shooter-scroll-note, .time-button, .video-overlay-close, .side-panel, .precision-mode-switch, .precision-ok, a',
+      '.shooter-mode-button, .shooter-scroll-note, .time-button, .video-overlay-close, .side-panel, .precision-mode-switch, .precision-ok, .shooter-bet-ui, .shooter-bet-hit, .shooter-bet-action, a',
     ),
   )
 }
@@ -56,6 +56,8 @@ export const usePrecisionPhases = (
   stageRef: RefObject<HTMLElement | null>,
   controlsRef: RefObject<ShooterControls | null>,
   shotRef: { current: Omit<PrecisionThrow, 'speed' | 'lean'> | null },
+  /** False once the dice leave the hold. A bet clock suspends `enabled` without resetting the phase. */
+  holdActive = true,
 ) => {
   const [phase, setPhase] = useState<PrecisionPhase>('target')
   const [target, setTarget] = useState<StagePoint>(defaultPrecisionTarget)
@@ -70,8 +72,8 @@ export const usePrecisionPhases = (
   shotRef.current = precisionOn ? { targetX: target.x, targetY: target.y, angleDeg: angle, spin } : null
 
   useEffect(() => {
-    if (!enabled) setPhase('target')
-  }, [enabled])
+    if (!holdActive) setPhase('target')
+  }, [holdActive])
 
   const accept = () => setPhase((current) => nextPhase(current))
 

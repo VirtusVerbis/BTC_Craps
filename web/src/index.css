@@ -1293,6 +1293,11 @@ body {
   color: #1a1208;
 }
 
+.precision-mode-switch button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .precision-mode-switch button:focus-visible {
   outline: 2px solid #f7931a;
   outline-offset: 2px;
@@ -1927,4 +1932,214 @@ html.shooter-gesture-lock body {
 
 .dice-control-hard {
   margin-top: 0.35rem;
+}
+
+.shooter-bet-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 32;
+  pointer-events: none;
+}
+
+.shooter-bet-hits {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.shooter-bet-hit {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.shooter-bet-hit rect,
+.shooter-bet-hit polygon {
+  fill: transparent;
+  pointer-events: all;
+}
+
+.shooter-bet-preview rect,
+.shooter-bet-preview polygon {
+  fill: rgba(0, 255, 255, 0.16);
+  stroke: #00ffff;
+  stroke-width: 3;
+}
+
+.shooter-bet-preview text {
+  fill: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  text-anchor: middle;
+}
+
+.shooter-bet-ring {
+  fill: none;
+  stroke: #ffe566;
+  stroke-width: 4;
+}
+
+.shooter-bet-place,
+.shooter-bet-ui {
+  pointer-events: auto;
+}
+
+.shooter-bet-place {
+  position: absolute;
+  top: 1744px;
+  white-space: nowrap;
+}
+
+.shooter-bet-ui {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.shooter-bet-action {
+  min-width: 148px;
+  padding: 0.5rem 1.1rem;
+  border: 0;
+  border-radius: 16px;
+  background: #f7931a;
+  color: #1a1208;
+  font: inherit;
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.shooter-bet-action:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.shooter-bet-purse,
+.shooter-bet-clock {
+  margin: 0;
+  color: #fff;
+  font-size: 28px;
+  font-weight: 800;
+  text-shadow: 0 2px 3px #000, 0 0 8px rgba(0, 0, 0, 0.9);
+}
+
+.shooter-chip-tray {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.shooter-chip-tray .shooter-chip {
+  box-shadow: 0 4px 8px 2px rgba(0, 0, 0, 0.72);
+}
+
+.shooter-chip-tray .shooter-chip.is-selected {
+  box-shadow: 0 0 0 4px #ffe566, 0 4px 8px 2px rgba(0, 0, 0, 0.72);
+}
+
+.shooter-chip {
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+
+.shooter-chip img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.shooter-chip.is-selected {
+  box-shadow: 0 0 0 4px #ffe566;
+}
+
+.shooter-side-switch {
+  display: flex;
+  overflow: hidden;
+  border: 1px solid rgba(247, 147, 26, 0.38);
+  border-radius: 10px;
+}
+
+.shooter-side-switch button {
+  appearance: none;
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  padding: 0.45rem 0.3rem;
+  background: rgba(7, 7, 12, 0.66);
+  color: #f6f0da;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.shooter-side-switch button.is-selected {
+  background: #f7931a;
+  color: #1a1208;
+}
+
+.shooter-side-switch button:focus-visible {
+  outline: 2px solid #f7931a;
+  outline-offset: 2px;
+  z-index: 1;
+}
+
+.shooter-rule-list h3 {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.shooter-rule-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.45rem;
+}
+
+.shooter-rule {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  align-items: center;
+  margin-top: 0.35rem;
+}
+
+.shooter-rule select {
+  max-width: 8.5rem;
+}
+
+.shooter-rule-chips {
+  display: flex;
+  gap: 0.2rem;
+}
+
+.shooter-rule .shooter-chip {
+  width: 28px;
+  height: 28px;
+}
+
+.shooter-rule-total {
+  color: #f6f0da;
+  font-size: 0.75rem;
+}
+
+.shooter-rule-minus {
+  width: 1.6rem;
+  height: 1.6rem;
+  border: 0;
+  border-radius: 999px;
+  background: #5c4030;
+  color: #f6f0da;
+  cursor: pointer;
 }

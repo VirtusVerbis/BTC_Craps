@@ -22,7 +22,7 @@ import { spawnBalanceDeltas, tickBalanceDeltas, type BalanceDelta } from './bala
 import type { BalanceDeltaFrameApply } from './BalanceDeltaLayer'
 import { displayedEyeMarks, emptyPhaseBtc, eyeMarksShouldClear, markedCharacters, stepPhaseBtc, type EyeMarkFrame, type PhaseBtc } from './eyeMarks'
 import type { EyeMarkFrameApply } from './EyeMarkLayer'
-import { SPEECH_SHOW_MS, STACK_POSITION_PREVIEW_ON } from './characterBetConstants'
+import { SHOOTER_ON, SPEECH_SHOW_MS, STACK_POSITION_PREVIEW_ON } from './characterBetConstants'
 import { diceLaunchPoint, type DiceFrameApply, type LaunchPoint } from './dicePose'
 import type { EyeFrameApply } from './EyeLayer'
 import { columnsOf, glanceOffsetMs, resolveEyeGaze, type EyeColumn } from './eyeGaze'
@@ -75,7 +75,7 @@ import {
 import { DEFAULT_DICE_CONTROL, holdFor, type DiceControlRoll, type DiceControlSettings } from './diceControl'
 import type { GestureStroke } from './gestureThrow'
 import type { PrecisionThrow } from './precisionAim'
-import type { ChipCharacter } from './chipConstants'
+import type { ChipCharacter, ChipColor } from './chipConstants'
 import type { ChipFrameApply } from './chips/ChipPresenterHost'
 import { dieDepthKey } from './feltDepth'
 import { allPuckPlacements, puckPlacement } from './puckState'
@@ -84,15 +84,34 @@ import { dicePresentationReactChanged } from './chips/presentationReactUpdate'
 import { useDiceVolumeWindow } from './useDiceVolumeWindow'
 import { emptyBonusHand, type BonusHand } from './bonusCraps'
 import {
-  applyShooterRoll,
   bonusStakeDollars,
   emptyBonusStakes,
   loadShooterBook,
   saveShooterBook,
-  shooterLineBets,
   type BonusStakes,
   type ShooterBook,
 } from './shooterProfile'
+import {
+  BET_CLOCK_MS,
+  addChip,
+  addSessionResult,
+  beginRoll,
+  clearBet,
+  emptySessionPnl,
+  emptySlip,
+  loadBetSettings,
+  saveBetSettings,
+  sessionAfterMode,
+  settleSlip,
+  slipChips,
+  syncComeOut,
+  undoLast,
+  type FeltBet,
+  type FeltKind,
+  type SessionPnl,
+  type ShooterBetSettings,
+  type ShooterSlip,
+} from './shooterSlip'
 import {
   applyRollStreak,
   loadRollStreakLongest,
@@ -138,6 +157,20 @@ export interface DicePresentation {
   phase: ThrowState['phase']
   /** Remaining shot-clock time while Shooter mode is holding. Null otherwise. */
   shotClockMs: number | null
+  /** Whole seconds left on the bet clock. Null while Place Bet is closed. */
+  betClockSec: number | null
+  purse: number
+  session: SessionPnl
+  felt: readonly FeltBet[]
+}
+
+export interface BetControls {
+  placeBet: () => void
+  done: () => void
+  undo: () => void
+  clear: (betId: string) => void
+  add: (kind: FeltKind, number: number | null, spot: string | null, color: ChipColor) => void
+  setSettings: (settings: ShooterBetSettings) => void
 }
 
 export interface ShooterControls {
@@ -184,6 +217,13 @@ const shotClockMs = (state: ThrowState, nowMs: number): number | null => {
   return Math.max(0, SHOT_CLOCK_MS - (nowMs - state.phaseStartedMs))
 }
 
+const emptyFeltHud = (): Pick<DicePresentation, 'betClockSec' | 'purse' | 'session' | 'felt'> => ({
+  betClockSec: null,
+  purse: 0,
+  session: emptySessionPnl(),
+  felt: [],
+})
+
 const present = (
   state: ThrowState,
   chips: readonly ChipDisc[],
@@ -195,6 +235,7 @@ const present = (
   rollStreak: RollStreakView,
   nowMs: number,
   display: readonly [ArcDisplay, ArcDisplay],
+  feltHud: Pick<DicePresentation, 'betClockSec' | 'purse' | 'session' | 'felt'> = emptyFeltHud(),
 ): DicePresentation => {
   const [x0, x1] = spreadPairX(state.dice[0], state.dice[1])
   return {
@@ -210,6 +251,7 @@ const present = (
     rollStreak,
     phase: state.phase,
     shotClockMs: shotClockMs(state, nowMs),
+    ...feltHud,
   }
 }
 
@@ -271,6 +313,7 @@ export const useDiceThrow = (
   launchPointRef?: MutableRefObject<LaunchPoint>,
   balanceDeltaApplyRef?: MutableRefObject<BalanceDeltaFrameApply | null>,
   eyeMarkApplyRef?: MutableRefObject<EyeMarkFrameApply | null>,
+  betControlsRef?: { current: BetControls | null },
 ): DicePresentation | null => {
   const oi = useOpenInterest()
   const volume = useDiceVolumeWindow(market)
@@ -335,6 +378,52 @@ export const useDiceThrow = (
   manualRef.current = shooterMode
   const commandRef = useRef<ShooterCommand[]>([])
   const lastVolumeRef = useRef<VolumeTotals>(emptyVolume())
+  const slipRef = useRef<ShooterSlip>(emptySlip())
+  const settingsRef = useRef<ShooterBetSettings>(loadBetSettings())
+  const sessionRef = useRef<SessionPnl>(emptySessionPnl())
+  const wasManualRef = useRef(shooterMode)
+  const betOpenRef = useRef(false)
+  const betOpenAtRef = useRef(0)
+  const shotLeftRef = useRef(SHOT_CLOCK_MS)
+  const rollArmedRef = useRef(false)
+  type BetCommand =
+    | { kind: 'open' }
+    | { kind: 'done' }
+    | { kind: 'undo' }
+    | { kind: 'clear'; id: string }
+    | { kind: 'add'; felt: FeltKind; number: number | null; spot: string | null; color: ChipColor }
+    | { kind: 'settings'; settings: ShooterBetSettings }
+  const betCommandRef = useRef<BetCommand[]>([])
+  const betControls = useMemo<BetControls>(
+    () => ({
+      placeBet: () => {
+        betCommandRef.current.push({ kind: 'open' })
+      },
+      done: () => {
+        betCommandRef.current.push({ kind: 'done' })
+      },
+      undo: () => {
+        betCommandRef.current.push({ kind: 'undo' })
+      },
+      clear: (id) => {
+        betCommandRef.current.push({ kind: 'clear', id })
+      },
+      add: (felt, number, spot, color) => {
+        betCommandRef.current.push({ kind: 'add', felt, number, spot, color })
+      },
+      setSettings: (settings) => {
+        betCommandRef.current.push({ kind: 'settings', settings })
+      },
+    }),
+    [],
+  )
+  useEffect(() => {
+    if (!betControlsRef) return undefined
+    betControlsRef.current = betControls
+    return () => {
+      if (betControlsRef.current === betControls) betControlsRef.current = null
+    }
+  }, [betControls, betControlsRef])
   const controls = useMemo<ShooterControls>(
     () => ({
       aimLaunchX: (stageX) => {
@@ -374,6 +463,12 @@ export const useDiceThrow = (
     balanceDeltaIdRef.current = 1
     balanceDeltaApplyRef?.current?.([])
     shooterRef.current = loadShooterBook()
+    slipRef.current = emptySlip()
+    sessionRef.current = emptySessionPnl()
+    wasManualRef.current = manualRef.current
+    betOpenRef.current = false
+    rollArmedRef.current = false
+    betCommandRef.current = []
     betsRef.current = []
     profilesRef.current = []
     profilePointRef.current = null
@@ -399,6 +494,12 @@ export const useDiceThrow = (
         streakView(),
         performance.now(),
         displayRef.current,
+        {
+          betClockSec: null,
+          purse: slipRef.current.purse,
+          session: sessionRef.current,
+          felt: slipRef.current.bets,
+        },
       ),
     )
     let frame = 0
@@ -407,7 +508,7 @@ export const useDiceThrow = (
     const betsNow = (now: number) => {
       const snap = oiRef.current
       const price = btcPrice(marketRef.current)
-      const shooter = shooterLineBets(shooterRef.current.allWorking)
+      const shooter = SHOOTER_ON ? slipChips(slipRef.current) : []
       if (!snap || !(price > 0)) {
         betsRef.current = shooter
         return shooter
@@ -482,6 +583,7 @@ export const useDiceThrow = (
       const commands = commandRef.current.splice(0)
       for (const command of commands) {
         if (stateRef.current.phase !== 'holding') continue
+        if (betOpenRef.current && command.kind !== 'auto') continue
         if (command.kind === 'aim' && manualRef.current) {
           stateRef.current = aimHeldPair(stateRef.current, command.x)
         } else if (command.kind === 'gesture' && stateRef.current.manualHold) {
@@ -505,7 +607,74 @@ export const useDiceThrow = (
       if (desiredKey !== heldKey) stateRef.current = reseatHeldDice(stateRef.current, desired)
       armManualHold(now)
       drainCommands(now, metrics)
-      if (stateRef.current.phase === 'holding' && stateRef.current.manualHold) {
+      const pointNow = stateRef.current.point
+      const publishSlip = () => {
+        const shooter = SHOOTER_ON ? slipChips(slipRef.current) : []
+        const bets = [...betsRef.current.filter((bet) => bet.character !== 'shooter'), ...shooter]
+        betsRef.current = bets
+        if (worldRef.current && (stateRef.current.phase === 'holding' || stateRef.current.phase === 'result')) {
+          worldRef.current = settleColumns(worldRef.current, bets, now, Math.floor(now))
+        }
+      }
+      const noteAllWorking = () => {
+        const working = slipRef.current.bets.some((bet) => bet.kind === 'all')
+        if (working !== shooterRef.current.allWorking) {
+          shooterRef.current = { ...shooterRef.current, allWorking: working }
+        }
+      }
+      const closeBetClock = () => {
+        if (!betOpenRef.current) return
+        betOpenRef.current = false
+        if (stateRef.current.phase === 'holding') {
+          stateRef.current = {
+            ...stateRef.current,
+            phaseStartedMs: manualRef.current ? now - (SHOT_CLOCK_MS - shotLeftRef.current) : now,
+          }
+        }
+      }
+      if (manualRef.current !== wasManualRef.current) {
+        sessionRef.current = sessionAfterMode(sessionRef.current, manualRef.current, wasManualRef.current)
+        wasManualRef.current = manualRef.current
+      }
+      for (const command of betCommandRef.current.splice(0)) {
+        if (command.kind === 'settings') {
+          const previous = settingsRef.current
+          settingsRef.current = command.settings
+          saveBetSettings(command.settings)
+          const opening = pointNow == null && !slipRef.current.pointSeen
+          if (opening && (previous.sameBet !== command.settings.sameBet || previous.darkSide !== command.settings.darkSide)) {
+            slipRef.current = syncComeOut(slipRef.current, command.settings)
+            noteAllWorking()
+            publishSlip()
+          }
+        } else if (command.kind === 'open' && stateRef.current.phase === 'holding' && !betOpenRef.current) {
+          shotLeftRef.current = Math.max(0, SHOT_CLOCK_MS - (now - stateRef.current.phaseStartedMs))
+          betOpenAtRef.current = now
+          betOpenRef.current = true
+        } else if (command.kind === 'done') {
+          closeBetClock()
+        } else if (command.kind === 'undo' && betOpenRef.current) {
+          slipRef.current = undoLast(slipRef.current, pointNow)
+          publishSlip()
+        } else if (command.kind === 'clear' && betOpenRef.current) {
+          slipRef.current = clearBet(slipRef.current, command.id, pointNow)
+          noteAllWorking()
+          publishSlip()
+        } else if (command.kind === 'add' && betOpenRef.current) {
+          slipRef.current = addChip(slipRef.current, command.felt, command.number, command.spot, command.color, pointNow)
+          publishSlip()
+        }
+      }
+      if (betOpenRef.current) {
+        if (now - betOpenAtRef.current >= BET_CLOCK_MS) closeBetClock()
+        else if (stateRef.current.phase === 'holding') {
+          stateRef.current = {
+            ...stateRef.current,
+            phaseStartedMs: manualRef.current ? now - (SHOT_CLOCK_MS - shotLeftRef.current) : now,
+          }
+        }
+      }
+      if (stateRef.current.phase === 'holding' && stateRef.current.manualHold && !betOpenRef.current) {
         lastVolumeRef.current = volumeRef.current
         if (now - stateRef.current.phaseStartedMs >= SHOT_CLOCK_MS) {
           const aimed = precisionShotRef?.current
@@ -518,6 +687,11 @@ export const useDiceThrow = (
               )
             : launchHeldAuto(stateRef.current, now, lastVolumeRef.current, metrics)
         }
+      }
+      if (stateRef.current.phase === 'holding' && !rollArmedRef.current && SHOOTER_ON) {
+        slipRef.current = beginRoll(slipRef.current, settingsRef.current, stateRef.current.point)
+        rollArmedRef.current = true
+        noteAllWorking()
       }
       if (!worldRef.current) {
         const bets = betsNow(now)
@@ -573,13 +747,29 @@ export const useDiceThrow = (
           }
           const samePoint = pointBefore != null && stateRef.current.point === pointBefore
           pressRollRef.current = samePoint && (result.total === 6 || result.total === 8) ? result.total : null
-          const nextShooter = applyShooterRoll(
-            shooterRef.current,
-            pointBefore,
-            result.total,
-            bonusHandRef?.current ?? emptyBonusHand(),
-            price,
-          )
+          const settled = SHOOTER_ON
+            ? settleSlip(
+                slipRef.current,
+                pointBefore,
+                result.total,
+                hard,
+                bonusHandRef?.current ?? emptyBonusHand(),
+              )
+            : { slip: slipRef.current, profit: 0 }
+          slipRef.current = settled.slip
+          sessionRef.current = addSessionResult(sessionRef.current, manualRef.current, settled.profit, price)
+          const nextShooter = (() => {
+            const allWorking = settled.slip.bets.some((bet) => bet.kind === 'all')
+            if (settled.profit === 0 && allWorking === shooterRef.current.allWorking) return shooterRef.current
+            const pnl = settled.profit === 0
+              ? shooterRef.current.pnl
+              : {
+                  btc: shooterRef.current.pnl.btc + (price > 0 ? settled.profit / price : 0),
+                  usd: shooterRef.current.pnl.usd + settled.profit,
+                  shown: true,
+                }
+            return { allWorking, pnl }
+          })()
           if (nextShooter !== shooterRef.current) {
             shooterRef.current = nextShooter
             saveShooterBook(nextShooter)
@@ -604,7 +794,13 @@ export const useDiceThrow = (
         const extra = typeof raw === 'number' ? raw : 0
         if (extra > 0) stateRef.current = { ...stateRef.current, resultHoldMs: DIE_RESULT_HOLD_MS + extra }
       }
+      if (stateRef.current.phase !== 'holding') rollArmedRef.current = false
       if (phaseBefore !== 'holding' && stateRef.current.phase === 'holding') {
+        if (SHOOTER_ON) {
+          slipRef.current = beginRoll(slipRef.current, settingsRef.current, stateRef.current.point)
+          rollArmedRef.current = true
+          noteAllWorking()
+        }
         const bets = betsNow(now)
         worldRef.current = settleColumns(worldRef.current ?? emptyChipWorld(), bets, now, Math.floor(now))
         aimedKey = ''
@@ -630,6 +826,14 @@ export const useDiceThrow = (
         streakView(),
         now,
         displayRef.current,
+        {
+          betClockSec: betOpenRef.current
+            ? Math.max(0, Math.ceil((BET_CLOCK_MS - (now - betOpenAtRef.current)) / 1000))
+            : null,
+          purse: slipRef.current.purse,
+          session: sessionRef.current,
+          felt: slipRef.current.bets,
+        },
       )
       const dieKeys = next.dice.filter((die) => die.visible).map((die) => die.depthKey)
       chipApplyRef?.current?.({

@@ -25,7 +25,10 @@ import type { DiceFrameApply, LaunchPoint } from './ui/dicePose'
 import type { EyeFrameApply } from './ui/EyeLayer'
 import type { EyeMarkFrameApply } from './ui/EyeMarkLayer'
 import type { BalanceDeltaFrameApply } from './ui/BalanceDeltaLayer'
-import { useDiceThrow, type ShooterControls } from './ui/useDiceThrow'
+import { useDiceThrow, type BetControls, type ShooterControls } from './ui/useDiceThrow'
+import { ShooterBetLayer } from './ui/ShooterBetLayer'
+import { ShooterBetsPanel } from './ui/ShooterBetsPanel'
+import { emptySessionPnl, loadBetSettings, withLockedRule, type ShooterBetSettings } from './ui/shooterSlip'
 import {
   loadDiceControlBook,
   loadDiceControlSettings,
@@ -103,6 +106,13 @@ function App() {
   const stageRef = useRef<HTMLDivElement | null>(null)
   const displayRef = useRef<HTMLDivElement | null>(null)
   const shooterControlsRef = useRef<ShooterControls | null>(null)
+  const betControlsRef = useRef<BetControls | null>(null)
+  const [betSettings, setBetSettings] = useState<ShooterBetSettings>(loadBetSettings)
+  const onBetSettings = useCallback((next: ShooterBetSettings) => {
+    const locked = withLockedRule(next)
+    setBetSettings(locked)
+    betControlsRef.current?.setSettings(locked)
+  }, [])
   const [diceControl, setDiceControl] = useState(loadDiceControlSettings)
   const diceControlRef = useRef(diceControl)
   diceControlRef.current = diceControl
@@ -122,6 +132,7 @@ function App() {
     })
   }, [])
   const [manualShooter, setManualShooter] = useState(false)
+  const [betClockOpen, setBetClockOpen] = useState(false)
   const [splashDone, setSplashDone] = useState(false)
   const onSplashDone = useCallback(() => setSplashDone(true), [])
 
@@ -154,12 +165,13 @@ function App() {
   const setFeedRef = useRef(setFeed)
   setFeedRef.current = setFeed
 
-  const bg2Meme = useBg2MemeState(feed.market.binance.price, feed.market.coinbase.price, manualShooter)
+  const tableQuiet = manualShooter || betClockOpen
+  const bg2Meme = useBg2MemeState(feed.market.binance.price, feed.market.coinbase.price, tableQuiet)
   const hasActiveBg2Meme = bg2Meme.activeMeme !== null
-  const videoOverlay = useVideoOverlayState(manualShooter)
+  const videoOverlay = useVideoOverlayState(tableQuiet)
   const isVideoActive = videoOverlay.isVideoActive
   const bg2Visible = useBg2ChartVisible(hasActiveBg2Meme || isVideoActive)
-  const fg3 = useFg3CatState(manualShooter)
+  const fg3 = useFg3CatState(tableQuiet)
   const [dieColor, setDieColor] = useState(loadDieColor)
   const onTimeClick = useCallback(() => {
     setDieColor((current) => {
@@ -254,17 +266,25 @@ function App() {
     launchPointRef,
     balanceDeltaApplyRef,
     eyeMarkApplyRef,
+    betControlsRef,
   )
   const gestureReady = manualShooter && dice?.phase === 'holding'
+  const betting = dice?.betClockSec != null
+  useEffect(() => {
+    setBetClockOpen(betting)
+  }, [betting])
+  const shooting = gestureReady && !betting
+  const distractionsPaused = manualShooter || betting
   const precisionOn = diceControl.precisionTargeting
   const precision = usePrecisionPhases(
-    gestureReady && precisionOn,
+    shooting && precisionOn,
     precisionOn,
     stageRef,
     shooterControlsRef,
     precisionShotRef,
+    gestureReady,
   )
-  useShooterGesture(gestureReady && !precisionOn, stageRef, shooterControlsRef)
+  useShooterGesture(shooting && !precisionOn, stageRef, shooterControlsRef)
   useShooterPageLock(manualShooter)
   const onShooterMode = useCallback(() => {
     setManualShooter((current) => {
@@ -301,8 +321,8 @@ function App() {
     return () => window.clearInterval(id)
   }, [])
 
-  const showCandleChart = bg2Visible && !isVideoActive && !manualShooter
-  const showBg2Meme = splashDone && hasActiveBg2Meme && !isVideoActive && !manualShooter
+  const showCandleChart = bg2Visible && !isVideoActive && !distractionsPaused
+  const showBg2Meme = splashDone && hasActiveBg2Meme && !isVideoActive && !distractionsPaused
 
   return (
     <main ref={appShellRef} className="app-shell">
@@ -315,7 +335,7 @@ function App() {
               showBg2Meme={showBg2Meme}
               bg2ActiveMeme={bg2Meme.activeMeme}
               candles={candles}
-              showFg3Cat={fg3.active && !manualShooter}
+              showFg3Cat={fg3.active && !distractionsPaused}
               fg3Direction={fg3.direction}
               fg3Frame={fg3.frame}
               fg3Left={fg3.left}
@@ -347,10 +367,18 @@ function App() {
               bonusStakes={dice?.bonusStakes ?? emptyBonusStakes()}
               rollStreak={dice?.rollStreak ?? emptyRollStreakView()}
               shooterMode={manualShooter}
+              session={dice?.session ?? emptySessionPnl()}
               status={feed.status}
             />
+            <ShooterBetLayer
+              active={dice?.phase === 'holding'}
+              betClockSec={dice?.betClockSec ?? null}
+              purse={dice?.purse ?? 0}
+              felt={dice?.felt ?? []}
+              controlsRef={betControlsRef}
+            />
             <PrecisionOverlay
-              active={gestureReady && precisionOn}
+              active={shooting && precisionOn}
               phase={precision.phase}
               target={precision.target}
               angle={precision.angle}
@@ -358,8 +386,9 @@ function App() {
               launchPointRef={launchPointRef}
               dieColor={dieColor}
               onOk={precision.accept}
+              betting={dice?.betClockSec != null}
             />
-            {videoOverlay.active && !manualShooter ? (
+            {videoOverlay.active && !distractionsPaused ? (
               <VideoOverlay
                 videoId={videoOverlay.active.videoId}
                 soundEnabled={videoOverlay.soundEnabled}
@@ -398,6 +427,7 @@ function App() {
                 type="button"
                 aria-pressed={!diceControl.precisionTargeting}
                 className={diceControl.precisionTargeting ? '' : 'is-selected'}
+                disabled={betting}
                 onClick={() => onDiceControl({ precisionTargeting: false })}
               >
                 Regular
@@ -406,12 +436,14 @@ function App() {
                 type="button"
                 aria-pressed={diceControl.precisionTargeting}
                 className={diceControl.precisionTargeting ? 'is-selected' : ''}
+                disabled={betting}
                 onClick={() => onDiceControl({ precisionTargeting: true })}
               >
                 Precision
               </button>
             </div>
           ) : null}
+          <ShooterBetsPanel settings={betSettings} onChange={onBetSettings} />
           <DiceControlPanel
             settings={diceControl}
             onChange={onDiceControl}

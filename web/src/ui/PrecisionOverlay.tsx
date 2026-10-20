@@ -94,6 +94,7 @@ export const PrecisionOverlay = ({
   launchPointRef,
   dieColor,
   onOk,
+  betting = false,
 }: {
   active: boolean
   phase: PrecisionPhase
@@ -103,6 +104,7 @@ export const PrecisionOverlay = ({
   launchPointRef: MutableRefObject<LaunchPoint>
   dieColor: DieColorId
   onOk: () => void
+  betting?: boolean
 }) => {
   const spinDegRef = useRef(0)
   const arcPathRef = useRef<SVGPathElement>(null)
@@ -225,7 +227,7 @@ export const PrecisionOverlay = ({
         </>
       ) : null}
       <p className="precision-phase-label">{PRECISION_PHASE_LABEL[phase]}</p>
-      {phase === 'gesture' ? null : (
+      {phase === 'gesture' || betting ? null : (
         <button className="precision-ok" type="button" onClick={onOk}>
           OK
         </button>

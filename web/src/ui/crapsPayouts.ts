@@ -247,12 +247,12 @@ const FIELD_TRIPLE_PAY: WholeDollarPay = { unit: 1, profit: 3 }
 const FIELD_WINNERS = new Set([2, 3, 4, 9, 10, 11, 12])
 
 /**
- * One roll. Wins on 2, 3, 4, 9, 10, 11, and 12. Loses on 5, 6, 7, and 8.
- * 2 and 12 pay 3:1. The other winners pay 1:1. Off on the come-out.
+ * One roll on the come-out and while a point is up.
+ * Wins on 2, 3, 4, 9, 10, 11, and 12. Loses on 5, 6, 7, and 8.
+ * 2 and 12 pay 3:1. The other winners pay 1:1.
  */
-export const settleField = (point: number | null, total: number, stake: number): BetSettlement => {
+export const settleField = (_point: number | null, total: number, stake: number): BetSettlement => {
   const { booked, unbooked } = bookDollars(stake, FIELD_PAY.unit)
-  if (point == null || !isPointNumber(point)) return noBet(stake)
   const triple = total === 2 || total === 12
   return settleBooked(
     booked,
@@ -291,9 +291,12 @@ export const settleHorn = (total: number, number: number, stake: number): BetSet
   return settleBooked(booked, unbooked, hit, !hit, false, false, HORN_PAY[number])
 }
 
+/** Five percent of a winning lay's profit. Charged only when the lay wins. */
+export const LAY_WIN_COMMISSION = 0.05
+
 /**
  * A lay wins when a 7 beats the number, and loses when the number rolls.
- * True odds, no commission, no line-odds cap. Off on the come-out.
+ * True odds, then 5% of the profit. Off on the come-out. Don't-pass odds stay free.
  */
 export const settleLay = (
   point: number | null,
@@ -304,5 +307,152 @@ export const settleLay = (
   if (!isPointNumber(number)) return noBet(stake)
   const { booked, unbooked } = bookDollars(stake, LAY_ODDS_PAY[number].unit)
   if (point == null || !isPointNumber(point)) return resting(booked, unbooked)
-  return settleBooked(booked, unbooked, total === 7, total === number, false, false, LAY_ODDS_PAY[number])
+  const settled = settleBooked(booked, unbooked, total === 7, total === number, false, false, LAY_ODDS_PAY[number])
+  if (settled.outcome !== 'win') return settled
+  const vig = nearestCent(settled.profit * LAY_WIN_COMMISSION)
+  return { ...settled, profit: nearestCent(settled.profit - vig) }
+}
+
+const ANY_SEVEN_PAY: WholeDollarPay = { unit: 1, profit: 4 }
+const ANY_CRAPS_PAY: WholeDollarPay = { unit: 1, profit: 7 }
+const ELEVEN_PAY: WholeDollarPay = { unit: 1, profit: 15 }
+const CRAPS_TOTALS = new Set([2, 3, 12])
+
+const settleOneRoll = (_total: number, stake: number, hit: boolean, pay: WholeDollarPay): BetSettlement => {
+  const { booked, unbooked } = bookDollars(stake, pay.unit)
+  return settleBooked(booked, unbooked, hit, !hit, false, false, pay)
+}
+
+/** One roll. Any 7 pays 4:1. Working on the come-out and while a point is up. */
+export const settleAnySeven = (total: number, stake: number): BetSettlement =>
+  settleOneRoll(total, stake, total === 7, ANY_SEVEN_PAY)
+
+/** One roll. 2, 3, or 12 pays 7:1. */
+export const settleAnyCraps = (total: number, stake: number): BetSettlement =>
+  settleOneRoll(total, stake, CRAPS_TOTALS.has(total), ANY_CRAPS_PAY)
+
+/** One roll. Eleven pays 15:1. */
+export const settleEleven = (total: number, stake: number): BetSettlement =>
+  settleOneRoll(total, stake, total === 11, ELEVEN_PAY)
+
+/**
+ * Four equal units on 2, 3, 11, and 12.
+ * A 2 or 12 nets 27 units. A 3 or 11 nets 12. Anything else loses the stake.
+ */
+export const settleHornBox = (total: number, stake: number): BetSettlement => {
+  const { booked, unbooked } = bookDollars(stake, 4)
+  if (!(booked > 0)) return noBet(unbooked)
+  const unit = booked / 4
+  if (total === 2 || total === 12) {
+    return { outcome: 'win', booked, unbooked, profit: unit * 27, staysUp: false }
+  }
+  if (total === 3 || total === 11) {
+    return { outcome: 'win', booked, unbooked, profit: unit * 12, staysUp: false }
+  }
+  return { outcome: 'lose', booked, unbooked, profit: -booked, staysUp: false }
+}
+
+export interface TravelSettlement extends BetSettlement {
+  /** The point number a flat come or don't-come bet moved onto. */
+  traveledTo: PointNumber | null
+}
+
+const travel = (settled: BetSettlement, traveledTo: PointNumber | null = null): TravelSettlement => ({
+  ...settled,
+  traveledTo,
+})
+
+/**
+ * A flat come bet's next roll wins on 7 or 11, loses on 2, 3, or 12, and otherwise
+ * moves to that number. On a number it wins if the number returns before a 7.
+ * A resolved come bet comes down.
+ */
+export const settleCome = (comeNumber: number | null, total: number, stake: number): TravelSettlement => {
+  const { booked, unbooked } = bookDollars(stake, LINE_PAY.unit)
+  if (comeNumber == null) {
+    if (total === 7 || total === 11) return travel(settleBooked(booked, unbooked, true, false, false, false, LINE_PAY))
+    if (total === 2 || total === 3 || total === 12) {
+      return travel(settleBooked(booked, unbooked, false, true, false, false, LINE_PAY))
+    }
+    if (isPointNumber(total)) return travel(resting(booked, unbooked), total)
+    return travel(resting(booked, unbooked))
+  }
+  if (!isPointNumber(comeNumber)) return travel(noBet(stake))
+  return travel(settleBooked(
+    booked,
+    unbooked,
+    total === comeNumber,
+    total === 7,
+    false,
+    false,
+    LINE_PAY,
+  ))
+}
+
+/**
+ * A flat don't-come bet wins on 2 or 3, loses on 7 or 11, and pushes on 12.
+ * A point number moves it behind that number, where a 7 wins and the number loses.
+ */
+export const settleDontCome = (comeNumber: number | null, total: number, stake: number): TravelSettlement => {
+  const { booked, unbooked } = bookDollars(stake, LINE_PAY.unit)
+  if (comeNumber == null) {
+    if (total === 2 || total === 3) return travel(settleBooked(booked, unbooked, true, false, false, false, LINE_PAY))
+    if (total === 12) return travel(settleBooked(booked, unbooked, false, false, true, true, LINE_PAY))
+    if (total === 7 || total === 11) return travel(settleBooked(booked, unbooked, false, true, false, false, LINE_PAY))
+    if (isPointNumber(total)) return travel(resting(booked, unbooked), total)
+    return travel(resting(booked, unbooked))
+  }
+  if (!isPointNumber(comeNumber)) return travel(noBet(stake))
+  return travel(settleBooked(
+    booked,
+    unbooked,
+    total === 7,
+    total === comeNumber,
+    false,
+    false,
+    LINE_PAY,
+  ))
+}
+
+/**
+ * Come odds are off on the come-out: a 7 or the come number returns them.
+ * While a point is up they pay true odds and come down when that come bet resolves.
+ */
+export const settleComeOdds = (
+  comeNumber: number | null,
+  tablePoint: number | null,
+  total: number,
+  flatStake: number,
+  oddsStake: number,
+): BetSettlement => {
+  if (comeNumber == null || !isPointNumber(comeNumber)) return noBet(oddsStake)
+  if (tablePoint == null || !isPointNumber(tablePoint)) {
+    const offered = Math.min(Math.max(oddsStake, 0), maxOddsDollars(flatStake))
+    const { booked, unbooked: belowUnit } = bookDollars(offered, TAKE_ODDS_PAY[comeNumber].unit)
+    const unbooked = nearestCent(belowUnit + Math.max(oddsStake, 0) - offered)
+    if (total === 7 || total === comeNumber) {
+      return { outcome: 'push', booked, unbooked, profit: 0, staysUp: false }
+    }
+    return resting(booked, unbooked)
+  }
+  return settleOdds(
+    comeNumber,
+    total,
+    flatStake,
+    oddsStake,
+    TAKE_ODDS_PAY,
+    total === comeNumber,
+    total === 7,
+  )
+}
+
+/** Don't-come odds stay working on the come-out and pay true odds. */
+export const settleDontComeOdds = (
+  comeNumber: number | null,
+  total: number,
+  flatStake: number,
+  oddsStake: number,
+): BetSettlement => {
+  if (comeNumber == null || !isPointNumber(comeNumber)) return noBet(oddsStake)
+  return settleOdds(comeNumber, total, flatStake, oddsStake, LAY_ODDS_PAY, total === 7, total === comeNumber)
 }
