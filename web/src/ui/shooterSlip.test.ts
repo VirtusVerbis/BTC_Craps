@@ -5,7 +5,6 @@ import {
   SHOOTER_BANK,
   SHOOTER_WHITE,
   addChip,
-  applyStandingProfile,
   beginRoll,
   canClear,
   clearBet,
@@ -61,8 +60,15 @@ describe('shooter slip', () => {
     expect(slip.bets.map((bet) => bet.kind).sort()).toEqual(['all', 'dont', 'pass'])
   })
 
-  it('opens dark side with one red on Don\'t Pass', () => {
+  it('keeps Pass, Don\'t Pass, and Make \'Em All when Dark Side is on and Same Bet is off', () => {
     const slip = beginRoll(emptySlip(), { ...defaultBetSettings(), darkSide: true }, null)
+    expect(slip.bets.map((bet) => bet.kind).sort()).toEqual(['all', 'dont', 'pass'])
+    expect(slip.bets.every((bet) => bet.dollars === red)).toBe(true)
+  })
+
+  it('opens Dark Side with one red on Don\'t Pass when Same Bet is on', () => {
+    const settings = withLockedRule({ ...defaultBetSettings(), sameBet: true, darkSide: true, comeOut: [] })
+    const slip = beginRoll(emptySlip(), settings, null)
     expect(slip.bets.map((bet) => bet.kind)).toEqual(['dont'])
     expect(slip.bets[0].dollars).toBe(red)
   })
@@ -162,11 +168,11 @@ describe('shooter slip', () => {
     expect(paid.profit).toBe(red * 150)
   })
 
-  it('switches the standing profile when Dark Side flips before a point', () => {
+  it('leaves the default line in place when Dark Side flips and Same Bet is off', () => {
     const opened = beginRoll(emptySlip(), defaultBetSettings(), null)
-    const dark = applyStandingProfile(opened, true, null)
-    expect(dark.bets.map((bet) => bet.kind)).toEqual(['dont'])
-    expect(dark.purse + red).toBe(SHOOTER_BANK)
+    const dark = syncComeOut(opened, { ...defaultBetSettings(), darkSide: true })
+    expect(dark.bets.map((bet) => bet.kind).sort()).toEqual(['all', 'dont', 'pass'])
+    expect(dark.purse).toBe(opened.purse)
   })
 
   it('replaces the opening line when Same Bet turns on before a point', () => {
@@ -184,13 +190,15 @@ describe('shooter slip', () => {
     expect(addSessionResult(entered, true, red, 50_000)).toEqual({ usd: red, btc: red / 50_000 })
   })
 
-  it('keeps Pass through a point and moves to Don\'t Pass on the next come-out', () => {
+  it('keeps Pass up when Dark Side is on and Same Bet is off', () => {
     const opened = beginRoll(emptySlip(), defaultBetSettings(), null)
     const point = beginRoll(opened, { ...defaultBetSettings(), darkSide: true }, 8)
     expect(point.bets.some((bet) => bet.kind === 'pass')).toBe(true)
+    expect(point.bets.some((bet) => bet.kind === 'dont')).toBe(true)
     const made = settleSlip(point, 8, 8, false).slip
     const comeOut = beginRoll(made, { ...defaultBetSettings(), darkSide: true }, null)
-    expect(comeOut.bets.map((bet) => bet.kind)).toEqual(['dont'])
+    expect(comeOut.bets.some((bet) => bet.kind === 'pass')).toBe(true)
+    expect(comeOut.bets.some((bet) => bet.kind === 'dont')).toBe(true)
   })
 
   it('rejects a chip the purse cannot cover', () => {

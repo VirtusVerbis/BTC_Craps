@@ -439,14 +439,9 @@ const setExact = (
   }
 }
 
-/** Dark Side off keeps Pass, Don't Pass, and Make 'Em All. Dark Side on keeps Don't Pass only. */
-export const applyStandingProfile = (slip: ShooterSlip, darkSide: boolean, point: number | null): ShooterSlip => {
+/** Same Bet off. Pass, Don't Pass, and Make 'Em All, one red each. Light/Dark is ignored. */
+export const applyStandingProfile = (slip: ShooterSlip, point: number | null): ShooterSlip => {
   if (point != null) return slip
-  if (darkSide) {
-    let next = setExact(slip, 'pass', null, null, 0)
-    next = setExact(next, 'all', null, null, 0)
-    return setExact(next, 'dont', null, null, SHOOTER_RED)
-  }
   let next = ensureAmount(slip, 'pass', null, null, SHOOTER_RED, null)
   next = ensureAmount(next, 'dont', null, null, SHOOTER_RED, null)
   if (!next.pointSeen) next = ensureAmount(next, 'all', null, null, SHOOTER_RED, null)
@@ -466,17 +461,16 @@ const applyRules = (slip: ShooterSlip, rules: readonly ShooterRule[], point: num
   return next
 }
 
-/** Place the opening profile once per hand, then top up the active phase while Same Bet is on. */
+/** Place the default line while Same Bet is off. Same Bet uses the saved rules, including Light/Dark. */
 export const beginRoll = (slip: ShooterSlip, settings: ShooterBetSettings, point: number | null): ShooterSlip => {
   let next = { ...slip, pointSeen: slip.pointSeen || point != null }
-  if (point == null && !next.handOpen) {
-    next = settings.sameBet ? applyRules(next, settings.comeOut, null) : applyStandingProfile(next, settings.darkSide, null)
+  if (!settings.sameBet) {
+    if (point == null) next = applyStandingProfile(next, null)
     return { ...next, handOpen: true, darkSide: settings.darkSide }
   }
-  if (point == null && !settings.sameBet && next.darkSide !== settings.darkSide) {
-    return { ...applyStandingProfile(next, settings.darkSide, null), handOpen: true, darkSide: settings.darkSide }
+  if (point == null && !next.handOpen) {
+    return { ...applyRules(next, settings.comeOut, null), handOpen: true, darkSide: settings.darkSide }
   }
-  if (!settings.sameBet) return next
   const rules = point == null ? settings.comeOut : settings.point
   return { ...applyRules(next, rules, point), darkSide: settings.darkSide }
 }
@@ -631,11 +625,11 @@ export const setRuleDollars = (settings: ShooterBetSettings, id: string, dollars
 
 const OPENING_LINE: readonly FeltKind[] = ['pass', 'dont', 'tall', 'all', 'small']
 
-/** Dark Side and Same Bet update the felt before this shooter has set a point. */
+/** Same Bet replaces the come-out line. Light/Dark is part of that profile and is ignored while Same Bet is off. */
 export const syncComeOut = (slip: ShooterSlip, settings: ShooterBetSettings): ShooterSlip => {
   if (slip.pointSeen) return slip
   if (!settings.sameBet) {
-    return { ...applyStandingProfile(slip, settings.darkSide, null), handOpen: true, darkSide: settings.darkSide }
+    return { ...applyStandingProfile(slip, null), handOpen: true, darkSide: settings.darkSide }
   }
   let next = slip
   for (const kind of OPENING_LINE) {
