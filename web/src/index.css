@@ -1967,6 +1967,33 @@ html.shooter-gesture-lock body {
   stroke-width: 3;
 }
 
+.shooter-odds-hitbox {
+  pointer-events: none;
+}
+
+.shooter-odds-hitbox rect {
+  fill: transparent;
+  stroke: #1565c0;
+  stroke-width: 3;
+}
+
+.shooter-odds-open rect {
+  fill: transparent;
+  stroke: #ffe566;
+  stroke-width: 3;
+  pointer-events: all;
+}
+
+.shooter-odds-open text {
+  fill: #fff;
+  font-size: 18px;
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+  text-shadow: 0 1px 0 #000, 0 2px 4px #000;
+}
+
 .shooter-bet-preview text {
   fill: #fff;
   font-size: 16px;

@@ -23,6 +23,7 @@ import type { BalanceDeltaFrameApply } from './BalanceDeltaLayer'
 import { displayedEyeMarks, emptyPhaseBtc, eyeMarksShouldClear, markedCharacters, stepPhaseBtc, type EyeMarkFrame, type PhaseBtc } from './eyeMarks'
 import type { EyeMarkFrameApply } from './EyeMarkLayer'
 import { SHOOTER_ON, SPEECH_SHOW_MS, STACK_POSITION_PREVIEW_ON } from './characterBetConstants'
+import { SHOOTER_BET_AREAS_ON, shooterAreaPreviewWorld } from './shooterBetGeometry'
 import { diceLaunchPoint, type DiceFrameApply, type LaunchPoint } from './dicePose'
 import type { EyeFrameApply } from './EyeLayer'
 import { columnsOf, glanceOffsetMs, resolveEyeGaze, type EyeColumn } from './eyeGaze'
@@ -812,7 +813,11 @@ export const useDiceThrow = (
         worldRef.current = driftLooseChips(worldRef.current, dt, metrics, puckObstacle(stateRef.current.point))
       }
       if (worldRef.current?.restack) worldRef.current = tickRestack(worldRef.current, now)
-      const felt = STACK_POSITION_PREVIEW_ON ? stackPositionPreviewWorld() : worldRef.current
+      const felt = SHOOTER_BET_AREAS_ON
+        ? shooterAreaPreviewWorld()
+        : STACK_POSITION_PREVIEW_ON
+          ? stackPositionPreviewWorld()
+          : worldRef.current
       const chips = felt ? presentChips(felt, now, metrics) : []
       const guides = felt ? guideFrames(felt, metrics) : []
       const next = present(

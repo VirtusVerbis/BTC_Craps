@@ -1,9 +1,149 @@
 import { BONUS_ALL_X, BONUS_ALL_Y, BONUS_SMALL_X, BONUS_SMALL_Y, BONUS_TALL_X, BONUS_TALL_Y } from './bonusFieldConstants'
 import { SHOOTER_DONT_X, SHOOTER_DONT_Y, SHOOTER_PASS_X, SHOOTER_PASS_Y } from './characterBetConstants'
+import { CHIP_MAX_STACK, type ChipColor } from './chipConstants'
+import type { ChipBet } from './chipBets'
+import { chipDiameter, worldFromBets, type ChipWorld } from './chipPhysics'
 import type { FeltKind } from './shooterSlip'
 
-/** Outlines and marker stacks for tuning shooter anchors. Live bets still resolve. */
+/** Outlines and a full chip stack on every shooter bet and odds spot. Live bets still resolve. */
 export const SHOOTER_BET_AREAS_ON = false
+
+/** Solid chip-sized squares on every odds hit box. Live bets still resolve. */
+export const SHOOTER_ODDS_HITBOX_ON = true//false// false
+
+/** Pass and Don't Pass odds squares. X,Y is the center. The square stays one chip wide. */
+export const SHOOTER_PASS_ODDS_X = 280
+export const SHOOTER_PASS_ODDS_Y = 1892
+export const SHOOTER_DONT_ODDS_X = 280
+export const SHOOTER_DONT_ODDS_Y = 1840
+
+/**
+ * Left column, stage pixels (1080×1920). Each number has three independent spots.
+ * Lay X,Y is the top-left of that click box; W,H is its size. The lay stack sits at the box center.
+ * DC X,Y is the traveled Don't Come chip.
+ * DC Lay X,Y is the center of the Don't Come odds square. That square stays one chip wide.
+ */
+export const SHOOTER_LAY_10_X = 96
+export const SHOOTER_LAY_10_Y = 978
+export const SHOOTER_LAY_10_W = 54
+export const SHOOTER_LAY_10_H = 117
+export const SHOOTER_DC_10_X = 123
+export const SHOOTER_DC_10_Y = 1037
+export const SHOOTER_DC_LAY_10_X = 114
+export const SHOOTER_DC_LAY_10_Y = 1000
+
+export const SHOOTER_LAY_9_X = 82
+export const SHOOTER_LAY_9_Y = 1104
+export const SHOOTER_LAY_9_W = 60
+export const SHOOTER_LAY_9_H = 124
+export const SHOOTER_DC_9_X = 112
+export const SHOOTER_DC_9_Y = 1166
+export const SHOOTER_DC_LAY_9_X = 100
+export const SHOOTER_DC_LAY_9_Y = 1126
+
+export const SHOOTER_LAY_8_X = 74
+export const SHOOTER_LAY_8_Y = 1238
+export const SHOOTER_LAY_8_W = 60
+export const SHOOTER_LAY_8_H = 118
+export const SHOOTER_DC_8_X = 104
+export const SHOOTER_DC_8_Y = 1297
+export const SHOOTER_DC_LAY_8_X = 92
+export const SHOOTER_DC_LAY_8_Y = 1260
+
+export const SHOOTER_LAY_6_X = 58
+export const SHOOTER_LAY_6_Y = 1366
+export const SHOOTER_LAY_6_W = 66
+export const SHOOTER_LAY_6_H = 119
+export const SHOOTER_DC_6_X = 91
+export const SHOOTER_DC_6_Y = 1426
+export const SHOOTER_DC_LAY_6_X = 76
+export const SHOOTER_DC_LAY_6_Y = 1388
+
+export const SHOOTER_LAY_5_X = 48
+export const SHOOTER_LAY_5_Y = 1494
+export const SHOOTER_LAY_5_W = 66
+export const SHOOTER_LAY_5_H = 117
+export const SHOOTER_DC_5_X = 81
+export const SHOOTER_DC_5_Y = 1553
+export const SHOOTER_DC_LAY_5_X = 66
+export const SHOOTER_DC_LAY_5_Y = 1516
+
+export const SHOOTER_LAY_4_X = 36
+export const SHOOTER_LAY_4_Y = 1622
+export const SHOOTER_LAY_4_W = 69
+export const SHOOTER_LAY_4_H = 120
+export const SHOOTER_DC_4_X = 71
+export const SHOOTER_DC_4_Y = 1682
+export const SHOOTER_DC_LAY_4_X = 54
+export const SHOOTER_DC_LAY_4_Y = 1644
+
+/**
+ * Place click box, stage pixels (1080×1920). X,Y is the top-left; W,H is the size.
+ * The place stack sits at the box center.
+ */
+export const SHOOTER_PLACE_10_X = 159
+export const SHOOTER_PLACE_10_Y = 978
+export const SHOOTER_PLACE_10_W = 204
+export const SHOOTER_PLACE_10_H = 118
+
+export const SHOOTER_PLACE_9_X = 152
+export const SHOOTER_PLACE_9_Y = 1104
+export const SHOOTER_PLACE_9_W = 205
+export const SHOOTER_PLACE_9_H = 124
+
+export const SHOOTER_PLACE_8_X = 141
+export const SHOOTER_PLACE_8_Y = 1238
+export const SHOOTER_PLACE_8_W = 211
+export const SHOOTER_PLACE_8_H = 118
+
+export const SHOOTER_PLACE_6_X = 134
+export const SHOOTER_PLACE_6_Y = 1365
+export const SHOOTER_PLACE_6_W = 216
+export const SHOOTER_PLACE_6_H = 120
+
+export const SHOOTER_PLACE_5_X = 123
+export const SHOOTER_PLACE_5_Y = 1494
+export const SHOOTER_PLACE_5_W = 222
+export const SHOOTER_PLACE_5_H = 117
+
+export const SHOOTER_PLACE_4_X = 112
+export const SHOOTER_PLACE_4_Y = 1620
+export const SHOOTER_PLACE_4_W = 224
+export const SHOOTER_PLACE_4_H = 122
+
+/**
+ * Traveled Come chip, and the Come odds square, stage pixels (1080×1920).
+ * Come X,Y is the chip. Come Lay X,Y is the center of the odds square. That square stays one chip wide.
+ */
+export const SHOOTER_COME_10_X = 207
+export const SHOOTER_COME_10_Y = 1037
+export const SHOOTER_COME_LAY_10_X = 315
+export const SHOOTER_COME_LAY_10_Y = 1037
+
+export const SHOOTER_COME_9_X = 200
+export const SHOOTER_COME_9_Y = 1166
+export const SHOOTER_COME_LAY_9_X = 309
+export const SHOOTER_COME_LAY_9_Y = 1166
+
+export const SHOOTER_COME_8_X = 189
+export const SHOOTER_COME_8_Y = 1297
+export const SHOOTER_COME_LAY_8_X = 304
+export const SHOOTER_COME_LAY_8_Y = 1297
+
+export const SHOOTER_COME_6_X = 182
+export const SHOOTER_COME_6_Y = 1425
+export const SHOOTER_COME_LAY_6_X = 302
+export const SHOOTER_COME_LAY_6_Y = 1425
+
+export const SHOOTER_COME_5_X = 171
+export const SHOOTER_COME_5_Y = 1553
+export const SHOOTER_COME_LAY_5_X = 297
+export const SHOOTER_COME_LAY_5_Y = 1553
+
+export const SHOOTER_COME_4_X = 160
+export const SHOOTER_COME_4_Y = 1681
+export const SHOOTER_COME_LAY_4_X = 288
+export const SHOOTER_COME_LAY_4_Y = 1681
 
 export interface StageRect {
   x: number
@@ -33,6 +173,8 @@ const rect = (x0: number, y0: number, x1: number, y1: number): StageRect => ({
   w: x1 - x0,
   h: y1 - y0,
 })
+
+const sized = (x: number, y: number, w: number, h: number): StageRect => ({ x, y, w, h })
 
 const mid = (box: StageRect): StagePoint => ({
   x: Math.round(box.x + box.w / 2),
@@ -79,42 +221,76 @@ const oddsBox = (
   kind: FeltKind,
   number: number | null,
   anchor: StagePoint,
-): ShooterHit => box(id, kind, number, null, rect(anchor.x - 36, anchor.y - 28, anchor.x + 36, anchor.y + 28), anchor)
+): ShooterHit => {
+  const half = chipDiameter() / 2
+  return box(id, kind, number, null, rect(anchor.x - half, anchor.y - half, anchor.x + half, anchor.y + half), anchor)
+}
+
+const ODDS_KINDS = new Set<FeltKind>(['passOdds', 'dontOdds', 'comeOdds', 'dontComeOdds'])
+
+export const isOddsHit = (hit: ShooterHit): boolean => ODDS_KINDS.has(hit.kind)
 
 const PLACE: Record<number, StageRect> = {
-  10: rect(159, 978, 363, 1096),
-  9: rect(152, 1104, 357, 1228),
-  8: rect(141, 1238, 352, 1356),
-  6: rect(134, 1365, 350, 1485),
-  5: rect(123, 1494, 345, 1611),
-  4: rect(112, 1620, 336, 1742),
+  10: sized(SHOOTER_PLACE_10_X, SHOOTER_PLACE_10_Y, SHOOTER_PLACE_10_W, SHOOTER_PLACE_10_H),
+  9: sized(SHOOTER_PLACE_9_X, SHOOTER_PLACE_9_Y, SHOOTER_PLACE_9_W, SHOOTER_PLACE_9_H),
+  8: sized(SHOOTER_PLACE_8_X, SHOOTER_PLACE_8_Y, SHOOTER_PLACE_8_W, SHOOTER_PLACE_8_H),
+  6: sized(SHOOTER_PLACE_6_X, SHOOTER_PLACE_6_Y, SHOOTER_PLACE_6_W, SHOOTER_PLACE_6_H),
+  5: sized(SHOOTER_PLACE_5_X, SHOOTER_PLACE_5_Y, SHOOTER_PLACE_5_W, SHOOTER_PLACE_5_H),
+  4: sized(SHOOTER_PLACE_4_X, SHOOTER_PLACE_4_Y, SHOOTER_PLACE_4_W, SHOOTER_PLACE_4_H),
 }
 
 const LAY: Record<number, StageRect> = {
-  10: rect(96, 978, 150, 1095),
-  9: rect(82, 1104, 142, 1228),
-  8: rect(74, 1238, 134, 1356),
-  6: rect(58, 1366, 124, 1485),
-  5: rect(48, 1494, 114, 1611),
-  4: rect(36, 1622, 105, 1742),
+  10: sized(SHOOTER_LAY_10_X, SHOOTER_LAY_10_Y, SHOOTER_LAY_10_W, SHOOTER_LAY_10_H),
+  9: sized(SHOOTER_LAY_9_X, SHOOTER_LAY_9_Y, SHOOTER_LAY_9_W, SHOOTER_LAY_9_H),
+  8: sized(SHOOTER_LAY_8_X, SHOOTER_LAY_8_Y, SHOOTER_LAY_8_W, SHOOTER_LAY_8_H),
+  6: sized(SHOOTER_LAY_6_X, SHOOTER_LAY_6_Y, SHOOTER_LAY_6_W, SHOOTER_LAY_6_H),
+  5: sized(SHOOTER_LAY_5_X, SHOOTER_LAY_5_Y, SHOOTER_LAY_5_W, SHOOTER_LAY_5_H),
+  4: sized(SHOOTER_LAY_4_X, SHOOTER_LAY_4_Y, SHOOTER_LAY_4_W, SHOOTER_LAY_4_H),
 }
 
-const comeAnchor = (number: number): StagePoint => ({
-  x: PLACE[number].x + 48,
-  y: mid(PLACE[number]).y,
-})
+const DC_PLACE: Record<number, StagePoint> = {
+  10: { x: SHOOTER_DC_10_X, y: SHOOTER_DC_10_Y },
+  9: { x: SHOOTER_DC_9_X, y: SHOOTER_DC_9_Y },
+  8: { x: SHOOTER_DC_8_X, y: SHOOTER_DC_8_Y },
+  6: { x: SHOOTER_DC_6_X, y: SHOOTER_DC_6_Y },
+  5: { x: SHOOTER_DC_5_X, y: SHOOTER_DC_5_Y },
+  4: { x: SHOOTER_DC_4_X, y: SHOOTER_DC_4_Y },
+}
 
-const comeOddsAnchor = (number: number): StagePoint => ({
-  x: PLACE[number].x + PLACE[number].w - 48,
-  y: mid(PLACE[number]).y,
-})
+const DC_LAY: Record<number, StagePoint> = {
+  10: { x: SHOOTER_DC_LAY_10_X, y: SHOOTER_DC_LAY_10_Y },
+  9: { x: SHOOTER_DC_LAY_9_X, y: SHOOTER_DC_LAY_9_Y },
+  8: { x: SHOOTER_DC_LAY_8_X, y: SHOOTER_DC_LAY_8_Y },
+  6: { x: SHOOTER_DC_LAY_6_X, y: SHOOTER_DC_LAY_6_Y },
+  5: { x: SHOOTER_DC_LAY_5_X, y: SHOOTER_DC_LAY_5_Y },
+  4: { x: SHOOTER_DC_LAY_4_X, y: SHOOTER_DC_LAY_4_Y },
+}
 
-const dcAnchor = (number: number): StagePoint => mid(LAY[number])
+const COME: Record<number, StagePoint> = {
+  10: { x: SHOOTER_COME_10_X, y: SHOOTER_COME_10_Y },
+  9: { x: SHOOTER_COME_9_X, y: SHOOTER_COME_9_Y },
+  8: { x: SHOOTER_COME_8_X, y: SHOOTER_COME_8_Y },
+  6: { x: SHOOTER_COME_6_X, y: SHOOTER_COME_6_Y },
+  5: { x: SHOOTER_COME_5_X, y: SHOOTER_COME_5_Y },
+  4: { x: SHOOTER_COME_4_X, y: SHOOTER_COME_4_Y },
+}
 
-const dcOddsAnchor = (number: number): StagePoint => ({
-  x: LAY[number].x + 18,
-  y: LAY[number].y + 22,
-})
+const COME_LAY: Record<number, StagePoint> = {
+  10: { x: SHOOTER_COME_LAY_10_X, y: SHOOTER_COME_LAY_10_Y },
+  9: { x: SHOOTER_COME_LAY_9_X, y: SHOOTER_COME_LAY_9_Y },
+  8: { x: SHOOTER_COME_LAY_8_X, y: SHOOTER_COME_LAY_8_Y },
+  6: { x: SHOOTER_COME_LAY_6_X, y: SHOOTER_COME_LAY_6_Y },
+  5: { x: SHOOTER_COME_LAY_5_X, y: SHOOTER_COME_LAY_5_Y },
+  4: { x: SHOOTER_COME_LAY_4_X, y: SHOOTER_COME_LAY_4_Y },
+}
+
+const comeAnchor = (number: number): StagePoint => COME[number]
+
+const comeOddsAnchor = (number: number): StagePoint => COME_LAY[number]
+
+const dcAnchor = (number: number): StagePoint => DC_PLACE[number]
+
+const dcOddsAnchor = (number: number): StagePoint => DC_LAY[number]
 
 const NUMBERS = [4, 5, 6, 8, 9, 10] as const
 
@@ -145,8 +321,8 @@ export const SHOOTER_HITS: readonly ShooterHit[] = [
     oddsBox(`come-odds-${number}`, 'comeOdds', number, comeOddsAnchor(number)),
     oddsBox(`dc-odds-${number}`, 'dontComeOdds', number, dcOddsAnchor(number)),
   ]),
-  oddsBox('pass-odds', 'passOdds', null, { x: 280, y: 1892 }),
-  oddsBox('dont-odds', 'dontOdds', null, { x: 280, y: 1840 }),
+  oddsBox('pass-odds', 'passOdds', null, { x: SHOOTER_PASS_ODDS_X, y: SHOOTER_PASS_ODDS_Y }),
+  oddsBox('dont-odds', 'dontOdds', null, { x: SHOOTER_DONT_ODDS_X, y: SHOOTER_DONT_ODDS_Y }),
   box('any-seven', 'anySeven', null, null, rect(430, 1269, 504, 1446)),
   box('hard-10', 'hard', 10, null, rect(514, 1269, 609, 1354)),
   box('hard-4', 'hard', 4, null, rect(620, 1269, 722, 1354)),
@@ -191,6 +367,49 @@ export const hitAt = (point: StagePoint): ShooterHit | null => {
 }
 
 export const hitById = (id: string): ShooterHit | undefined => SHOOTER_HITS.find((hit) => hit.id === id)
+
+const stackColumn = (): ChipColor[] => Array.from({ length: CHIP_MAX_STACK }, () => 'red')
+
+/** One full red stack at every bet, traveled come, don't-come, and odds spot. */
+export const shooterAreaPreviewBets = (): ChipBet[] => {
+  const spots: { id: string; x: number; y: number; lay: boolean }[] = SHOOTER_HITS.map((hit) => ({
+    id: hit.id,
+    x: hit.anchor.x,
+    y: hit.anchor.y,
+    lay: hit.kind === 'lay',
+  }))
+  for (const number of NUMBERS) {
+    const come = comeAnchor(number)
+    const dc = dcAnchor(number)
+    spots.push({ id: `come-${number}`, x: come.x, y: come.y, lay: false })
+    spots.push({ id: `dc-${number}`, x: dc.x, y: dc.y, lay: false })
+  }
+  const seen = new Set<string>()
+  const bets: ChipBet[] = []
+  for (const spot of spots) {
+    const key = `${spot.x},${spot.y}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    bets.push({
+      id: `shooter-area-${spot.id}`,
+      character: 'shooter',
+      side: 'felt',
+      dollars: 0,
+      columns: [stackColumn()],
+      anchor: { x: spot.x, y: spot.y },
+      lay: spot.lay,
+    })
+  }
+  return bets
+}
+
+let areaPreviewWorld: ChipWorld | null = null
+
+/** Stable marker stacks. Physics keeps using the live bets. */
+export const shooterAreaPreviewWorld = (): ChipWorld => {
+  areaPreviewWorld ??= worldFromBets(shooterAreaPreviewBets(), 1)
+  return areaPreviewWorld
+}
 
 /** Where a shooter stack sits. Traveled come and don't-come bets use the number anchors. */
 export const anchorFor = (kind: FeltKind, number: number | null, spot: string | null): StagePoint => {

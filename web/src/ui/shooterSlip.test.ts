@@ -7,6 +7,7 @@ import {
   addChip,
   beginRoll,
   canClear,
+  oddsSpotOpen,
   clearBet,
   defaultBetSettings,
   deleteRule,
@@ -22,7 +23,9 @@ import {
   syncComeOut,
   undoLast,
   withLockedRule,
+  type FeltBet,
 } from './shooterSlip'
+import { maxOddsDollars } from './crapsPayouts'
 import { SHOOTER_RED } from './shooterProfile'
 
 const red = SHOOTER_RED
@@ -109,6 +112,25 @@ describe('shooter slip', () => {
     expect(come).toMatchObject({ number: 8 })
     expect(come && canClear(moved.slip, come, 6)).toBe(false)
     expect(addChip(moved.slip, 'come', 8, null, 'red', 6)).toBe(moved.slip)
+  })
+
+  it('opens an odds box only while that flat can still take odds', () => {
+    const line = (kind: FeltBet['kind'], number: number | null, dollars: number): FeltBet => ({
+      id: `${kind}-${number ?? 'flat'}`,
+      kind,
+      number,
+      spot: null,
+      dollars,
+      preset: 0,
+    })
+    const pass = line('pass', null, red)
+    expect(oddsSpotOpen([pass], 'passOdds', null, null)).toBe(false)
+    expect(oddsSpotOpen([pass], 'passOdds', null, 6)).toBe(true)
+    expect(oddsSpotOpen([pass, line('passOdds', null, maxOddsDollars(red))], 'passOdds', null, 6)).toBe(false)
+    const come = line('come', 5, red)
+    expect(oddsSpotOpen([come], 'comeOdds', 5, null)).toBe(true)
+    expect(oddsSpotOpen([come], 'comeOdds', 8, null)).toBe(false)
+    expect(oddsSpotOpen([line('dontCome', 4, red)], 'dontComeOdds', 4, null)).toBe(true)
   })
 
   it('pays the field on the come-out and refills the purse after a seven out', () => {

@@ -375,6 +375,7 @@ function App() {
               betClockSec={dice?.betClockSec ?? null}
               purse={dice?.purse ?? 0}
               felt={dice?.felt ?? []}
+              point={dice?.point ?? null}
               controlsRef={betControlsRef}
             />
             <PrecisionOverlay

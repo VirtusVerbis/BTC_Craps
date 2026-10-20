@@ -257,6 +257,27 @@ export const canAdd = (
   return true
 }
 
+/** The odds hit can still take a chip. A full cap hides the box. */
+export const oddsSpotOpen = (
+  bets: readonly FeltBet[],
+  kind: FeltKind,
+  number: number | null,
+  point: number | null,
+): boolean => {
+  if (lineKind(kind) == null) return false
+  const slip = { ...emptySlip(), bets: [...bets] }
+  if (!canAdd(slip, kind, number, point)) return false
+  const oddsNumber = kind === 'passOdds' || kind === 'dontOdds' ? point : number
+  if (oddsNumber == null || !isPointNumber(oddsNumber)) return false
+  const flat = flatForOdds(slip, kind, kind === 'passOdds' || kind === 'dontOdds' ? null : oddsNumber)
+  const cap = flat ? maxOddsDollars(flat.dollars) : 0
+  if (!(cap > 0)) return false
+  const unit = oddsUnitWhites(takeOdds(kind), oddsNumber) * SHOOTER_WHITE
+  const room = Math.floor(cap / unit) * unit
+  const current = findBet(slip, kind, number, null)?.dollars ?? 0
+  return room > current
+}
+
 const hasLine = (slip: ShooterSlip, kind: 'pass' | 'dont'): boolean =>
   slip.bets.some((bet) => bet.kind === kind && bet.dollars > 0)
 

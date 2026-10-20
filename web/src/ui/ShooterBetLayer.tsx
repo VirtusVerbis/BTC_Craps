@@ -4,8 +4,8 @@ import { chipFaceUrl } from './chips/chipFace'
 import { OI_LABEL_X, OI_LABEL_Y } from './overlayConstants'
 import { formatLiqUsd } from './format'
 import { formatShotClock } from './gestureThrow'
-import { SHOOTER_BET_AREAS_ON, SHOOTER_HITS, anchorFor, hitAt } from './shooterBetGeometry'
-import { FELT_LABEL, type FeltBet } from './shooterSlip'
+import { SHOOTER_BET_AREAS_ON, SHOOTER_HITS, SHOOTER_ODDS_HITBOX_ON, anchorFor, hitAt, isOddsHit } from './shooterBetGeometry'
+import { FELT_LABEL, oddsSpotOpen, type FeltBet } from './shooterSlip'
 import type { BetControls } from './useDiceThrow'
 
 const TRAY: readonly ChipColor[] = ['white', 'red', 'green', 'blue', 'black']
@@ -16,6 +16,7 @@ interface ShooterBetLayerProps {
   betClockSec: number | null
   purse: number
   felt: readonly FeltBet[]
+  point: number | null
   controlsRef: { current: BetControls | null }
 }
 
@@ -38,6 +39,7 @@ export const ShooterBetLayer = ({
   betClockSec,
   purse,
   felt,
+  point,
   controlsRef,
 }: ShooterBetLayerProps) => {
   const [color, setColor] = useState<ChipColor>('white')
@@ -48,7 +50,8 @@ export const ShooterBetLayer = ({
     if (!betting) setSelectedId(null)
   }, [betting])
 
-  if (!active && !SHOOTER_BET_AREAS_ON) return null
+  const showGuides = SHOOTER_BET_AREAS_ON || SHOOTER_ODDS_HITBOX_ON
+  if (!active && !showGuides) return null
 
   const onFelt = (event: PointerEvent<SVGElement>) => {
     const controls = controlsRef.current
@@ -77,7 +80,7 @@ export const ShooterBetLayer = ({
   const selected = felt.find((bet) => bet.id === selectedId) ?? null
 
   return (
-    <div className="shooter-bet-layer" aria-hidden={!betting && !SHOOTER_BET_AREAS_ON}>
+    <div className="shooter-bet-layer" aria-hidden={!betting && !showGuides}>
       <svg className="shooter-bet-hits" viewBox="0 0 1080 1920">
         {SHOOTER_BET_AREAS_ON
           ? SHOOTER_HITS.map((hit) => (
@@ -92,15 +95,32 @@ export const ShooterBetLayer = ({
               </g>
             ))
           : null}
-        {betting
-          ? SHOOTER_HITS.map((hit) => (
-              <g key={`hit-${hit.id}`} className="shooter-bet-hit" onPointerDown={onFelt}>
+        {SHOOTER_ODDS_HITBOX_ON
+          ? SHOOTER_HITS.filter(isOddsHit).map((hit) => (
+              <g key={`odds-${hit.id}`} className="shooter-odds-hitbox">
                 {hit.rects.map((box, index) => (
                   <rect key={index} x={box.x} y={box.y} width={box.w} height={box.h} />
                 ))}
-                {hit.polygon ? <polygon points={hit.polygon.map((point) => `${point.x},${point.y}`).join(' ')} /> : null}
               </g>
             ))
+          : null}
+        {betting
+          ? SHOOTER_HITS.map((hit) => {
+              const open = isOddsHit(hit) && oddsSpotOpen(felt, hit.kind, hit.number, point)
+              return (
+                <g
+                  key={`hit-${hit.id}`}
+                  className={open ? 'shooter-bet-hit shooter-odds-open' : 'shooter-bet-hit'}
+                  onPointerDown={onFelt}
+                >
+                  {hit.rects.map((box, index) => (
+                    <rect key={index} x={box.x} y={box.y} width={box.w} height={box.h} />
+                  ))}
+                  {hit.polygon ? <polygon points={hit.polygon.map((corner) => `${corner.x},${corner.y}`).join(' ')} /> : null}
+                  {open ? <text x={hit.anchor.x} y={hit.anchor.y}>Odds</text> : null}
+                </g>
+              )
+            })
           : null}
         {selected
           ? (() => {
