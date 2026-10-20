@@ -108,6 +108,7 @@ describe('shooter slip', () => {
     const come = moved.slip.bets.find((bet) => bet.kind === 'come')
     expect(come).toMatchObject({ number: 8 })
     expect(come && canClear(moved.slip, come, 6)).toBe(false)
+    expect(addChip(moved.slip, 'come', 8, null, 'red', 6)).toBe(moved.slip)
   })
 
   it('pays the field on the come-out and refills the purse after a seven out', () => {

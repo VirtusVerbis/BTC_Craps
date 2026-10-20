@@ -246,6 +246,7 @@ export const canAdd = (
 ): boolean => {
   if ((kind === 'pass' || kind === 'dont') && point != null) return false
   if ((kind === 'tall' || kind === 'all' || kind === 'small') && (point != null || slip.pointSeen)) return false
+  if ((kind === 'come' || kind === 'dontCome') && number != null) return false
   if (kind === 'passOdds' || kind === 'dontOdds') {
     if (point == null) return false
     return flatForOdds(slip, kind, null) != null

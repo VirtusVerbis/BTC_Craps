@@ -61,7 +61,11 @@ export const ShooterBetLayer = ({
     const y = ((event.clientY - rect.top) / rect.height) * 1920
     const stack = nearestStack(felt, x, y)
     if (stack) {
-      setSelectedId(stack.id)
+      if (stack.id !== selectedId) {
+        setSelectedId(stack.id)
+        return
+      }
+      controls.add(stack.kind, stack.number, stack.spot, color)
       return
     }
     const hit = hitAt({ x, y })
