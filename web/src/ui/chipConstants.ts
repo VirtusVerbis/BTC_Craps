@@ -108,6 +108,9 @@ export const CHIP_ANCHORS: readonly ChipAnchor[] = [
 
 export type ChipColor = 'white' | 'red' | 'green' | 'blue' | 'black'
 
+/** Cap on a money stack. Every marker shares the Lay diameter and physics. */
+export type ChipMarker = 'lay' | 'odds' | 'dc' | 'come'
+
 /** Preview column, bottom to top: larger colors under smaller ones. */
 export const WOLF_PASS_PREVIEW_STACK: ChipColor[] = [
   'black',

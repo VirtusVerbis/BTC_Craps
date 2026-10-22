@@ -3,16 +3,24 @@ import { CHIP_FACE_VALUE, chipsForDollars } from './chipBets'
 import type { ChipColor } from './chipConstants'
 import { chipFaceUrl } from './chips/chipFace'
 import { formatLiqUsd } from './format'
+import { HORN_NUMBERS } from './crapsPayouts'
 import {
   COME_OUT_KINDS,
+  CRAPS_SPOTS,
   FELT_LABEL,
+  HARD_NUMBERS,
+  PLACE_NUMBERS,
   POINT_KINDS,
   SHOOTER_RULE_LIMIT,
-  addRule,
+  addBlankRule,
   deleteRule,
+  firstFreeVariant,
+  kindExhausted,
   minimumDollars,
   setRuleDollars,
   setTableSide,
+  variantTaken,
+  withLockedRule,
   type FeltKind,
   type RulePhase,
   type ShooterBetSettings,
@@ -21,9 +29,6 @@ import {
 
 const COLORS: readonly ChipColor[] = ['white', 'red', 'green', 'blue', 'black']
 const NUMBERED = new Set<FeltKind>(['place', 'lay', 'hard', 'hornNumber', 'comeOdds', 'dontComeOdds'])
-const PLACE_NUMBERS = [4, 5, 6, 8, 9, 10]
-const HARD_NUMBERS = [4, 6, 8, 10]
-const HORN_NUMBERS = [2, 3, 12]
 
 const numbersFor = (kind: FeltKind): readonly number[] => {
   if (kind === 'hard') return HARD_NUMBERS
@@ -44,86 +49,95 @@ const chipCount = (dollars: number): string => {
 
 const RuleRow = ({
   rule,
+  rules,
   kinds,
   onChange,
   onDelete,
 }: {
   rule: ShooterRule
+  rules: readonly ShooterRule[]
   kinds: readonly FeltKind[]
   onChange: (rule: ShooterRule) => void
   onDelete: () => void
 }) => {
-  const numbers = numbersFor(rule.kind)
+  const numbers = rule.kind ? numbersFor(rule.kind) : []
+  const takenNumber = (number: number) =>
+    rule.kind != null && variantTaken(rules, rule.id, rule.kind, number, rule.spot) && number !== rule.number
   return (
     <div className="shooter-rule">
       <select
         aria-label="Bet"
         disabled={rule.locked}
-        value={rule.kind}
+        value={rule.kind ?? ''}
         onChange={(event) => {
-          const kind = event.target.value as FeltKind
-          const number = numbersFor(kind)[0] ?? null
+          const value = event.target.value
+          if (value === '' || rule.kind === value) return
+          const kind = value as FeltKind
+          const variant = firstFreeVariant(rules, rule.id, kind)
           onChange({
             ...rule,
             kind,
-            number,
-            spot: kind === 'anyCraps' ? 'craps' : kind === 'eleven' ? 'eleven' : null,
-            dollars: minimumDollars(kind, number),
+            number: variant.number,
+            spot: variant.spot,
+            dollars: minimumDollars(kind, variant.number),
           })
         }}
       >
+        {rule.kind == null ? <option value=""> </option> : null}
         {kinds.map((kind) => (
-          <option key={kind} value={kind}>
+          <option key={kind} value={kind} disabled={kindExhausted(rules, rule.id, kind)}>
             {FELT_LABEL[kind]}
           </option>
         ))}
       </select>
-      {numbers.length > 0 ? (
+      {rule.kind != null && numbers.length > 0 ? (
         <select
           aria-label="Number"
           value={rule.number ?? numbers[0]}
           onChange={(event) => onChange({ ...rule, number: Number(event.target.value) })}
         >
           {numbers.map((number) => (
-            <option key={number} value={number}>
+            <option key={number} value={number} disabled={takenNumber(number)}>
               {number}
             </option>
           ))}
         </select>
       ) : null}
-      {rule.kind === 'anyCraps' || rule.kind === 'eleven' ? (
+      {rule.kind === 'anyCraps' ? (
         <select
           aria-label="Spot"
-          value={rule.spot ?? ''}
+          value={rule.spot ?? 'craps'}
           onChange={(event) => onChange({ ...rule, spot: event.target.value })}
         >
-          {rule.kind === 'anyCraps' ? (
-            <>
-              <option value="craps">CRAPS</option>
-              <option value="c">C</option>
-            </>
-          ) : (
-            <>
-              <option value="eleven">11</option>
-              <option value="e">E</option>
-            </>
-          )}
+          {CRAPS_SPOTS.map((spot) => (
+            <option
+              key={spot}
+              value={spot}
+              disabled={variantTaken(rules, rule.id, 'anyCraps', null, spot) && rule.spot !== spot}
+            >
+              {spot === 'craps' ? 'CRAPS' : 'C'}
+            </option>
+          ))}
         </select>
       ) : null}
-      <div className="shooter-rule-chips">
-        {COLORS.map((color) => (
-          <button
-            key={color}
-            type="button"
-            className="shooter-chip"
-            aria-label={color}
-            onClick={() => onChange({ ...rule, dollars: rule.dollars + CHIP_FACE_VALUE[color] })}
-          >
-            <img src={chipFaceUrl(color)} alt="" draggable={false} />
-          </button>
-        ))}
-      </div>
-      <span className="shooter-rule-total">{chipCount(rule.dollars)}</span>
+      {rule.kind == null ? null : (
+        <>
+          <div className="shooter-rule-chips">
+            {COLORS.map((color) => (
+              <button
+                key={color}
+                type="button"
+                className="shooter-chip"
+                aria-label={color}
+                onClick={() => onChange({ ...rule, dollars: rule.dollars + CHIP_FACE_VALUE[color] })}
+              >
+                <img src={chipFaceUrl(color)} alt="" draggable={false} />
+              </button>
+            ))}
+          </div>
+          <span className="shooter-rule-total">{chipCount(rule.dollars)}</span>
+        </>
+      )}
       {rule.locked ? null : (
         <button className="shooter-rule-minus" type="button" aria-label="Remove rule" onClick={onDelete}>
           −
@@ -153,12 +167,23 @@ const RuleList = ({
   <section className="shooter-rule-list" aria-label={phase}>
     <div className="shooter-rule-heading">
       <h3>{title}</h3>
-      <button type="button" disabled={rules.length >= SHOOTER_RULE_LIMIT} onClick={onAdd}>
+      <button
+        type="button"
+        disabled={rules.length >= SHOOTER_RULE_LIMIT || rules.some((rule) => rule.kind == null)}
+        onClick={onAdd}
+      >
         Add
       </button>
     </div>
     {rules.map((rule) => (
-      <RuleRow key={rule.id} rule={rule} kinds={kinds} onChange={onCommit} onDelete={() => onDelete(rule.id)} />
+      <RuleRow
+        key={rule.id}
+        rule={rule}
+        rules={rules}
+        kinds={kinds}
+        onChange={onCommit}
+        onDelete={() => onDelete(rule.id)}
+      />
     ))}
   </section>
 )
@@ -184,7 +209,7 @@ export const ShooterBetsPanel = ({
       onChange(setRuleDollars(settings, next.id, next.dollars))
       return
     }
-    onChange({ ...settings, [key]: settings[key].map((rule) => (rule.id === next.id ? next : rule)) })
+    onChange(withLockedRule({ ...settings, [key]: settings[key].map((rule) => (rule.id === next.id ? next : rule)) }))
   }
   return (
     <section className="side-panel shooter-bets-panel">
@@ -231,7 +256,7 @@ export const ShooterBetsPanel = ({
             phase="comeOut"
             rules={settings.comeOut}
             kinds={COME_OUT_KINDS}
-            onAdd={() => onChange(addRule(settings, 'comeOut', 'field'))}
+            onAdd={() => onChange(addBlankRule(settings, 'comeOut'))}
             onCommit={(rule) => commit('comeOut', rule)}
             onDelete={(id) => onChange(deleteRule(settings, id))}
           />
@@ -240,7 +265,7 @@ export const ShooterBetsPanel = ({
             phase="point"
             rules={settings.point}
             kinds={POINT_KINDS}
-            onAdd={() => onChange(addRule(settings, 'point', 'come'))}
+            onAdd={() => onChange(addBlankRule(settings, 'point'))}
             onCommit={(rule) => commit('point', rule)}
             onDelete={(id) => onChange(deleteRule(settings, id))}
           />

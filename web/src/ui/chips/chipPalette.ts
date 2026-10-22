@@ -1,4 +1,4 @@
-import type { ChipColor } from '../chipConstants'
+import type { ChipColor, ChipMarker } from '../chipConstants'
 
 /** Hex colors aligned with `index.css` chip themes (WebGL cannot read CSS vars). */
 export const CHIP_PALETTE: Record<
@@ -14,7 +14,14 @@ export const CHIP_PALETTE: Record<
 
 /**
  * Solid lay button. A step brighter than the blue denomination face `#2c5368`,
- * with a plain edge and no spots.
+ * with a plain edge and no spots. Odds, Don't Come, and Come use the same shape.
  */
 export const LAY_CHIP_FACE = 0x3b7b9b
 export const LAY_CHIP_EDGE = 0x1e4e68
+
+export const MARKER_PAINT: Record<ChipMarker, { face: number; edge: number; ink: string; label: string }> = {
+  lay: { face: LAY_CHIP_FACE, edge: LAY_CHIP_EDGE, ink: '#ffffff', label: 'LAY' },
+  odds: { face: 0xf5d90a, edge: 0xc4a000, ink: '#000000', label: 'ODDS' },
+  dc: { face: 0x7a8088, edge: 0x4a5058, ink: '#ffffff', label: 'DC' },
+  come: { face: 0xe86a12, edge: 0xa84808, ink: '#000000', label: 'C' },
+}

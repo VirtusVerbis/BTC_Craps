@@ -1,6 +1,6 @@
 import { applyBonusRoll, emptyBonusHand, type BonusHand } from './bonusCraps'
 import { CHIP_FACE_VALUE, chipsForDollars, splitColumns, type ChipBet } from './chipBets'
-import { CHIP_MAX_BET_CHIPS, type ChipColor } from './chipConstants'
+import { CHIP_MAX_BET_CHIPS, type ChipColor, type ChipMarker } from './chipConstants'
 import {
   settleAnyCraps,
   settleAnySeven,
@@ -21,6 +21,7 @@ import {
   settlePlace,
   maxOddsDollars,
   isPointNumber,
+  HORN_NUMBERS,
   type BetSettlement,
   type PointNumber,
 } from './crapsPayouts'
@@ -86,7 +87,7 @@ export interface ShooterSlip {
 export interface ShooterRule {
   id: string
   phase: RulePhase
-  kind: FeltKind
+  kind: FeltKind | null
   number: number | null
   spot: string | null
   dollars: number
@@ -131,7 +132,10 @@ export const defaultBetSettings = (): ShooterBetSettings => ({
 const isRule = (value: unknown): value is ShooterRule => {
   if (!value || typeof value !== 'object') return false
   const row = value as ShooterRule
-  return typeof row.id === 'string' && typeof row.kind === 'string' && typeof row.dollars === 'number'
+  return typeof row.id === 'string'
+    && typeof row.dollars === 'number'
+    && 'kind' in row
+    && (row.kind === null || typeof row.kind === 'string')
 }
 
 export const loadBetSettings = (): ShooterBetSettings => {
@@ -166,9 +170,47 @@ export const setTableSide = (settings: ShooterBetSettings, darkSide: boolean): S
   return withLockedRule({ ...settings, darkSide, comeOut: [lockedRule(kind), ...comeOut] })
 }
 
+const migrateRule = (rule: ShooterRule): ShooterRule => {
+  if (rule.kind === 'eleven' && rule.spot === 'eleven') {
+    return { ...rule, kind: 'hornNumber', number: 11, spot: null }
+  }
+  if (rule.kind === 'eleven') return { ...rule, number: null, spot: 'e' }
+  return rule
+}
+
+const ruleKey = (rule: ShooterRule): string | null => {
+  if (rule.kind == null) return null
+  return `${rule.kind}|${rule.number ?? ''}|${rule.spot ?? ''}`
+}
+
+/** One row per bet. A locked row wins. Dollars become the higher amount. One blank stays. */
+const pruneRules = (rules: readonly ShooterRule[]): ShooterRule[] => {
+  const kept: ShooterRule[] = []
+  const indexByKey = new Map<string, number>()
+  let blank: ShooterRule | null = null
+  for (const rule of rules) {
+    const key = ruleKey(rule)
+    if (key == null) {
+      blank ??= rule
+      continue
+    }
+    const index = indexByKey.get(key)
+    if (index == null) {
+      indexByKey.set(key, kept.length)
+      kept.push(rule)
+      continue
+    }
+    const current = kept[index]
+    const survivor = current.locked ? current : rule.locked ? rule : current
+    kept[index] = { ...survivor, dollars: Math.max(current.dollars, rule.dollars) }
+  }
+  if (blank) kept.push(blank)
+  return kept
+}
+
 export const withLockedRule = (settings: ShooterBetSettings): ShooterBetSettings => {
   const kind: 'pass' | 'dont' = settings.darkSide ? 'dont' : 'pass'
-  const comeOut = settings.comeOut.map((rule) => {
+  const comeOut = pruneRules(settings.comeOut.map(migrateRule)).map((rule) => {
     const locked = rule.phase === 'comeOut' && rule.kind === kind && rule.number == null && rule.spot == null
     return {
       ...rule,
@@ -180,9 +222,45 @@ export const withLockedRule = (settings: ShooterBetSettings): ShooterBetSettings
   return {
     ...settings,
     comeOut: comeOut.slice(0, SHOOTER_RULE_LIMIT),
-    point: settings.point.slice(0, SHOOTER_RULE_LIMIT),
+    point: pruneRules(settings.point.map(migrateRule)).slice(0, SHOOTER_RULE_LIMIT),
   }
 }
+
+export const PLACE_NUMBERS = [4, 5, 6, 8, 9, 10] as const
+export const HARD_NUMBERS = [4, 6, 8, 10] as const
+export const CRAPS_SPOTS = ['craps', 'c'] as const
+
+export interface RuleVariant {
+  number: number | null
+  spot: string | null
+}
+
+export const variantsOf = (kind: FeltKind): readonly RuleVariant[] => {
+  if (kind === 'place' || kind === 'lay' || kind === 'comeOdds' || kind === 'dontComeOdds') {
+    return PLACE_NUMBERS.map((number) => ({ number, spot: null }))
+  }
+  if (kind === 'hard') return HARD_NUMBERS.map((number) => ({ number, spot: null }))
+  if (kind === 'hornNumber') return HORN_NUMBERS.map((number) => ({ number, spot: null }))
+  if (kind === 'anyCraps') return CRAPS_SPOTS.map((spot) => ({ number: null, spot }))
+  if (kind === 'eleven') return [{ number: null, spot: 'e' }]
+  return [{ number: null, spot: null }]
+}
+
+export const variantTaken = (
+  rules: readonly ShooterRule[],
+  ruleId: string,
+  kind: FeltKind,
+  number: number | null,
+  spot: string | null,
+): boolean => rules.some((rule) =>
+  rule.id !== ruleId && rule.kind === kind && rule.number === number && rule.spot === spot)
+
+export const kindExhausted = (rules: readonly ShooterRule[], ruleId: string, kind: FeltKind): boolean =>
+  variantsOf(kind).every((variant) => variantTaken(rules, ruleId, kind, variant.number, variant.spot))
+
+export const firstFreeVariant = (rules: readonly ShooterRule[], ruleId: string, kind: FeltKind): RuleVariant =>
+  variantsOf(kind).find((variant) => !variantTaken(rules, ruleId, kind, variant.number, variant.spot))
+  ?? variantsOf(kind)[0]
 
 const sameBet = (bet: FeltBet, kind: FeltKind, number: number | null, spot: string | null): boolean =>
   bet.kind === kind && bet.number === number && bet.spot === spot
@@ -473,12 +551,14 @@ export const applyStandingProfile = (slip: ShooterSlip, point: number | null): S
 const applyRules = (slip: ShooterSlip, rules: readonly ShooterRule[], point: number | null): ShooterSlip => {
   let next = slip
   for (const rule of rules) {
-    if ((rule.kind === 'tall' || rule.kind === 'all' || rule.kind === 'small') && next.pointSeen) continue
-    if ((rule.kind === 'come' || rule.kind === 'dontCome') && findBet(next, rule.kind, null, rule.spot)) continue
-    if ((rule.kind === 'come' || rule.kind === 'dontCome') && next.bets.some((bet) => bet.kind === rule.kind && bet.number == null)) {
+    const kind = rule.kind
+    if (kind == null) continue
+    if ((kind === 'tall' || kind === 'all' || kind === 'small') && next.pointSeen) continue
+    if ((kind === 'come' || kind === 'dontCome') && findBet(next, kind, null, rule.spot)) continue
+    if ((kind === 'come' || kind === 'dontCome') && next.bets.some((bet) => bet.kind === kind && bet.number == null)) {
       continue
     }
-    next = ensureAmount(next, rule.kind, rule.number, rule.spot, rule.dollars, point)
+    next = ensureAmount(next, kind, rule.number, rule.spot, rule.dollars, point)
   }
   return next
 }
@@ -586,6 +666,14 @@ export const settleSlip = (
   return { profit, slip: { ...slip, bets, purse, undo: [] } }
 }
 
+export const markerForKind = (kind: FeltKind): ChipMarker | null => {
+  if (kind === 'lay') return 'lay'
+  if (kind === 'passOdds' || kind === 'dontOdds' || kind === 'comeOdds' || kind === 'dontComeOdds') return 'odds'
+  if (kind === 'come') return 'come'
+  if (kind === 'dontCome') return 'dc'
+  return null
+}
+
 const chipSide = (kind: FeltKind): ChipBet['side'] => {
   if (kind === 'pass' || kind === 'passOdds') return 'pass'
   if (kind === 'dont' || kind === 'dontOdds') return 'dont'
@@ -605,7 +693,7 @@ export const slipChips = (slip: ShooterSlip): ChipBet[] =>
       dollars: bet.dollars,
       columns,
       anchor,
-      lay: bet.kind === 'lay',
+      marker: markerForKind(bet.kind),
       guide: bet.kind === 'pass' || bet.kind === 'dont' || bet.kind === 'all'
         ? {
             label: bet.kind === 'pass' ? 'SHOOTER_PASS' : bet.kind === 'dont' ? 'SHOOTER_DONT' : 'SHOOTER_ALL',
@@ -615,22 +703,42 @@ export const slipChips = (slip: ShooterSlip): ChipBet[] =>
     }]
   })
 
-export const addRule = (settings: ShooterBetSettings, phase: RulePhase, kind: FeltKind): ShooterBetSettings => {
-  const list = phase === 'comeOut' ? settings.comeOut : settings.point
-  if (list.length >= SHOOTER_RULE_LIMIT) return settings
-  const rule: ShooterRule = {
-    id: `rule-${phase}-${kind}-${list.length + 1}-${Date.now()}`,
-    phase,
-    kind,
-    number: kind === 'place' || kind === 'lay' || kind === 'hard' || kind === 'hornNumber' || kind === 'comeOdds' || kind === 'dontComeOdds' ? 6 : null,
-    spot: kind === 'anyCraps' ? 'craps' : kind === 'eleven' ? 'eleven' : null,
-    dollars: minimumDollars(kind, kind === 'place' ? 6 : null),
-    locked: false,
-  }
+const appendRule = (settings: ShooterBetSettings, phase: RulePhase, rule: ShooterRule): ShooterBetSettings => {
   const next = phase === 'comeOut'
     ? { ...settings, comeOut: [...settings.comeOut, rule] }
     : { ...settings, point: [...settings.point, rule] }
   return withLockedRule(next)
+}
+
+export const addBlankRule = (settings: ShooterBetSettings, phase: RulePhase): ShooterBetSettings => {
+  const list = phase === 'comeOut' ? settings.comeOut : settings.point
+  if (list.length >= SHOOTER_RULE_LIMIT || list.some((rule) => rule.kind == null)) return settings
+  return appendRule(settings, phase, {
+    id: `rule-${phase}-blank-${Date.now()}`,
+    phase,
+    kind: null,
+    number: null,
+    spot: null,
+    dollars: 0,
+    locked: false,
+  })
+}
+
+export const addRule = (settings: ShooterBetSettings, phase: RulePhase, kind: FeltKind): ShooterBetSettings => {
+  const list = phase === 'comeOut' ? settings.comeOut : settings.point
+  if (list.length >= SHOOTER_RULE_LIMIT || list.some((rule) => rule.kind == null) || kindExhausted(list, '', kind)) {
+    return settings
+  }
+  const variant = firstFreeVariant(list, '', kind)
+  return appendRule(settings, phase, {
+    id: `rule-${phase}-${kind}-${list.length + 1}-${Date.now()}`,
+    phase,
+    kind,
+    number: variant.number,
+    spot: variant.spot,
+    dollars: minimumDollars(kind, variant.number),
+    locked: false,
+  })
 }
 
 export const deleteRule = (settings: ShooterBetSettings, id: string): ShooterBetSettings => withLockedRule({
@@ -660,7 +768,10 @@ export const syncComeOut = (slip: ShooterSlip, settings: ShooterBetSettings): Sh
   }
   next = applyRules(
     next,
-    settings.comeOut.filter((rule) => !(OPENING_LINE.includes(rule.kind) && rule.number == null && rule.spot == null)),
+    settings.comeOut.filter((rule) => {
+      const kind = rule.kind
+      return kind == null || !OPENING_LINE.includes(kind) || rule.number != null || rule.spot != null
+    }),
     null,
   )
   return { ...next, handOpen: true, darkSide: settings.darkSide }

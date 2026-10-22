@@ -17,12 +17,12 @@ import {
   WebGLRenderer,
 } from 'three'
 import { REFERENCE_HEIGHT } from '../../config/constants'
-import { LAY_CHIP_DIAMETER_RATIO, type ChipColor } from '../chipConstants'
+import { LAY_CHIP_DIAMETER_RATIO, type ChipColor, type ChipMarker } from '../chipConstants'
 import { PUCK_IMAGE_WIDTH_PX } from '../diceConstants'
 import { compareDepth, PUCK_PLATE } from '../feltDepth'
 import { chipDrawSize, type ChipDisc } from '../chipPhysics'
 import type { PuckPlacement } from '../puckState'
-import { chipHex, paintChipCell, paintLayCell } from './chipFace'
+import { chipHex, paintChipCell, paintMarkerCell } from './chipFace'
 import { CHIP_PALETTE } from './chipPalette'
 import {
   CHIP_CAMERA_BOTTOM,
@@ -38,10 +38,10 @@ import {
 } from './chipWebglConstants'
 
 const COLORS: ChipColor[] = ['white', 'red', 'green', 'blue', 'black']
+const MARKERS: ChipMarker[] = ['lay', 'odds', 'dc', 'come']
 
 const ATLAS_CELL = 256
-const LAY_ATLAS_COL = COLORS.length
-const ATLAS_COLS = COLORS.length + 1
+const ATLAS_COLS = COLORS.length + MARKERS.length
 const ATLAS_ROWS = 2
 
 /**
@@ -60,8 +60,11 @@ const paintAtlas = (): HTMLCanvasElement => {
     paintChipCell(ctx, col * ATLAS_CELL, 0, ATLAS_CELL, spot, chipHex(palette.edge), false)
     paintChipCell(ctx, col * ATLAS_CELL, ATLAS_CELL, ATLAS_CELL, spot, chipHex(palette.face), true)
   })
-  paintLayCell(ctx, LAY_ATLAS_COL * ATLAS_CELL, 0, ATLAS_CELL, false)
-  paintLayCell(ctx, LAY_ATLAS_COL * ATLAS_CELL, ATLAS_CELL, ATLAS_CELL, true)
+  MARKERS.forEach((marker, index) => {
+    const col = (COLORS.length + index) * ATLAS_CELL
+    paintMarkerCell(ctx, col, 0, ATLAS_CELL, marker, false)
+    paintMarkerCell(ctx, col, ATLAS_CELL, ATLAS_CELL, marker, true)
+  })
   return canvas
 }
 
@@ -83,6 +86,13 @@ const COLOR_INDEX: Record<ChipColor, number> = {
   green: 2,
   blue: 3,
   black: 4,
+}
+
+const MARKER_COL: Record<ChipMarker, number> = {
+  lay: COLORS.length,
+  odds: COLORS.length + 1,
+  dc: COLORS.length + 2,
+  come: COLORS.length + 3,
 }
 
 const tempMatrix = new Matrix4()
@@ -326,10 +336,10 @@ export class WebGLChipPresenter {
     const uv = this.uvRect.array as Float32Array
     for (let i = 0; i < count; i += 1) {
       const disc = discs[i]
-      const lay = disc.lay === true
-      chipDiscMatrix(disc, radiusOf * disc.scale * (lay ? LAY_CHIP_DIAMETER_RATIO : 1), tempMatrix)
+      const marker = disc.marker
+      chipDiscMatrix(disc, radiusOf * disc.scale * (marker ? LAY_CHIP_DIAMETER_RATIO : 1), tempMatrix)
       this.mesh.setMatrixAt(i, tempMatrix)
-      const rect = atlasRect(lay ? LAY_ATLAS_COL : COLOR_INDEX[disc.color], disc.face)
+      const rect = atlasRect(marker ? MARKER_COL[marker] : COLOR_INDEX[disc.color], disc.face)
       const offset = i * 4
       uv[offset] = rect[0]
       uv[offset + 1] = rect[1]

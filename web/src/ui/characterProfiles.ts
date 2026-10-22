@@ -789,7 +789,7 @@ export const strategyChipBet = (item: ProfileBet, scale: number): ChipBet => {
     columns: columns.length > 0 ? columns : [colors],
     anchor: { x: item.x, y: item.y },
     guide: { label: item.label, color: CHARACTER_GUIDE_COLOR[item.character] },
-    lay: item.role === 'lay' || item.role === 'point-lay',
+    marker: item.role === 'lay' || item.role === 'point-lay' ? 'lay' : null,
   }
 }
 

@@ -1,9 +1,9 @@
 import { BONUS_ALL_X, BONUS_ALL_Y, BONUS_SMALL_X, BONUS_SMALL_Y, BONUS_TALL_X, BONUS_TALL_Y } from './bonusFieldConstants'
 import { SHOOTER_DONT_X, SHOOTER_DONT_Y, SHOOTER_PASS_X, SHOOTER_PASS_Y } from './characterBetConstants'
-import { CHIP_MAX_STACK, type ChipColor } from './chipConstants'
+import { CHIP_MAX_STACK, type ChipColor, type ChipMarker } from './chipConstants'
 import type { ChipBet } from './chipBets'
 import { chipDiameter, worldFromBets, type ChipWorld } from './chipPhysics'
-import type { FeltKind } from './shooterSlip'
+import { markerForKind, type FeltKind } from './shooterSlip'
 
 /** Outlines and a full chip stack on every shooter bet and odds spot. Live bets still resolve. */
 export const SHOOTER_BET_AREAS_ON = false
@@ -334,7 +334,7 @@ export const SHOOTER_HITS: readonly ShooterHit[] = [
   box('horn-3', 'hornNumber', 3, null, rect(844, 1362, 948, 1446)),
   box('c', 'anyCraps', null, 'c', rect(496, 1466, 724, 1504)),
   box('e', 'eleven', null, 'e', rect(818, 1466, 1030, 1504)),
-  box('eleven', 'eleven', null, 'eleven', rect(840, 1269, 942, 1353)),
+  box('horn-11', 'hornNumber', 11, null, rect(840, 1269, 942, 1353)),
   box('horn', 'horn', null, null, rect(801, 1336, 874, 1377)),
   box('tall', 'tall', null, null, rect(BONUS_TALL_X - 41, BONUS_TALL_Y - 41, BONUS_TALL_X + 41, BONUS_TALL_Y + 41), { x: BONUS_TALL_X, y: BONUS_TALL_Y }),
   box('all', 'all', null, null, rect(BONUS_ALL_X - 41, BONUS_ALL_Y - 41, BONUS_ALL_X + 41, BONUS_ALL_Y + 41), { x: BONUS_ALL_X, y: BONUS_ALL_Y }),
@@ -372,17 +372,17 @@ const stackColumn = (): ChipColor[] => Array.from({ length: CHIP_MAX_STACK }, ()
 
 /** One full red stack at every bet, traveled come, don't-come, and odds spot. */
 export const shooterAreaPreviewBets = (): ChipBet[] => {
-  const spots: { id: string; x: number; y: number; lay: boolean }[] = SHOOTER_HITS.map((hit) => ({
+  const spots: { id: string; x: number; y: number; marker: ChipMarker | null }[] = SHOOTER_HITS.map((hit) => ({
     id: hit.id,
     x: hit.anchor.x,
     y: hit.anchor.y,
-    lay: hit.kind === 'lay',
+    marker: markerForKind(hit.kind),
   }))
   for (const number of NUMBERS) {
     const come = comeAnchor(number)
     const dc = dcAnchor(number)
-    spots.push({ id: `come-${number}`, x: come.x, y: come.y, lay: false })
-    spots.push({ id: `dc-${number}`, x: dc.x, y: dc.y, lay: false })
+    spots.push({ id: `come-${number}`, x: come.x, y: come.y, marker: 'come' })
+    spots.push({ id: `dc-${number}`, x: dc.x, y: dc.y, marker: 'dc' })
   }
   const seen = new Set<string>()
   const bets: ChipBet[] = []
@@ -397,7 +397,7 @@ export const shooterAreaPreviewBets = (): ChipBet[] => {
       dollars: 0,
       columns: [stackColumn()],
       anchor: { x: spot.x, y: spot.y },
-      lay: spot.lay,
+      marker: spot.marker,
     })
   }
   return bets

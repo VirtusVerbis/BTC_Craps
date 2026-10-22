@@ -14,8 +14,12 @@ import {
   emptySlip,
   minimumDollars,
   oddsMinimumDollars,
+  addBlankRule,
   addRule,
+  kindExhausted,
   setRuleDollars,
+  slipChips,
+  variantTaken,
   setTableSide,
   addSessionResult,
   sessionAfterMode,
@@ -24,6 +28,7 @@ import {
   undoLast,
   withLockedRule,
   type FeltBet,
+  type ShooterRule,
 } from './shooterSlip'
 import { maxOddsDollars } from './crapsPayouts'
 import { SHOOTER_RED } from './shooterProfile'
@@ -222,6 +227,104 @@ describe('shooter slip', () => {
     const comeOut = beginRoll(made, { ...defaultBetSettings(), darkSide: true }, null)
     expect(comeOut.bets.some((bet) => bet.kind === 'pass')).toBe(true)
     expect(comeOut.bets.some((bet) => bet.kind === 'dont')).toBe(true)
+  })
+
+  it('turns Eleven on the 11 square into Horn 11 and keeps the higher amount', () => {
+    const line = (id: string, dollars: number, spot: string | null, kind: ShooterRule['kind'], number: number | null): ShooterRule => ({
+      id,
+      phase: 'comeOut',
+      kind,
+      number,
+      spot,
+      dollars,
+      locked: id === 'locked-pass',
+    })
+    const settings = withLockedRule({
+      ...defaultBetSettings(),
+      comeOut: [
+        line('locked-pass', red, null, 'pass', null),
+        line('yo', red, 'eleven', 'eleven', null),
+        line('horn', red * 2, null, 'hornNumber', 11),
+      ],
+    })
+    const horn = settings.comeOut.filter((rule) => rule.kind === 'hornNumber' && rule.number === 11)
+    expect(horn).toEqual([expect.objectContaining({ id: 'yo', dollars: red * 2, spot: null })])
+    const point = withLockedRule({
+      ...defaultBetSettings(),
+      point: [
+        { ...line('e-bar', red, 'e', 'eleven', null), phase: 'point' },
+        { ...line('craps', red, 'craps', 'anyCraps', null), phase: 'point' },
+        { ...line('c', red * 2, 'c', 'anyCraps', null), phase: 'point' },
+      ],
+    })
+    expect(point.point.filter((rule) => rule.kind === 'eleven')).toEqual([
+      expect.objectContaining({ id: 'e-bar', spot: 'e' }),
+    ])
+    expect(point.point.filter((rule) => rule.kind === 'anyCraps')).toHaveLength(2)
+  })
+
+  it('prunes a duplicate Pass onto the locked row at the higher amount', () => {
+    const settings = withLockedRule({
+      ...defaultBetSettings(),
+      comeOut: [
+        {
+          id: 'extra',
+          phase: 'comeOut',
+          kind: 'pass',
+          number: null,
+          spot: null,
+          dollars: red * 4,
+          locked: false,
+        },
+        {
+          id: 'locked-pass',
+          phase: 'comeOut',
+          kind: 'pass',
+          number: null,
+          spot: null,
+          dollars: red,
+          locked: true,
+        },
+      ],
+    })
+    expect(settings.comeOut.filter((rule) => rule.kind === 'pass')).toEqual([
+      expect.objectContaining({ id: 'locked-pass', locked: true, dollars: red * 4 }),
+    ])
+  })
+
+  it('skips a blank rule and greys out a bet that is already used', () => {
+    const blank = addBlankRule(defaultBetSettings(), 'comeOut')
+    expect(blank.comeOut.some((rule) => rule.kind == null)).toBe(true)
+    expect(addBlankRule(blank, 'comeOut')).toBe(blank)
+    const placed = beginRoll(emptySlip(), { ...blank, sameBet: true }, null)
+    expect(placed.bets.map((bet) => bet.kind)).toEqual(['pass'])
+    expect(kindExhausted(blank.comeOut, 'other', 'pass')).toBe(true)
+    expect(variantTaken(blank.comeOut, 'other', 'pass', null, null)).toBe(true)
+    const field = addRule(defaultBetSettings(), 'point', 'place')
+    expect(variantTaken(field.point, 'other', 'place', 4, null)).toBe(true)
+    expect(kindExhausted(field.point, 'other', 'place')).toBe(false)
+  })
+
+  it('marks come, don\'t come, odds, and lay stacks', () => {
+    const bet = (kind: FeltBet['kind'], number: number | null): FeltBet => ({
+      id: kind + String(number),
+      kind,
+      number,
+      spot: null,
+      dollars: red,
+      preset: red,
+    })
+    const chips = slipChips({
+      ...emptySlip(),
+      bets: [bet('lay', 4), bet('come', null), bet('dontCome', 6), bet('passOdds', null), bet('field', null)],
+    })
+    expect(chips.map((chip) => [chip.id, chip.marker])).toEqual([
+      ['lay4', 'lay'],
+      ['comenull', 'come'],
+      ['dontCome6', 'dc'],
+      ['passOddsnull', 'odds'],
+      ['fieldnull', null],
+    ])
   })
 
   it('rejects a chip the purse cannot cover', () => {

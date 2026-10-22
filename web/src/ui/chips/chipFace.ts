@@ -1,5 +1,5 @@
-import type { ChipColor } from '../chipConstants'
-import { CHIP_PALETTE, LAY_CHIP_EDGE, LAY_CHIP_FACE } from './chipPalette'
+import type { ChipColor, ChipMarker } from '../chipConstants'
+import { CHIP_PALETTE, MARKER_PAINT } from './chipPalette'
 
 /** View box of `bitcoin-mark.svg`. The mark sits in the gray center of a face. */
 const MARK_VIEW_W = 273.6
@@ -73,35 +73,37 @@ export const paintChipCell = (
   ctx.restore()
 }
 
-/** Solid blue lammer. The edge has no spots. The face is bold white LAY and nothing else. */
-export const paintLayCell = (
+/** Solid lammer. The edge has no spots. The face is the marker word and nothing else. */
+export const paintMarkerCell = (
   ctx: CanvasRenderingContext2D,
   originX: number,
   originY: number,
   size: number,
+  marker: ChipMarker,
   face: boolean,
 ): void => {
+  const paint = MARKER_PAINT[marker]
   const cx = originX + size / 2
   const cy = originY + size / 2
   ctx.save()
   ctx.beginPath()
   ctx.arc(cx, cy, size / 2, 0, Math.PI * 2)
   ctx.clip()
-  ctx.fillStyle = chipHex(face ? LAY_CHIP_FACE : LAY_CHIP_EDGE)
+  ctx.fillStyle = chipHex(face ? paint.face : paint.edge)
   ctx.fillRect(originX, originY, size, size)
   if (face) {
     const maxWidth = size * 0.78
     let fontPx = Math.round(size * 0.42)
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillStyle = '#ffffff'
+    ctx.fillStyle = paint.ink
     ctx.font = `bold ${fontPx}px "Arial Black", Arial, sans-serif`
-    const measured = ctx.measureText('LAY').width
+    const measured = ctx.measureText(paint.label).width
     if (measured > maxWidth && measured > 0) {
       fontPx = Math.round(fontPx * (maxWidth / measured))
       ctx.font = `bold ${fontPx}px "Arial Black", Arial, sans-serif`
     }
-    ctx.fillText('LAY', cx, cy)
+    ctx.fillText(paint.label, cx, cy)
   }
   ctx.restore()
 }

@@ -22,6 +22,7 @@ import {
   CHIP_WIDTH_PX,
   chipRotationDeg,
   type ChipColor,
+  type ChipMarker,
 } from './chipConstants'
 
 export interface PuckObstacle {
@@ -42,8 +43,9 @@ export const puckObstacle = (point: number | null): PuckObstacle => {
 
 export const chipDiameter = (): number => CHIP_WIDTH_PX * CHIP_SIZE_SCALAR
 export const chipRadius = (): number => chipDiameter() / 2
-/** Money chips use the full radius. A loose LAY chip collides at 5/6. */
-export const chipBodyRadius = (lay?: boolean): number => chipRadius() * (lay ? LAY_CHIP_DIAMETER_RATIO : 1)
+/** Money chips use the full radius. A loose lammer collides at 5/6. */
+export const chipBodyRadius = (marker?: ChipMarker | null): number =>
+  chipRadius() * (marker ? LAY_CHIP_DIAMETER_RATIO : 1)
 export const chipThickness = (): number => Math.max(1, Math.round(CHIP_THICKNESS_PX * CHIP_SIZE_SCALAR))
 
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value))
@@ -72,8 +74,8 @@ export interface StandingStack {
   offsets: ChipOffset[]
   pinned?: boolean
   guide?: { label: string; color: string }
-  /** Blue LAY chip on the top plate. Absent once that chip has been peeled off. */
-  lay?: boolean
+  /** Lammer on the top plate. Absent once that chip has been peeled off. */
+  marker?: ChipMarker | null
 }
 
 export interface LooseChip {
@@ -89,8 +91,8 @@ export interface LooseChip {
   /** Column spot at the moment this plate was sheared. */
   homeX?: number
   homeZ?: number
-  /** This loose plate is the LAY chip, not a blue denomination. */
-  lay?: boolean
+  /** This loose plate is a lammer, not a denomination chip. */
+  marker?: ChipMarker | null
 }
 
 export interface RestackChip {
@@ -103,7 +105,7 @@ export interface RestackChip {
   toZ: number
   toH: number
   spin: number
-  lay?: boolean
+  marker?: ChipMarker | null
 }
 
 export interface ChipWorld {
@@ -136,8 +138,8 @@ export interface ChipDisc {
   feltZ: number
   /** Plate order within one felt depth. Does not move an object across a felt gap. */
   zIndex: number
-  /** Solid LAY face. The felt-depth `scale` stays put; the renderer shrinks the radius. */
-  lay?: boolean
+  /** Solid lammer face. The felt-depth `scale` stays put; the renderer shrinks the radius. */
+  marker?: ChipMarker | null
 }
 
 export const emptyChipWorld = (): ChipWorld => ({ stacks: [], loose: [], restack: null })
@@ -164,10 +166,10 @@ export const worldFromBets = (bets: readonly ChipBet[], seed: number): ChipWorld
     x: column.x,
     z: column.z,
     colors: column.colors,
-    offsets: zeroOffsets(column.colors.length + (column.lay ? 1 : 0)),
+    offsets: zeroOffsets(column.colors.length + (column.marker ? 1 : 0)),
     pinned: column.pinned,
     guide: column.guide,
-    lay: column.lay,
+    marker: column.marker,
   })),
   loose: [],
   restack: null,
@@ -175,8 +177,8 @@ export const worldFromBets = (bets: readonly ChipBet[], seed: number): ChipWorld
 
 const copyDie = (die: Die): Die => ({ ...die, q: { ...die.q }, w: { ...die.w } })
 
-const plateCount = (stack: { colors: readonly unknown[]; lay?: boolean }): number =>
-  stack.colors.length + (stack.lay ? 1 : 0)
+const plateCount = (stack: { colors: readonly unknown[]; marker?: ChipMarker | null }): number =>
+  stack.colors.length + (stack.marker ? 1 : 0)
 
 const stackHeight = (stack: StandingStack): number => plateCount(stack) * chipThickness()
 
@@ -213,21 +215,21 @@ const shearStack = (
   const flyingCount = chipsAHitCanLift(speed, eligible)
   if (flyingCount <= 0) return []
   const shearAt = count - flyingCount
-  const layIndex = stack.lay ? stack.colors.length : -1
+  const markerIndex = stack.marker ? stack.colors.length : -1
   const thickness = chipThickness()
   const mass = chipMass()
   const flying: LooseChip[] = []
   for (let index = shearAt; index < count; index += 1) {
-    const lay = index === layIndex
-    const color = lay ? 'blue' : stack.colors[index]
+    const marker = index === markerIndex ? stack.marker ?? null : null
+    const color = marker ? 'blue' : stack.colors[index]
     if (!color) continue
     const offset = index - shearAt
     const kick = 0.45 + 0.55 * ((offset + 1) / Math.max(flyingCount, 1))
-    const hop = chipBodyRadius(lay) * 0.2 * (offset + 1)
+    const hop = chipBodyRadius(marker) * 0.2 * (offset + 1)
     flying.push({
       id: nextLooseId(stack.id, index),
       color,
-      lay,
+      marker,
       x: stack.x + dirX * hop,
       z: stack.z + dirZ * hop,
       h: index * thickness,
@@ -240,7 +242,7 @@ const shearStack = (
     })
   }
   stack.colors = stack.colors.slice(0, Math.min(shearAt, stack.colors.length))
-  stack.lay = layIndex >= 0 && layIndex < shearAt
+  stack.marker = markerIndex >= 0 && markerIndex < shearAt ? stack.marker : null
   stack.offsets = fitOffsets(stack.offsets, plateCount(stack))
   return flying
 }
@@ -366,7 +368,7 @@ const integrateLoose = (chip: LooseChip, dt: number): LooseChip => {
 
 const constrainLoose = (chip: LooseChip, metrics: StageMetrics, dt: number): LooseChip => {
   const next = { ...chip }
-  const radius = chipBodyRadius(next.lay)
+  const radius = chipBodyRadius(next.marker)
   const bounce = CHIP_RAIL_RESTITUTION
   let rail = backRailContact(next.x, next.z, radius)
   const filletOwns = !rail.flat && rail.penetration > 0
@@ -413,7 +415,7 @@ const resolveLoosePairs = (chips: LooseChip[]) => {
     for (let j = i + 1; j < chips.length; j += 1) {
       const a = chips[i]
       const b = chips[j]
-      const minDist = chipBodyRadius(a.lay) + chipBodyRadius(b.lay)
+      const minDist = chipBodyRadius(a.marker) + chipBodyRadius(b.marker)
       let dx = b.x - a.x
       let dz = b.z - a.z
       let dist = Math.hypot(dx, dz)
@@ -449,7 +451,7 @@ const resolveLooseDice = (chips: LooseChip[], dice: [Die, Die], metrics: StageMe
       const dx = chip.x - die.x
       const dz = chip.z - die.z
       const dist = Math.hypot(dx, dz)
-      const minDist = chipBodyRadius(chip.lay) + dieSize(die.z, metrics) / 2
+      const minDist = chipBodyRadius(chip.marker) + dieSize(die.z, metrics) / 2
       if (dist >= minDist) continue
       const chipTop = chip.h + thickness
       const dieTop = die.h + dieSize(die.z, metrics)
@@ -486,7 +488,7 @@ const resolveLooseStacks = (world: ChipWorld, shooterLive: boolean) => {
       const dz = chip.z - stack.z
       const dist = Math.hypot(dx, dz)
       const plates = plateCount(stack)
-      const minDist = chipBodyRadius(chip.lay) + chipRadius()
+      const minDist = chipBodyRadius(chip.marker) + chipRadius()
       if (dist >= minDist || plates === 0) continue
       const nx = dist > 1e-4 ? dx / dist : 1
       const nz = dist > 1e-4 ? dz / dist : 0
@@ -560,7 +562,7 @@ const resolvePuckDice = (dice: [Die, Die], puck: PuckObstacle | null | undefined
 const resolvePuckChips = (chips: LooseChip[], puck: PuckObstacle | null | undefined) => {
   if (!puck) return
   for (const chip of chips) {
-    const hit = bounceOffPuck(chip.x, chip.z, chip.vx, chip.vz, chip.h, chipBodyRadius(chip.lay), puck)
+    const hit = bounceOffPuck(chip.x, chip.z, chip.vx, chip.vz, chip.h, chipBodyRadius(chip.marker), puck)
     if (!hit) continue
     chip.x = hit.x
     chip.z = hit.z
@@ -616,7 +618,7 @@ export const driftLooseChips = (
 
 interface ChipPlate {
   color: ChipColor
-  lay: boolean
+  marker: ChipMarker | null
   x: number
   z: number
   h: number
@@ -626,7 +628,7 @@ interface ChipPlate {
 
 interface RestackSlot {
   color: ChipColor
-  lay: boolean
+  marker: ChipMarker | null
   x: number
   z: number
   h: number
@@ -679,7 +681,7 @@ const settleStack = (
   rebuild: boolean,
 ): StandingStack => {
   const pose = columnPose(column, existing, loose, rebuild)
-  const plates = column.colors.length + (column.lay ? 1 : 0)
+  const plates = column.colors.length + (column.marker ? 1 : 0)
   return {
     id: column.id,
     x: pose.x,
@@ -688,7 +690,7 @@ const settleStack = (
     offsets: rebuild || !existing ? zeroOffsets(plates) : fitOffsets(existing.offsets, plates),
     pinned: column.pinned,
     guide: column.guide,
-    lay: column.lay,
+    marker: column.marker,
   }
 }
 
@@ -751,7 +753,7 @@ export const beginRestack = (world: ChipWorld, bets: readonly ChipBet[], nowMs: 
     stack.colors.forEach((color, index) => {
       sources.push({
         color,
-        lay: false,
+        marker: null,
         x: stack.x + (stack.offsets[index]?.x ?? 0),
         z: stack.z + (stack.offsets[index]?.z ?? 0),
         h: index * thickness,
@@ -759,11 +761,11 @@ export const beginRestack = (world: ChipWorld, bets: readonly ChipBet[], nowMs: 
         stackId: stack.id,
       })
     })
-    if (stack.lay) {
+    if (stack.marker) {
       const index = stack.colors.length
       sources.push({
         color: 'blue',
-        lay: true,
+        marker: stack.marker,
         x: stack.x + (stack.offsets[index]?.x ?? 0),
         z: stack.z + (stack.offsets[index]?.z ?? 0),
         h: index * thickness,
@@ -775,7 +777,7 @@ export const beginRestack = (world: ChipWorld, bets: readonly ChipBet[], nowMs: 
   for (const chip of world.loose) {
     sources.push({
       color: chip.color,
-      lay: chip.lay === true,
+      marker: chip.marker ?? null,
       x: chip.x,
       z: chip.z,
       h: chip.h,
@@ -792,18 +794,18 @@ export const beginRestack = (world: ChipWorld, bets: readonly ChipBet[], nowMs: 
   for (const stack of nextStacks) {
     const columnSlots: RestackSlot[] = stack.colors.map((color, index) => ({
       color,
-      lay: false,
+      marker: null,
       x: stack.x,
       z: stack.z,
       h: index * thickness,
       spin: chipRotationDeg(index),
       from: null,
     }))
-    if (stack.lay) {
+    if (stack.marker) {
       const index = stack.colors.length
       columnSlots.push({
         color: 'blue',
-        lay: true,
+        marker: stack.marker,
         x: stack.x,
         z: stack.z,
         h: index * thickness,
@@ -815,17 +817,17 @@ export const beginRestack = (world: ChipWorld, bets: readonly ChipBet[], nowMs: 
   }
 
   const moneyExtras: ChipPlate[] = []
-  const layExtras: ChipPlate[] = []
+  const capExtras: ChipPlate[] = []
   for (const source of sources) {
     const columnSlots = source.stackId ? slots.get(source.stackId) : undefined
-    const open = columnSlots?.find((slot) => slot.from == null && slot.lay === source.lay)
+    const open = columnSlots?.find((slot) => slot.from == null && slot.marker === source.marker)
     if (open) open.from = source
-    else if (source.lay) layExtras.push(source)
+    else if (source.marker) capExtras.push(source)
     else moneyExtras.push(source)
   }
   for (const stack of nextStacks) {
     for (const slot of slots.get(stack.id) ?? []) {
-      if (slot.from || slot.lay) continue
+      if (slot.from || slot.marker) continue
       const source = moneyExtras.shift()
       if (!source) break
       slot.from = source
@@ -833,9 +835,10 @@ export const beginRestack = (world: ChipWorld, bets: readonly ChipBet[], nowMs: 
   }
   for (const stack of nextStacks) {
     for (const slot of slots.get(stack.id) ?? []) {
-      if (slot.from || !slot.lay) continue
-      const source = layExtras.shift()
-      if (!source) break
+      if (slot.from || !slot.marker) continue
+      const index = capExtras.findIndex((source) => source.marker === slot.marker)
+      if (index < 0) continue
+      const [source] = capExtras.splice(index, 1)
       slot.from = source
     }
   }
@@ -847,7 +850,7 @@ export const beginRestack = (world: ChipWorld, bets: readonly ChipBet[], nowMs: 
     chips.push({
       id: `restack-${chips.length}`,
       color: slot.color,
-      lay: slot.lay,
+      marker: slot.marker,
       fromX: from.x,
       fromZ: from.z,
       fromH: from.h,
@@ -862,7 +865,7 @@ export const beginRestack = (world: ChipWorld, bets: readonly ChipBet[], nowMs: 
     chips.push({
       id: `restack-${chips.length}`,
       color: slot.color,
-      lay: slot.lay,
+      marker: slot.marker,
       fromX: extra.x,
       fromZ: extra.z,
       fromH: extra.h,
@@ -872,10 +875,12 @@ export const beginRestack = (world: ChipWorld, bets: readonly ChipBet[], nowMs: 
       spin: extra.spin,
     })
   }
-  const lastMoney = [...ordered].reverse().find((slot) => !slot.lay)
-  const lastLay = [...ordered].reverse().find((slot) => slot.lay)
+  const lastMoney = [...ordered].reverse().find((slot) => slot.marker == null)
+  const lastCap = (marker: ChipMarker) => [...ordered].reverse().find((slot) => slot.marker === marker)
   for (const extra of moneyExtras) park(extra, lastMoney)
-  for (const extra of layExtras) park(extra, lastLay)
+  for (const extra of capExtras) {
+    if (extra.marker) park(extra, lastCap(extra.marker))
+  }
 
   return {
     stacks: survivors,
@@ -905,7 +910,7 @@ const disc = (
   zIndex: number,
   metrics: StageMetrics,
   feltZ = z,
-  lay = false,
+  marker: ChipMarker | null = null,
 ): ChipDisc => ({
   key,
   color,
@@ -917,7 +922,7 @@ const disc = (
   face,
   feltZ,
   zIndex,
-  lay,
+  marker,
 })
 
 /** One chip, wall slices plus the face, same height as a plate in a standing column. */
@@ -931,12 +936,12 @@ const plateDiscs = (
   zIndex: number,
   metrics: StageMetrics,
   feltZ = z,
-  lay = false,
+  marker: ChipMarker | null = null,
 ): ChipDisc[] => {
   const layers = chipThickness()
   const discs: ChipDisc[] = []
   for (let layer = 0; layer < layers; layer += 1) {
-    discs.push(disc(`${id}-${layer}`, color, x, z, spin, -(bottom + layer), layer === layers - 1, zIndex + layer, metrics, feltZ, lay))
+    discs.push(disc(`${id}-${layer}`, color, x, z, spin, -(bottom + layer), layer === layers - 1, zIndex + layer, metrics, feltZ, marker))
   }
   return discs
 }
@@ -956,11 +961,11 @@ const standingDiscs = (stack: StandingStack, metrics: StageMetrics): ChipDisc[] 
       stack.z,
     ),
   )
-  if (!stack.lay) return discs
+  if (!stack.marker) return discs
   const index = stack.colors.length
   discs.push(
     ...plateDiscs(
-      `${stack.id}-lay`,
+      `${stack.id}-${stack.marker}`,
       'blue',
       stack.x + (stack.offsets[index]?.x ?? 0),
       stack.z + (stack.offsets[index]?.z ?? 0),
@@ -969,7 +974,7 @@ const standingDiscs = (stack: StandingStack, metrics: StageMetrics): ChipDisc[] 
       index * layers,
       metrics,
       stack.z,
-      true,
+      stack.marker,
     ),
   )
   return discs
@@ -990,14 +995,14 @@ export const presentChips = (world: ChipWorld, nowMs: number, metrics: StageMetr
         500 + index * chipThickness(),
         metrics,
         chip.toZ,
-        chip.lay === true,
+        chip.marker ?? null,
       ),
     )
     return [...standing, ...flying]
   }
   const standing = world.stacks.flatMap((stack) => standingDiscs(stack, metrics))
   const loose = world.loose.flatMap((chip, index) =>
-    plateDiscs(chip.id, chip.color, chip.x, chip.z, chip.spin, chip.h, 800 + index * chipThickness(), metrics, chip.z, chip.lay === true),
+    plateDiscs(chip.id, chip.color, chip.x, chip.z, chip.spin, chip.h, 800 + index * chipThickness(), metrics, chip.z, chip.marker ?? null),
   )
   return [...standing, ...loose]
 }
@@ -1041,8 +1046,8 @@ export const guideFrames = (world: ChipWorld, metrics: StageMetrics = stageMetri
       const thick = chipThickness() * scale
       const plates = Math.max(1, plateCount(stack))
       for (let index = 0; index < plates; index += 1) {
-        const layPlate = stack.lay === true && index === plates - 1
-        const diameter = chipDiameter() * scale * (layPlate ? LAY_CHIP_DIAMETER_RATIO : 1)
+        const capPlate = stack.marker != null && index === plates - 1
+        const diameter = chipDiameter() * scale * (capPlate ? LAY_CHIP_DIAMETER_RATIO : 1)
         const chipZ = stack.z + (stack.offsets[index]?.z ?? 0)
         const x = stack.x + (stack.offsets[index]?.x ?? 0)
         const y = metrics.height - chipZ
