@@ -9,12 +9,12 @@ import { markerForKind, type FeltKind } from './shooterSlip'
 export const SHOOTER_BET_AREAS_ON = false
 
 /** Solid chip-sized squares on every odds hit box. Live bets still resolve. */
-export const SHOOTER_ODDS_HITBOX_ON = true//false// false
+export const SHOOTER_ODDS_HITBOX_ON = false// false
 
 /** Pass and Don't Pass odds squares. X,Y is the center. The square stays one chip wide. */
-export const SHOOTER_PASS_ODDS_X = 280
+export const SHOOTER_PASS_ODDS_X = 360//280
 export const SHOOTER_PASS_ODDS_Y = 1892
-export const SHOOTER_DONT_ODDS_X = 280
+export const SHOOTER_DONT_ODDS_X = 360//280
 export const SHOOTER_DONT_ODDS_Y = 1840
 
 /**
@@ -28,54 +28,54 @@ export const SHOOTER_LAY_10_Y = 978
 export const SHOOTER_LAY_10_W = 54
 export const SHOOTER_LAY_10_H = 117
 export const SHOOTER_DC_10_X = 123
-export const SHOOTER_DC_10_Y = 1037
-export const SHOOTER_DC_LAY_10_X = 114
-export const SHOOTER_DC_LAY_10_Y = 1000
+export const SHOOTER_DC_10_Y = 1037 + 50
+export const SHOOTER_DC_LAY_10_X = 114 - 40
+export const SHOOTER_DC_LAY_10_Y = 1000 + 70
 
 export const SHOOTER_LAY_9_X = 82
 export const SHOOTER_LAY_9_Y = 1104
 export const SHOOTER_LAY_9_W = 60
 export const SHOOTER_LAY_9_H = 124
 export const SHOOTER_DC_9_X = 112
-export const SHOOTER_DC_9_Y = 1166
-export const SHOOTER_DC_LAY_9_X = 100
-export const SHOOTER_DC_LAY_9_Y = 1126
+export const SHOOTER_DC_9_Y = 1166 + 50
+export const SHOOTER_DC_LAY_9_X = 100 - 40
+export const SHOOTER_DC_LAY_9_Y = 1126 + 70
 
 export const SHOOTER_LAY_8_X = 74
 export const SHOOTER_LAY_8_Y = 1238
 export const SHOOTER_LAY_8_W = 60
 export const SHOOTER_LAY_8_H = 118
 export const SHOOTER_DC_8_X = 104
-export const SHOOTER_DC_8_Y = 1297
-export const SHOOTER_DC_LAY_8_X = 92
-export const SHOOTER_DC_LAY_8_Y = 1260
+export const SHOOTER_DC_8_Y = 1297 + 50
+export const SHOOTER_DC_LAY_8_X = 92 - 40
+export const SHOOTER_DC_LAY_8_Y = 1260 + 70
 
 export const SHOOTER_LAY_6_X = 58
 export const SHOOTER_LAY_6_Y = 1366
 export const SHOOTER_LAY_6_W = 66
 export const SHOOTER_LAY_6_H = 119
 export const SHOOTER_DC_6_X = 91
-export const SHOOTER_DC_6_Y = 1426
-export const SHOOTER_DC_LAY_6_X = 76
-export const SHOOTER_DC_LAY_6_Y = 1388
+export const SHOOTER_DC_6_Y = 1426 + 50
+export const SHOOTER_DC_LAY_6_X = 76 - 40
+export const SHOOTER_DC_LAY_6_Y = 1388 + 70
 
 export const SHOOTER_LAY_5_X = 48
 export const SHOOTER_LAY_5_Y = 1494
 export const SHOOTER_LAY_5_W = 66
 export const SHOOTER_LAY_5_H = 117
 export const SHOOTER_DC_5_X = 81
-export const SHOOTER_DC_5_Y = 1553
-export const SHOOTER_DC_LAY_5_X = 66
-export const SHOOTER_DC_LAY_5_Y = 1516
+export const SHOOTER_DC_5_Y = 1553 + 50
+export const SHOOTER_DC_LAY_5_X = 66 - 40
+export const SHOOTER_DC_LAY_5_Y = 1516 + 70
 
 export const SHOOTER_LAY_4_X = 36
 export const SHOOTER_LAY_4_Y = 1622
 export const SHOOTER_LAY_4_W = 69
 export const SHOOTER_LAY_4_H = 120
 export const SHOOTER_DC_4_X = 71
-export const SHOOTER_DC_4_Y = 1682
-export const SHOOTER_DC_LAY_4_X = 54
-export const SHOOTER_DC_LAY_4_Y = 1644
+export const SHOOTER_DC_4_Y = 1682 + 50
+export const SHOOTER_DC_LAY_4_X = 54 - 30
+export const SHOOTER_DC_LAY_4_Y = 1644 + 70
 
 /**
  * Place click box, stage pixels (1080×1920). X,Y is the top-left; W,H is the size.
@@ -116,34 +116,34 @@ export const SHOOTER_PLACE_4_H = 122
  * Come X,Y is the chip. Come Lay X,Y is the center of the odds square. That square stays one chip wide.
  */
 export const SHOOTER_COME_10_X = 207
-export const SHOOTER_COME_10_Y = 1037
+export const SHOOTER_COME_10_Y = 1087//1037
 export const SHOOTER_COME_LAY_10_X = 315
-export const SHOOTER_COME_LAY_10_Y = 1037
+export const SHOOTER_COME_LAY_10_Y = 1087//1037
 
 export const SHOOTER_COME_9_X = 200
-export const SHOOTER_COME_9_Y = 1166
+export const SHOOTER_COME_9_Y = 1216//1166
 export const SHOOTER_COME_LAY_9_X = 309
-export const SHOOTER_COME_LAY_9_Y = 1166
+export const SHOOTER_COME_LAY_9_Y = 1216//1166
 
 export const SHOOTER_COME_8_X = 189
-export const SHOOTER_COME_8_Y = 1297
+export const SHOOTER_COME_8_Y = 1297 + 50
 export const SHOOTER_COME_LAY_8_X = 304
-export const SHOOTER_COME_LAY_8_Y = 1297
+export const SHOOTER_COME_LAY_8_Y = 1297 + 50
 
 export const SHOOTER_COME_6_X = 182
-export const SHOOTER_COME_6_Y = 1425
+export const SHOOTER_COME_6_Y = 1425 + 50
 export const SHOOTER_COME_LAY_6_X = 302
-export const SHOOTER_COME_LAY_6_Y = 1425
+export const SHOOTER_COME_LAY_6_Y = 1425 + 50
 
 export const SHOOTER_COME_5_X = 171
-export const SHOOTER_COME_5_Y = 1553
+export const SHOOTER_COME_5_Y = 1553 + 50
 export const SHOOTER_COME_LAY_5_X = 297
-export const SHOOTER_COME_LAY_5_Y = 1553
+export const SHOOTER_COME_LAY_5_Y = 1553 + 50
 
 export const SHOOTER_COME_4_X = 160
-export const SHOOTER_COME_4_Y = 1681
+export const SHOOTER_COME_4_Y = 1681 + 50
 export const SHOOTER_COME_LAY_4_X = 288
-export const SHOOTER_COME_LAY_4_Y = 1681
+export const SHOOTER_COME_LAY_4_Y = 1681 + 50
 
 export interface StageRect {
   x: number

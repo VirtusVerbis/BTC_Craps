@@ -212,20 +212,20 @@ export const PUCK_ON_10_SCALE = 0.33//0.3
 
 export const PUCK_ON_9_X = 200
 export const PUCK_ON_9_Y = 1150
-export const PUCK_ON_9_SCALE = 0.35//0.31
+export const PUCK_ON_9_SCALE = 0.34//0.31
 
 export const PUCK_ON_8_X = 190
 export const PUCK_ON_8_Y = 1290
-export const PUCK_ON_8_SCALE = 0.37//0.34
+export const PUCK_ON_8_SCALE = 0.34//0.34
 
 export const PUCK_ON_6_X = 180
 export const PUCK_ON_6_Y = 1420
-export const PUCK_ON_6_SCALE = 0.40//0.37
+export const PUCK_ON_6_SCALE = 0.34//0.37
 
 export const PUCK_ON_5_X = 170
 export const PUCK_ON_5_Y = 1540
-export const PUCK_ON_5_SCALE = 0.42//0.39
+export const PUCK_ON_5_SCALE = 0.36//0.39
 
 export const PUCK_ON_4_X = 150
 export const PUCK_ON_4_Y = 1660
-export const PUCK_ON_4_SCALE = 0.45 //0.41
+export const PUCK_ON_4_SCALE = 0.36 //0.41
