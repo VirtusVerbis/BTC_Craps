@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
-import { SHAKE_DEBUG_BARS, SHAKE_PROBE_MS, SHAKE_THRESHOLD_MPS2, SHAKE_WINDOW_MS } from './diceConstants'
+import {
+  SHAKE_DEBUG_BARS,
+  SHAKE_PROBE_MS,
+  SHAKE_THRESHOLD_X_MPS2,
+  SHAKE_THRESHOLD_Z_MPS2,
+  SHAKE_WINDOW_MS,
+} from './diceConstants'
 import type { PrecisionThrow } from './precisionAim'
 import {
   clearShakeState,
@@ -195,6 +201,13 @@ const emptyDebug = (): ShakeDebugView => ({
   note: 'closed',
 })
 
+/** Hammer, book, and lift from the throw that just left the hand. */
+interface HeldTotals {
+  xTotal: number
+  pushTotal: number
+  yTotal: number
+}
+
 /**
  * Captures motion for one window, then launches.
  * A finger touch does not cancel it. A rail aim restarts the window with empty totals.
@@ -210,6 +223,7 @@ export const useShakeThrow = (
   shakeRestartRef?: RefObject<(() => void) | null>,
 ): ShakeDebugView | null => {
   const debugRef = useRef<ShakeDebugView>(emptyDebug())
+  const heldTotals = useRef<HeldTotals | null>(null)
   const [debugView, setDebugView] = useState<ShakeDebugView | null>(null)
 
   useEffect(() => {
@@ -224,11 +238,18 @@ export const useShakeThrow = (
   useEffect(() => {
     if (!SHAKE_DEBUG_BARS || enabled) return undefined
     const filter = createGravityFilter()
-    debugRef.current = emptyDebug()
     const onMotion = (event: DeviceMotionEvent) => {
       const sample = sampleFromEvent(filter, event)
       const read = shakeDebugRead(createShakeState(), sample)
-      debugRef.current = { ...emptyDebug(), ...read, note: 'closed' }
+      const held = heldTotals.current
+      debugRef.current = {
+        ...emptyDebug(),
+        ...read,
+        xTotal: held?.xTotal ?? 0,
+        pushTotal: held?.pushTotal ?? 0,
+        yTotal: held?.yTotal ?? 0,
+        note: held ? 'launched' : 'closed',
+      }
     }
     window.addEventListener('devicemotion', onMotion)
     return () => window.removeEventListener('devicemotion', onMotion)
@@ -277,6 +298,8 @@ export const useShakeThrow = (
       }
       finished = true
       note = 'launched'
+      const used = shakeDebugRead(state, lastSample)
+      heldTotals.current = { xTotal: used.xTotal, pushTotal: used.pushTotal, yTotal: used.yTotal }
       publish(null)
       if (release.kind === 'precision') {
         const shot = shotRef.current
@@ -293,6 +316,7 @@ export const useShakeThrow = (
       timer = 0
       deadline = 0
       note = 'armed'
+      heldTotals.current = null
       clearShakeState(state)
       publish(null)
     }
@@ -303,8 +327,9 @@ export const useShakeThrow = (
     const onMotion = (event: DeviceMotionEvent) => {
       const sample = sampleFromEvent(filter, event)
       if (shakeBusyRef) {
-        const mag = sample ? Math.hypot(sample.x, sample.z) : 0
-        shakeBusyRef.current = !finished && mag >= Math.max(SHAKE_THRESHOLD_MPS2, SHAKE_FINGER_HOLD_MPS2)
+        const xHot = sample != null && Math.abs(sample.x) >= Math.max(SHAKE_THRESHOLD_X_MPS2, SHAKE_FINGER_HOLD_MPS2)
+        const zHot = sample != null && Math.abs(sample.z) >= Math.max(SHAKE_THRESHOLD_Z_MPS2, SHAKE_FINGER_HOLD_MPS2)
+        shakeBusyRef.current = !finished && (xHot || zHot)
       }
       if (!sample || finished) {
         if (sample) publish(sample)

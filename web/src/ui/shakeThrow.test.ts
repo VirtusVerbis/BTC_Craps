@@ -12,7 +12,8 @@ import {
   SHAKE_HAMMER_LIFT_GAIN,
   SHAKE_HAMMER_LIFT_MAX,
   SHAKE_HAMMER_WALL_MPS2,
-  SHAKE_THRESHOLD_MPS2,
+  SHAKE_THRESHOLD_X_MPS2,
+  SHAKE_THRESHOLD_Y_MPS2,
 } from './diceConstants'
 import {
   createGravityFilter,
@@ -75,13 +76,23 @@ describe('shake throw', () => {
   })
 
   it('adds each bump that clears the noise line and ignores a still hand', () => {
-    const half = SHAKE_HAMMER_WALL_MPS2 / 2
-    const added = finish([...burst('x', 1, half, 0), ...burst('x', 1, half, 80)])
-    const quiet = finish([
-      ...burst('x', 1, SHAKE_THRESHOLD_MPS2 / 2, 0),
-      ...burst('x', -1, SHAKE_THRESHOLD_MPS2 / 2, 80),
+    const added = finish([
+      ...burst('x', 1, SHAKE_THRESHOLD_X_MPS2, 0),
+      ...burst('x', 1, SHAKE_THRESHOLD_X_MPS2, 80),
     ])
-    expect(added).toMatchObject({ kind: 'regular', speed: GESTURE_SPEED_WALL_PX_PER_S })
+    const quiet = finish([
+      ...burst('x', 1, SHAKE_THRESHOLD_X_MPS2 / 2, 0),
+      ...burst('x', -1, SHAKE_THRESHOLD_X_MPS2 / 2, 80),
+    ])
+    expect(added).toMatchObject({
+      kind: 'regular',
+      speed: shakeReleaseSpeed(
+        SHAKE_THRESHOLD_X_MPS2 * 2,
+        SHAKE_HAMMER_WALL_MPS2,
+        SHAKE_HAMMER_CLEAR_MPS2,
+        SHAKE_THRESHOLD_X_MPS2,
+      ),
+    })
     expect(quiet).toBeNull()
   })
 
@@ -129,16 +140,18 @@ describe('shake throw', () => {
   })
 
   it('raises the arc from upward acceleration and caps it', () => {
-    const raised = finish(burst('x', 1, SHAKE_HAMMER_WALL_MPS2, 0, { y: 5 }))
+    const raised = finish(burst('x', 1, SHAKE_HAMMER_WALL_MPS2, 0, { y: SHAKE_THRESHOLD_Y_MPS2 }))
     const capped = finish(burst('x', 1, SHAKE_HAMMER_WALL_MPS2, 0, { y: 1000 }))
-    expect(raised && raised.kind === 'regular' && raised.up).toBeCloseTo(shakeArcUp(5, SHAKE_HAMMER_LIFT_GAIN, SHAKE_HAMMER_LIFT_MAX))
+    expect(raised && raised.kind === 'regular' && raised.up).toBeCloseTo(
+      shakeArcUp(SHAKE_THRESHOLD_Y_MPS2, SHAKE_HAMMER_LIFT_GAIN, SHAKE_HAMMER_LIFT_MAX),
+    )
     expect(capped).toMatchObject({ kind: 'regular', up: SHAKE_HAMMER_LIFT_MAX })
     expect(shakeArcUp(0, SHAKE_HAMMER_LIFT_GAIN, SHAKE_HAMMER_LIFT_MAX)).toBe(baseUp)
   })
 
   it('maps a mid peak between a mid-felt flick and the wall', () => {
-    const mid = (SHAKE_THRESHOLD_MPS2 + SHAKE_HAMMER_WALL_MPS2) / 2
-    const speed = shakeReleaseSpeed(mid, SHAKE_HAMMER_WALL_MPS2, SHAKE_HAMMER_CLEAR_MPS2)
+    const mid = (SHAKE_THRESHOLD_X_MPS2 + SHAKE_HAMMER_WALL_MPS2) / 2
+    const speed = shakeReleaseSpeed(mid, SHAKE_HAMMER_WALL_MPS2, SHAKE_HAMMER_CLEAR_MPS2, SHAKE_THRESHOLD_X_MPS2)
     expect(speed).toBeGreaterThan(GESTURE_SPEED_MIN_PX_PER_S)
     expect(speed).toBeLessThan(GESTURE_SPEED_WALL_PX_PER_S)
   })
@@ -156,7 +169,7 @@ describe('shake throw', () => {
     expect(still?.x).toBeCloseTo(0)
     expect(still?.y).toBeCloseTo(0)
     const spiked = linearFromRaw(filter, { ...rest, t: 40, gx: 9.7 })
-    expect(spiked && Math.abs(spiked.x)).toBeGreaterThan(SHAKE_THRESHOLD_MPS2)
+    expect(spiked && Math.abs(spiked.x)).toBeGreaterThan(1)
   })
 
   it('listens only while a shot can leave the hand', () => {

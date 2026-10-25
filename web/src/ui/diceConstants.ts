@@ -146,8 +146,14 @@ export const GESTURE_MAX_LEAN = 0.3//0.65
 /** Forward tumble on every flick, including a straight one. Side lean is added on top. */
 export const GESTURE_BASE_SPIN = 4
 
-/** A bump must peak at least this hard, in m/s², before it is added. */
-export const SHAKE_THRESHOLD_MPS2 = 10
+/** Hammer (sideways, x) must peak at least this hard, in m/s², before it is added. */
+export const SHAKE_THRESHOLD_X_MPS2 = 10
+
+/** Upward lift (y) must peak at least this hard, in m/s², before it is added. */
+export const SHAKE_THRESHOLD_Y_MPS2 = 10
+
+/** Book push away from the face (−z) must peak at least this hard, in m/s², before it is added. */
+export const SHAKE_THRESHOLD_Z_MPS2 = 10
 
 /** Quiet time after the last spike before the dice launch. The shot clock is the long listen. */
 export const SHAKE_WINDOW_MS = 400//3000
@@ -159,7 +165,7 @@ export const SHAKE_WINDOW_MS = 400//3000
 export const SHAKE_DISABLE_FLICK = true
 
 /** Center-screen bars for the live axes and the totals that launch. */
-export const SHAKE_DEBUG_BARS = true
+export const SHAKE_DEBUG_BARS = false//true
 
 /** After a finger lifts, ignore motion this long so the flick's follow-through cannot launch. */
 export const SHAKE_POINTER_TAIL_MS = 280

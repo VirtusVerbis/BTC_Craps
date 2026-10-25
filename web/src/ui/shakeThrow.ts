@@ -15,7 +15,9 @@ import {
   SHAKE_HAMMER_LIFT_GAIN,
   SHAKE_HAMMER_LIFT_MAX,
   SHAKE_HAMMER_WALL_MPS2,
-  SHAKE_THRESHOLD_MPS2,
+  SHAKE_THRESHOLD_X_MPS2,
+  SHAKE_THRESHOLD_Y_MPS2,
+  SHAKE_THRESHOLD_Z_MPS2,
 } from './diceConstants'
 import type { PrecisionPhase } from './precisionAim'
 
@@ -59,6 +61,7 @@ export interface ShakeState {
 }
 
 interface GripScale {
+  threshold: number
   wall: number
   clear: number
   liftGain: number
@@ -67,6 +70,7 @@ interface GripScale {
 }
 
 const HAMMER: GripScale = {
+  threshold: SHAKE_THRESHOLD_X_MPS2,
   wall: SHAKE_HAMMER_WALL_MPS2,
   clear: SHAKE_HAMMER_CLEAR_MPS2,
   liftGain: SHAKE_HAMMER_LIFT_GAIN,
@@ -75,6 +79,7 @@ const HAMMER: GripScale = {
 }
 
 const BOOK: GripScale = {
+  threshold: SHAKE_THRESHOLD_Z_MPS2,
   wall: SHAKE_BOOK_WALL_MPS2,
   clear: SHAKE_BOOK_CLEAR_MPS2,
   liftGain: SHAKE_BOOK_LIFT_GAIN,
@@ -190,14 +195,14 @@ export const sampleFromEvent = (filter: GravityFilter, event: DeviceMotionEvent)
 }
 
 /** Launch peak at the wall constant is a back-wall throw. The clear constant and above leaves the table. */
-export const shakeReleaseSpeed = (peak: number, wall: number, clear: number): number => {
+export const shakeReleaseSpeed = (peak: number, wall: number, clear: number, threshold: number): number => {
   const min = GESTURE_SPEED_MIN_PX_PER_S
   const atWall = GESTURE_SPEED_WALL_PX_PER_S
   const noRoll = GESTURE_SPEED_NO_ROLL_PX_PER_S
-  if (!(clear > wall) || !(wall > SHAKE_THRESHOLD_MPS2)) return peak >= wall ? atWall : min
+  if (!(clear > wall) || !(wall > threshold)) return peak >= wall ? atWall : min
   if (peak >= clear) return noRoll
   if (peak >= wall) return atWall + ((noRoll - atWall) * (peak - wall)) / (clear - wall)
-  const t = (peak - SHAKE_THRESHOLD_MPS2) / (wall - SHAKE_THRESHOLD_MPS2)
+  const t = (peak - threshold) / (wall - threshold)
   return min + (atWall - min) * Math.max(0, Math.min(1, t))
 }
 
@@ -220,7 +225,7 @@ const closeX = (state: ShakeState) => {
 
 const noteX = (state: ShakeState, value: number) => {
   const magnitude = Math.abs(value)
-  if (magnitude < SHAKE_THRESHOLD_MPS2) {
+  if (magnitude < SHAKE_THRESHOLD_X_MPS2) {
     closeX(state)
     return
   }
@@ -236,7 +241,7 @@ const noteX = (state: ShakeState, value: number) => {
 /** A push away from the face. A pull toward the face adds nothing. */
 const notePush = (state: ShakeState, z: number) => {
   const push = -z
-  if (push < SHAKE_THRESHOLD_MPS2) {
+  if (push < SHAKE_THRESHOLD_Z_MPS2) {
     if (state.push > 0) state.pushTotal += state.push
     state.push = 0
     return
@@ -245,7 +250,7 @@ const notePush = (state: ShakeState, z: number) => {
 }
 
 const noteLift = (state: ShakeState, y: number) => {
-  if (y < SHAKE_THRESHOLD_MPS2) {
+  if (y < SHAKE_THRESHOLD_Y_MPS2) {
     if (state.y > 0) state.yTotal += state.y
     state.y = 0
     return
@@ -260,13 +265,13 @@ const leanOf = (side: number, leanFull: number): number => {
 
 /** Hammer's added x, or book's added push, whichever is larger. */
 const releaseOf = (state: ShakeState, mode: ShakeMode): ShakeRelease | null => {
-  const bookWins = state.pushTotal > state.xTotal && state.pushTotal >= SHAKE_THRESHOLD_MPS2
-  const hammerWins = !bookWins && state.xTotal >= SHAKE_THRESHOLD_MPS2
+  const bookWins = state.pushTotal > state.xTotal && state.pushTotal >= SHAKE_THRESHOLD_Z_MPS2
+  const hammerWins = !bookWins && state.xTotal >= SHAKE_THRESHOLD_X_MPS2
   if (!bookWins && !hammerWins) return null
   const grip = bookWins ? BOOK : HAMMER
   const peak = bookWins ? state.pushTotal : state.xTotal
   const side = bookWins ? state.xSign * state.xBest : state.zPeak * state.xSign
-  const speed = shakeReleaseSpeed(peak, grip.wall, grip.clear)
+  const speed = shakeReleaseSpeed(peak, grip.wall, grip.clear, grip.threshold)
   const lean = leanOf(side, grip.leanFull)
   if (mode === 'precision') return { kind: 'precision', speed, lean }
   return { kind: 'regular', speed, lean, up: shakeArcUp(state.yTotal, grip.liftGain, grip.liftMax) }
@@ -274,9 +279,9 @@ const releaseOf = (state: ShakeState, mode: ShakeMode): ShakeRelease | null => {
 
 /** A sample loud enough to count as a spike. */
 export const shakeSampleHot = (sample: LinearSample): boolean =>
-  Math.abs(sample.x) >= SHAKE_THRESHOLD_MPS2 ||
-  Math.abs(sample.z) >= SHAKE_THRESHOLD_MPS2 ||
-  sample.y >= SHAKE_THRESHOLD_MPS2
+  Math.abs(sample.x) >= SHAKE_THRESHOLD_X_MPS2 ||
+  Math.abs(sample.z) >= SHAKE_THRESHOLD_Z_MPS2 ||
+  sample.y >= SHAKE_THRESHOLD_Y_MPS2
 
 export const stepShake = (state: ShakeState, sample: LinearSample) => {
   noteX(state, sample.x)
