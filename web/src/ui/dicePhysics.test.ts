@@ -861,12 +861,15 @@ describe('gesture launch', () => {
       speed: GESTURE_SPEED_WALL_PX_PER_S,
       lean: 0.3,
       up: 1400,
+      roll: -6,
     })
     expect(launched.phase).toBe('flying')
     expect(launched.requireWallContact).toBe(true)
     expect(launched.sharedX).toBe(540)
     expect(launched.dice[0].vh).toBe(1400)
     expect(launched.dice[1].vh).toBe(1400)
+    expect(launched.dice[0].w.x).toBeCloseTo(-6)
+    expect(launched.dice[1].w.x).toBeCloseTo(-6)
     expect(launched.dice[0].vz).toBeCloseTo(speeds.forward)
     expect(launched.dice[0].x).toBeCloseTo(540 - DIE_LAUNCH_SIZE_PX / 2)
     expect(launched.dice[1].x).toBeCloseTo(540 + DIE_LAUNCH_SIZE_PX / 2)

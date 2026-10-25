@@ -664,7 +664,17 @@ const applyOnAxis = (die: Die, forward: number, up: number, rate: number, gap: n
   }
 }
 
-const applyGestureLaunch = (die: Die, forward: number, up: number, leanSpin: number) => {
+/** Share of the lean rate that yaws about vertical. The rest barrels about the down-table axis. */
+const LEAN_YAW_SHARE = 0.45
+const LEAN_BARREL_SHARE = 0.7
+
+const applyGestureLaunch = (
+  die: Die,
+  forward: number,
+  up: number,
+  leanSpin: number,
+  roll = GESTURE_BASE_SPIN * DIE_FORWARD_SPIN_SCALE,
+) => {
   die.resting = false
   die.topFace = null
   die.hitBackWall = false
@@ -672,9 +682,9 @@ const applyGestureLaunch = (die: Die, forward: number, up: number, leanSpin: num
   die.vz = forward
   die.vh = up
   die.w = {
-    x: GESTURE_BASE_SPIN * DIE_FORWARD_SPIN_SCALE,
-    y: leanSpin * 0.45,
-    z: leanSpin * 0.7,
+    x: roll,
+    y: leanSpin * LEAN_YAW_SHARE,
+    z: leanSpin * LEAN_BARREL_SHARE,
   }
 }
 
@@ -692,8 +702,8 @@ const applyPrecisionLaunch = (
   die.vh = velocity.vh
   die.w = {
     x: spin * DIE_FORWARD_SPIN_SCALE,
-    y: leanSpin * 0.45,
-    z: leanSpin * 0.7,
+    y: leanSpin * LEAN_YAW_SHARE,
+    z: leanSpin * LEAN_BARREL_SHARE,
   }
 }
 
@@ -750,6 +760,9 @@ const gestureLeanSpin = (lean: number): number => {
   return capped * DIE_MAX_SPIN_RAD_PER_S
 }
 
+/** Vertical yaw, in rad/s, for a flick lean. Positive turns the down-table face to the shooter's right. */
+export const leanYawRate = (lean: number): number => gestureLeanSpin(lean) * LEAN_YAW_SHARE
+
 /** Flick launch. Both dice share the lean spin. The pair center is the pointer-down x. */
 export interface ShakeThrow {
   /** Finger-speed units. The wall constant reaches the back wall. */
@@ -758,6 +771,8 @@ export interface ShakeThrow {
   lean: number
   /** Upward speed. Zero extra phone lift passes today's arc. */
   up: number
+  /** Tumble about the table's left-right axis, in rad/s. Positive rolls the top toward the back wall. */
+  roll: number
 }
 
 /** Shake launch. The pair stays on its current rail spot. Lift comes from the phone. */
@@ -783,8 +798,8 @@ export const launchShakeThrow = (
     left.h = 0
     right.h = 0
   }
-  applyGestureLaunch(left, forward, release.up, leanSpin)
-  applyGestureLaunch(right, forward, release.up, leanSpin)
+  applyGestureLaunch(left, forward, release.up, leanSpin, release.roll)
+  applyGestureLaunch(right, forward, release.up, leanSpin, release.roll)
   return {
     ...state,
     phase: 'flying',

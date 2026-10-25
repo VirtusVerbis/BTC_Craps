@@ -15,16 +15,18 @@ import {
   SHAKE_HAMMER_LIFT_GAIN,
   SHAKE_HAMMER_LIFT_MAX,
   SHAKE_HAMMER_WALL_MPS2,
+  SHAKE_ROLL_MAX_RAD_PER_S,
   SHAKE_THRESHOLD_X_MPS2,
   SHAKE_THRESHOLD_Y_MPS2,
   SHAKE_THRESHOLD_Z_MPS2,
 } from './diceConstants'
+import { leanYawRate } from './dicePhysics'
 import type { PrecisionPhase } from './precisionAim'
 
 export type ShakeMode = 'regular' | 'precision'
 
 export type ShakeRelease =
-  | { kind: 'regular'; speed: number; lean: number; up: number }
+  | { kind: 'regular'; speed: number; lean: number; up: number; roll: number }
   | { kind: 'precision'; speed: number; lean: number }
 
 /** Gravity-removed motion, plus the gravity vector from the sensor. */
@@ -83,9 +85,11 @@ export interface ShakeState {
   xTotal: number
   xBest: number
   xSign: -1 | 1
-  /** Open push away from the face, as a positive magnitude. */
-  push: number
-  pushTotal: number
+  /** Book bump in progress, push or pull. Peaks add when the bump falls back under the noise line. */
+  zBump: OpenBump | null
+  zTotal: number
+  zBest: number
+  zSign: -1 | 1
   /** Signed z with the greatest magnitude. Hammer english, flipped by the launch sign. */
   zPeak: number
   zAbs: number
@@ -136,8 +140,10 @@ export const createShakeState = (): ShakeState => ({
   xTotal: 0,
   xBest: 0,
   xSign: 1,
-  push: 0,
-  pushTotal: 0,
+  zBump: null,
+  zTotal: 0,
+  zBest: 0,
+  zSign: 1,
   zPeak: 0,
   zAbs: 0,
   y: 0,
@@ -151,8 +157,10 @@ export const clearShakeState = (state: ShakeState) => {
   state.xTotal = 0
   state.xBest = 0
   state.xSign = 1
-  state.push = 0
-  state.pushTotal = 0
+  state.zBump = null
+  state.zTotal = 0
+  state.zBest = 0
+  state.zSign = 1
   state.zPeak = 0
   state.zAbs = 0
   state.y = 0
@@ -272,15 +280,31 @@ const noteX = (state: ShakeState, value: number) => {
   if (magnitude > state.x.peak) state.x.peak = magnitude
 }
 
-/** A push away from the face. A pull toward the face adds nothing. */
-const notePush = (state: ShakeState, z: number) => {
-  const push = -z
-  if (push < SHAKE_THRESHOLD_Z_MPS2) {
-    if (state.push > 0) state.pushTotal += state.push
-    state.push = 0
+const closeZ = (state: ShakeState) => {
+  const bump = state.zBump
+  if (!bump) return
+  state.zTotal += bump.peak
+  if (bump.peak >= state.zBest) {
+    state.zBest = bump.peak
+    state.zSign = bump.sign
+  }
+  state.zBump = null
+}
+
+/** A push away from the face or a pull toward it. Both add to the book total. */
+const noteZ = (state: ShakeState, value: number) => {
+  const magnitude = Math.abs(value)
+  if (magnitude < SHAKE_THRESHOLD_Z_MPS2) {
+    closeZ(state)
     return
   }
-  if (push > state.push) state.push = push
+  const sign: -1 | 1 = value >= 0 ? 1 : -1
+  if (!state.zBump || state.zBump.sign !== sign) {
+    closeZ(state)
+    state.zBump = { sign, peak: magnitude }
+    return
+  }
+  if (magnitude > state.zBump.peak) state.zBump.peak = magnitude
 }
 
 const noteLift = (state: ShakeState, y: number) => {
@@ -297,18 +321,65 @@ const leanOf = (side: number, leanFull: number): number => {
   return fraction * GESTURE_MAX_LEAN
 }
 
-/** Hammer's added x, or book's added push, whichever is larger. */
-const releaseOf = (state: ShakeState, mode: ShakeMode): ShakeRelease | null => {
-  const bookWins = state.pushTotal > state.xTotal && state.pushTotal >= SHAKE_THRESHOLD_Z_MPS2
-  const hammerWins = !bookWins && state.xTotal >= SHAKE_THRESHOLD_X_MPS2
-  if (!bookWins && !hammerWins) return null
+/**
+ * Signed axis peak over the wall line, capped at `SHAKE_ROLL_MAX_RAD_PER_S`.
+ * Positive rolls the top face toward the back wall.
+ */
+export const shakeRollRate = (signedPeak: number, wall: number): number => {
+  if (!(wall > 0)) return 0
+  const fraction = Math.max(-1, Math.min(1, signedPeak / wall))
+  return fraction * SHAKE_ROLL_MAX_RAD_PER_S
+}
+
+const louder = (sign: -1 | 1, best: number, open: OpenBump | null): { sign: -1 | 1; best: number } => {
+  if (open && open.peak >= best) return { sign: open.sign, best: open.peak }
+  return { sign, best }
+}
+
+/** Totals, lean, roll, and yaw a launch would use, counting a bump that is still open. */
+const motionOf = (state: ShakeState) => {
+  const xTotal = state.xTotal + (state.x?.peak ?? 0)
+  const pushTotal = state.zTotal + (state.zBump?.peak ?? 0)
+  const yTotal = state.yTotal + state.y
+  const x = louder(state.xSign, state.xBest, state.x)
+  const z = louder(state.zSign, state.zBest, state.zBump)
+  const bookWins = pushTotal > xTotal && pushTotal >= SHAKE_THRESHOLD_Z_MPS2
+  const hammerWins = !bookWins && xTotal >= SHAKE_THRESHOLD_X_MPS2
+  if (!bookWins && !hammerWins) {
+    return { xTotal, pushTotal, yTotal, bookWins, hammerWins, grip: HAMMER, lean: 0, roll: 0, spin: 0 }
+  }
   const grip = bookWins ? BOOK : HAMMER
-  const peak = bookWins ? state.pushTotal : state.xTotal
-  const side = bookWins ? state.xSign * state.xBest : state.zPeak * state.xSign
-  const speed = shakeReleaseSpeed(peak, grip.wall, grip.clear, grip.threshold)
+  const side = bookWins ? x.sign * x.best : state.zPeak * x.sign
   const lean = leanOf(side, grip.leanFull)
-  if (mode === 'precision') return { kind: 'precision', speed, lean }
-  return { kind: 'regular', speed, lean, up: shakeArcUp(state.yTotal, grip.liftGain, grip.liftMax) }
+  const signed = bookWins ? -z.sign * z.best : -x.sign * x.best
+  return {
+    xTotal,
+    pushTotal,
+    yTotal,
+    bookWins,
+    hammerWins,
+    grip,
+    lean,
+    roll: shakeRollRate(signed, grip.wall),
+    spin: leanYawRate(lean),
+  }
+}
+
+/** Hammer's added x, or book's added face bumps, whichever is larger. */
+const releaseOf = (state: ShakeState, mode: ShakeMode): ShakeRelease | null => {
+  const motion = motionOf(state)
+  if (!motion.bookWins && !motion.hammerWins) return null
+  const grip = motion.bookWins ? BOOK : HAMMER
+  const peak = motion.bookWins ? motion.pushTotal : motion.xTotal
+  const speed = shakeReleaseSpeed(peak, grip.wall, grip.clear, grip.threshold)
+  if (mode === 'precision') return { kind: 'precision', speed, lean: motion.lean }
+  return {
+    kind: 'regular',
+    speed,
+    lean: motion.lean,
+    up: shakeArcUp(motion.yTotal, grip.liftGain, grip.liftMax),
+    roll: motion.roll,
+  }
 }
 
 /** A sample loud enough to count as a spike. */
@@ -319,7 +390,7 @@ export const shakeSampleHot = (sample: LinearSample): boolean =>
 
 export const stepShake = (state: ShakeState, sample: LinearSample) => {
   noteX(state, sample.x)
-  notePush(state, sample.z)
+  noteZ(state, sample.z)
   noteLift(state, sample.y)
   const zAbs = Math.abs(sample.z)
   if (zAbs >= state.zAbs) {
@@ -331,22 +402,26 @@ export const stepShake = (state: ShakeState, sample: LinearSample) => {
 /** Close any bump still in progress and launch from the totals. A still hand launches nothing. */
 export const finishShake = (state: ShakeState, mode: ShakeMode): ShakeRelease | null => {
   closeX(state)
-  if (state.push > 0) state.pushTotal += state.push
-  state.push = 0
+  closeZ(state)
   if (state.y > 0) state.yTotal += state.y
   state.y = 0
   return releaseOf(state, mode)
 }
 
 /** Live sample plus the totals a launch would use, including a bump still open. */
-export const shakeDebugRead = (state: ShakeState, sample: LinearSample | null) => ({
-  x: sample?.x ?? 0,
-  y: sample?.y ?? 0,
-  z: sample?.z ?? 0,
-  xTotal: state.xTotal + (state.x?.peak ?? 0),
-  pushTotal: state.pushTotal + state.push,
-  yTotal: state.yTotal + state.y,
-})
+export const shakeDebugRead = (state: ShakeState, sample: LinearSample | null) => {
+  const motion = motionOf(state)
+  return {
+    x: sample?.x ?? 0,
+    y: sample?.y ?? 0,
+    z: sample?.z ?? 0,
+    xTotal: motion.xTotal,
+    pushTotal: motion.pushTotal,
+    yTotal: motion.yTotal,
+    roll: motion.roll,
+    spin: motion.spin,
+  }
+}
 
 /** Precision listens on the launch phase only. Regular listens for the whole hold. */
 export const shakeListenEnabled = (

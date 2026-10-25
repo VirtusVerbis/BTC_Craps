@@ -1,20 +1,25 @@
 import { describe, expect, it } from 'vitest'
 import {
   DIE_GRAVITY_PX_PER_S2,
+  DIE_MAX_SPIN_RAD_PER_S,
   GESTURE_ARC_SEC,
   GESTURE_MAX_LEAN,
   GESTURE_SPEED_MIN_PX_PER_S,
   GESTURE_SPEED_NO_ROLL_PX_PER_S,
   GESTURE_SPEED_WALL_PX_PER_S,
   SHAKE_BOOK_CLEAR_MPS2,
+  SHAKE_BOOK_WALL_MPS2,
   SHAKE_HAMMER_CLEAR_MPS2,
   SHAKE_HAMMER_LEAN_MPS2,
   SHAKE_HAMMER_LIFT_GAIN,
   SHAKE_HAMMER_LIFT_MAX,
   SHAKE_HAMMER_WALL_MPS2,
+  SHAKE_ROLL_MAX_RAD_PER_S,
   SHAKE_THRESHOLD_X_MPS2,
   SHAKE_THRESHOLD_Y_MPS2,
+  SHAKE_THRESHOLD_Z_MPS2,
 } from './diceConstants'
+import { leanYawRate } from './dicePhysics'
 import {
   createGravityFilter,
   createShakeState,
@@ -24,14 +29,17 @@ import {
   rawShakeTotals,
   scaleSampleToFactory,
   shakeArcUp,
+  shakeDebugRead,
   shakeListenEnabled,
   shakeReleaseSpeed,
+  shakeRollRate,
   stepShake,
   type LinearSample,
   type ShakeMode,
 } from './shakeThrow'
 
 const baseUp = (DIE_GRAVITY_PX_PER_S2 * GESTURE_ARC_SEC) / 2
+const fullRoll = SHAKE_ROLL_MAX_RAD_PER_S
 
 const sample = (t: number, x: number, y: number, z: number, gravity?: { gx: number; gy: number; gz: number }): LinearSample => ({
   t,
@@ -68,12 +76,19 @@ describe('shake throw', () => {
   it('treats an x bump as a hammer throw for either hand', () => {
     const right = finish([burst('x', 1, SHAKE_HAMMER_WALL_MPS2, 0, { side: SHAKE_HAMMER_LEAN_MPS2 })].flat())
     const left = finish([burst('x', -1, SHAKE_HAMMER_WALL_MPS2, 0, { side: SHAKE_HAMMER_LEAN_MPS2 })].flat())
-    expect(right).toMatchObject({ kind: 'regular', speed: GESTURE_SPEED_WALL_PX_PER_S, lean: GESTURE_MAX_LEAN, up: baseUp })
+    expect(right).toMatchObject({
+      kind: 'regular',
+      speed: GESTURE_SPEED_WALL_PX_PER_S,
+      lean: GESTURE_MAX_LEAN,
+      up: baseUp,
+      roll: -fullRoll,
+    })
     expect(left).toMatchObject({
       kind: 'regular',
       speed: GESTURE_SPEED_WALL_PX_PER_S,
       lean: -GESTURE_MAX_LEAN,
       up: baseUp,
+      roll: fullRoll,
     })
   })
 
@@ -98,11 +113,11 @@ describe('shake throw', () => {
     expect(quiet).toBeNull()
   })
 
-  it('throws a book push away and ignores a pull toward the face', () => {
+  it('throws a book push forward and a pull backward', () => {
     const push = finish(burst('z', -1, SHAKE_BOOK_CLEAR_MPS2, 0))
     const toward = finish(burst('z', 1, SHAKE_BOOK_CLEAR_MPS2, 0))
-    expect(push).toMatchObject({ kind: 'regular', speed: GESTURE_SPEED_NO_ROLL_PX_PER_S })
-    expect(toward).toBeNull()
+    expect(push).toMatchObject({ kind: 'regular', speed: GESTURE_SPEED_NO_ROLL_PX_PER_S, roll: fullRoll })
+    expect(toward).toMatchObject({ kind: 'regular', speed: GESTURE_SPEED_NO_ROLL_PX_PER_S, roll: -fullRoll })
   })
 
   it('keeps the stronger total when both grips are in one capture', () => {
@@ -110,13 +125,52 @@ describe('shake throw', () => {
     expect(release).toMatchObject({ kind: 'regular', speed: GESTURE_SPEED_NO_ROLL_PX_PER_S })
   })
 
-  it('lets a hammer throw win while z only moves toward the face', () => {
-    const settle = SHAKE_HAMMER_WALL_MPS2 + 6
+  it('lets a hammer throw win when the face spike is the smaller one', () => {
     const release = finish([
-      sample(0, SHAKE_HAMMER_WALL_MPS2, 0, settle),
+      sample(0, SHAKE_HAMMER_WALL_MPS2, 0, SHAKE_THRESHOLD_Z_MPS2),
       sample(40, 0, 0, 0),
     ])
-    expect(release).toMatchObject({ kind: 'regular', speed: GESTURE_SPEED_WALL_PX_PER_S })
+    expect(release).toMatchObject({ kind: 'regular', speed: GESTURE_SPEED_WALL_PX_PER_S, roll: -fullRoll })
+  })
+
+  it('lets a louder pull win as a book throw and roll backward', () => {
+    const pull = SHAKE_HAMMER_WALL_MPS2 + 6
+    const release = finish([
+      sample(0, SHAKE_HAMMER_WALL_MPS2, 0, pull),
+      sample(40, 0, 0, 0),
+    ])
+    expect(release).toMatchObject({
+      kind: 'regular',
+      speed: shakeReleaseSpeed(pull, SHAKE_BOOK_WALL_MPS2, SHAKE_BOOK_CLEAR_MPS2, SHAKE_THRESHOLD_Z_MPS2),
+      roll: -fullRoll,
+    })
+  })
+
+  it('sums opposing snaps for distance and rolls with the louder one', () => {
+    const release = finish([...burst('x', 1, 12, 0), ...burst('x', -1, 13, 80)])
+    expect(release).toMatchObject({
+      kind: 'regular',
+      speed: shakeReleaseSpeed(25, SHAKE_HAMMER_WALL_MPS2, SHAKE_HAMMER_CLEAR_MPS2, SHAKE_THRESHOLD_X_MPS2),
+      roll: shakeRollRate(13, SHAKE_HAMMER_WALL_MPS2),
+    })
+  })
+
+  it('scales a soft throw under a full roll', () => {
+    const release = finish(burst('x', -1, SHAKE_THRESHOLD_X_MPS2, 0))
+    expect(release).toMatchObject({
+      kind: 'regular',
+      roll: shakeRollRate(SHAKE_THRESHOLD_X_MPS2, SHAKE_HAMMER_WALL_MPS2),
+    })
+    expect(release && release.kind === 'regular' && release.roll).toBeLessThan(fullRoll)
+  })
+
+  it('previews the roll and the rightward yaw while the bump is still open', () => {
+    const state = createShakeState()
+    stepShake(state, sample(0, -SHAKE_HAMMER_WALL_MPS2, 0, -SHAKE_HAMMER_LEAN_MPS2))
+    const read = shakeDebugRead(state, null)
+    expect(read.roll).toBeCloseTo(fullRoll)
+    expect(read.spin).toBeCloseTo(leanYawRate(GESTURE_MAX_LEAN))
+    expect(read.spin).toBeCloseTo(DIE_MAX_SPIN_RAD_PER_S * 0.45)
   })
 
   it('counts a bump that is still open when the capture ends', () => {

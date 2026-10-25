@@ -188,6 +188,10 @@ export interface ShakeDebugView {
   xTotal: number
   pushTotal: number
   yTotal: number
+  /** Signed roll the launch would use, in rad/s. Positive is toward the back wall. */
+  roll: number
+  /** Signed yaw the launch would use, in rad/s. Positive turns the down-table face right. */
+  spin: number
   remainingMs: number
   note: string
 }
@@ -200,6 +204,8 @@ const emptyDebug = (): ShakeDebugView => ({
   xTotal: 0,
   pushTotal: 0,
   yTotal: 0,
+  roll: 0,
+  spin: 0,
   remainingMs: 0,
   note: 'closed',
 })
@@ -209,6 +215,8 @@ interface HeldTotals {
   xTotal: number
   pushTotal: number
   yTotal: number
+  roll: number
+  spin: number
 }
 
 const FACTORY_GAIN: ShakeAxisGain = {
@@ -262,6 +270,8 @@ export const useShakeThrow = (
         xTotal: held?.xTotal ?? 0,
         pushTotal: held?.pushTotal ?? 0,
         yTotal: held?.yTotal ?? 0,
+        roll: held?.roll ?? 0,
+        spin: held?.spin ?? 0,
         note: held ? 'launched' : 'closed',
       }
     }
@@ -317,7 +327,7 @@ export const useShakeThrow = (
       finished = true
       note = 'launched'
       const used = shakeDebugRead(state, lastSample)
-      heldTotals.current = rawShakeTotals(used, gainRef.current)
+      heldTotals.current = { ...rawShakeTotals(used, gainRef.current), roll: used.roll, spin: used.spin }
       publish(null)
       if (release.kind === 'precision') {
         const shot = shotRef.current

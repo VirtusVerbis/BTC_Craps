@@ -16,6 +16,13 @@ const fill = (value: number, full: number): { left: string; width: string } => {
 const mark = (value: number, full: number): string =>
   `${50 + (Math.max(-full, Math.min(full, value)) / full) * 50}%`
 
+const signed = (value: number, positive: string, negative: string): string => {
+  const text = value.toFixed(1)
+  if (value > 0) return `${text} ${positive}`
+  if (value < 0) return `${text} ${negative}`
+  return text
+}
+
 const Bar = ({ label, value, threshold }: { label: string; value: number; threshold: number }) => {
   const full = fullScale(threshold)
   const box = fill(value, full)
@@ -51,6 +58,9 @@ export const ShakeDebugOverlay = ({
     <Bar label="Z" value={view.z} threshold={thresholdZ} />
     <p className="shake-debug-totals">
       hammer {view.xTotal.toFixed(1)} · book {view.pushTotal.toFixed(1)} · lift {view.yTotal.toFixed(1)}
+    </p>
+    <p className="shake-debug-totals">
+      roll {signed(view.roll, 'forward', 'back')} · spin {signed(view.spin, 'right', 'left')}
     </p>
     <p className="shake-debug-meta">
       {view.note}

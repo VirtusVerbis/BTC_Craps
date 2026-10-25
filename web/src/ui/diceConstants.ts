@@ -152,7 +152,7 @@ export const SHAKE_THRESHOLD_X_MPS2 = 10
 /** Upward lift (y) must peak at least this hard, in m/s², before it is added. */
 export const SHAKE_THRESHOLD_Y_MPS2 = 10
 
-/** Book push away from the face (−z) must peak at least this hard, in m/s², before it is added. */
+/** Book push (−z) or pull (+z) must peak at least this hard, in m/s², before it is added. */
 export const SHAKE_THRESHOLD_Z_MPS2 = 10
 
 /** Quiet time after the last spike before the dice launch. The shot clock is the long listen. */
@@ -180,6 +180,12 @@ export const SHAKE_HAMMER_LIFT_MAX = 1800
 
 /** Sideways acceleration, in m/s², that becomes a full side spin. */
 export const SHAKE_HAMMER_LEAN_MPS2 = 10
+
+/**
+ * Fastest forward or backward tumble a shake applies, in rad/s.
+ * 16 matches a full precision swipe (`PRECISION_SPIN_MAX` × `DIE_FORWARD_SPIN_SCALE`).
+ */
+export const SHAKE_ROLL_MAX_RAD_PER_S = 16
 
 /** Book launch peak that maps to a back-wall throw. A push reads lower than a hammer flick. */
 export const SHAKE_BOOK_WALL_MPS2 = 12
