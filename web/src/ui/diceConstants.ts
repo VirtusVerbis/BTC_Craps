@@ -164,9 +164,6 @@ export const SHAKE_WINDOW_MS = 400//3000
  */
 export const SHAKE_DISABLE_FLICK = true
 
-/** Center-screen bars for the live axes and the totals that launch. */
-export const SHAKE_DEBUG_BARS = false//true
-
 /** After a finger lifts, ignore motion this long so the flick's follow-through cannot launch. */
 export const SHAKE_POINTER_TAIL_MS = 280
 

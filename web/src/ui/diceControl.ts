@@ -1,3 +1,4 @@
+import { SHAKE_THRESHOLD_X_MPS2, SHAKE_THRESHOLD_Y_MPS2, SHAKE_THRESHOLD_Z_MPS2 } from './diceConstants'
 import { diceSet, isDiceSetId, type DiceSetId } from './diceSets'
 import type { DiceHold } from './dicePhysics'
 
@@ -12,6 +13,13 @@ export interface DiceControlSettings {
   precisionTargeting: boolean
   /** Phone pull-back and launch can release a held shot. Off until the shooter opts in. */
   shakeToRoll: boolean
+  /**
+   * Phone reading, in m/s², that should behave like the factory line of 10.
+   * Wall, clear, and lean stay in code and scale with this number.
+   */
+  shakeThresholdX: number
+  shakeThresholdY: number
+  shakeThresholdZ: number
 }
 
 export const DEFAULT_DICE_CONTROL: DiceControlSettings = {
@@ -20,6 +28,44 @@ export const DEFAULT_DICE_CONTROL: DiceControlSettings = {
   stacked: false,
   precisionTargeting: false,
   shakeToRoll: false,
+  shakeThresholdX: SHAKE_THRESHOLD_X_MPS2,
+  shakeThresholdY: SHAKE_THRESHOLD_Y_MPS2,
+  shakeThresholdZ: SHAKE_THRESHOLD_Z_MPS2,
+}
+
+/** Saved axis readings stay inside this band. One decimal is allowed. */
+export const SHAKE_AXIS_MIN = 1
+export const SHAKE_AXIS_MAX = 60
+
+export const clampShakeAxis = (value: number): number => {
+  const rounded = Math.round(value * 10) / 10
+  if (!Number.isFinite(rounded)) return SHAKE_THRESHOLD_X_MPS2
+  return Math.min(SHAKE_AXIS_MAX, Math.max(SHAKE_AXIS_MIN, rounded))
+}
+
+export const formatShakeAxis = (value: number): string => {
+  const clamped = clampShakeAxis(value)
+  return Number.isInteger(clamped) ? String(clamped) : clamped.toFixed(1)
+}
+
+/** Plus and minus land on whole numbers. 10.6 becomes 11 or 10. The ends stick at 1 and 30. */
+export const stepShakeAxis = (value: number, direction: 1 | -1): number => {
+  const next = direction > 0 ? Math.floor(value) + 1 : Math.ceil(value) - 1
+  return clampShakeAxis(next)
+}
+
+/** A typed axis. Empty or junk returns null so the field can restore the last good value. */
+export const parseShakeAxisInput = (text: string): number | null => {
+  const trimmed = text.trim()
+  if (!/^\d+(\.\d+)?$/.test(trimmed) && !/^\d+\.$/.test(trimmed)) return null
+  const value = Number(trimmed)
+  if (!Number.isFinite(value)) return null
+  return clampShakeAxis(value)
+}
+
+const readShakeAxis = (value: unknown, fallback: number): number => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
+  return clampShakeAxis(value)
 }
 
 /** Face-pair counts. Index is `(left - 1) * 6 + (right - 1)` with faces 1 through 6. */
@@ -101,6 +147,9 @@ export const loadDiceControlSettings = (): DiceControlSettings => {
       stacked?: unknown
       precisionTargeting?: unknown
       shakeToRoll?: unknown
+      shakeThresholdX?: unknown
+      shakeThresholdY?: unknown
+      shakeThresholdZ?: unknown
     }
     return {
       comeOut: isDiceSetId(row.comeOut) ? row.comeOut : 'random',
@@ -108,6 +157,9 @@ export const loadDiceControlSettings = (): DiceControlSettings => {
       stacked: row.stacked === true,
       precisionTargeting: row.precisionTargeting === true,
       shakeToRoll: row.shakeToRoll === true,
+      shakeThresholdX: readShakeAxis(row.shakeThresholdX, SHAKE_THRESHOLD_X_MPS2),
+      shakeThresholdY: readShakeAxis(row.shakeThresholdY, SHAKE_THRESHOLD_Y_MPS2),
+      shakeThresholdZ: readShakeAxis(row.shakeThresholdZ, SHAKE_THRESHOLD_Z_MPS2),
     }
   } catch {
     return { ...DEFAULT_DICE_CONTROL }

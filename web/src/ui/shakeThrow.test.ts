@@ -21,6 +21,8 @@ import {
   finishShake,
   linearFromRaw,
   motionHasNumbers,
+  rawShakeTotals,
+  scaleSampleToFactory,
   shakeArcUp,
   shakeListenEnabled,
   shakeReleaseSpeed,
@@ -170,6 +172,25 @@ describe('shake throw', () => {
     expect(still?.y).toBeCloseTo(0)
     const spiked = linearFromRaw(filter, { ...rest, t: 40, gx: 9.7 })
     expect(spiked && Math.abs(spiked.x)).toBeGreaterThan(1)
+  })
+
+  it('maps a hotter phone back onto the same wall, clear, and lean throw', () => {
+    const gain = { x: 20, y: 20, z: 20 }
+    const tune = (steps: LinearSample[]) => steps.map((step) => scaleSampleToFactory(step, gain))
+    const wall = finish(tune(burst('x', 1, SHAKE_HAMMER_WALL_MPS2 * 2, 0, { side: SHAKE_HAMMER_LEAN_MPS2 * 2, y: 16 })))
+    const clear = finish(tune(burst('x', 1, SHAKE_HAMMER_CLEAR_MPS2 * 2, 0)))
+    const factory = finish(burst('x', 1, SHAKE_HAMMER_WALL_MPS2, 0, { side: SHAKE_HAMMER_LEAN_MPS2, y: 8 }))
+    expect(wall).toEqual(factory)
+    expect(clear).toMatchObject({ kind: 'regular', speed: GESTURE_SPEED_NO_ROLL_PX_PER_S })
+    const scaled = scaleSampleToFactory(sample(0, 20, 5, -30), { x: 20, y: 10, z: 15 })
+    expect(scaled.x).toBeCloseTo(10)
+    expect(scaled.y).toBeCloseTo(5)
+    expect(scaled.z).toBeCloseTo(-20)
+    expect(rawShakeTotals({ xTotal: 14, pushTotal: 12, yTotal: 10 }, gain)).toEqual({
+      xTotal: 28,
+      pushTotal: 24,
+      yTotal: 20,
+    })
   })
 
   it('listens only while a shot can leave the hand', () => {

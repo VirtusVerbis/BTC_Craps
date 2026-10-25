@@ -1,5 +1,12 @@
-import { memo, useState } from 'react'
-import { diceControlCharts, type DiceControlBook, type DiceControlSettings } from './diceControl'
+import { memo, useEffect, useRef, useState } from 'react'
+import {
+  diceControlCharts,
+  formatShakeAxis,
+  parseShakeAxisInput,
+  stepShakeAxis,
+  type DiceControlBook,
+  type DiceControlSettings,
+} from './diceControl'
 import { DIE_COLOR_LABELS, DIE_COLOR_ORDER, type DieColorId } from './diceColor'
 import { DICE_SETS, diceSet, type DiceSetId } from './diceSets'
 import { DiceControlChart } from './DiceControlChart'
@@ -37,6 +44,93 @@ const SetSelect = ({
   </label>
 )
 
+const AxisField = ({
+  id,
+  label,
+  value,
+  onCommit,
+}: {
+  id: string
+  label: string
+  value: number
+  onCommit: (next: number) => void
+}) => {
+  const [draft, setDraft] = useState<string | null>(null)
+  const draftRef = useRef<string | null>(null)
+  const valueRef = useRef(value)
+  const onCommitRef = useRef(onCommit)
+  valueRef.current = value
+  onCommitRef.current = onCommit
+
+  const remember = (text: string | null) => {
+    draftRef.current = text
+    setDraft(text)
+  }
+
+  const commit = (text: string | null) => {
+    if (text == null) return
+    const parsed = parseShakeAxisInput(text)
+    remember(null)
+    if (parsed == null || parsed === valueRef.current) return
+    onCommitRef.current(parsed)
+  }
+
+  useEffect(
+    () => () => {
+      const text = draftRef.current
+      if (text == null) return
+      const parsed = parseShakeAxisInput(text)
+      if (parsed == null || parsed === valueRef.current) return
+      onCommitRef.current(parsed)
+    },
+    [],
+  )
+
+  const bump = (direction: 1 | -1) => {
+    const typed = draftRef.current == null ? null : parseShakeAxisInput(draftRef.current)
+    const next = stepShakeAxis(typed ?? valueRef.current, direction)
+    remember(null)
+    onCommitRef.current(next)
+  }
+
+  return (
+    <label className="dice-control-axis" htmlFor={id}>
+      <span>{label}</span>
+      <span className="dice-control-axis-controls">
+        <button
+          className="dice-control-axis-step"
+          type="button"
+          aria-label={`Increase ${label}`}
+          onPointerDown={(event) => event.preventDefault()}
+          onClick={() => bump(1)}
+        >
+          +
+        </button>
+        <input
+          id={id}
+          inputMode="decimal"
+          autoComplete="off"
+          value={draft ?? formatShakeAxis(value)}
+          onChange={(event) => remember(event.target.value)}
+          onBlur={() => commit(draftRef.current)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') event.currentTarget.blur()
+          }}
+        />
+        <button
+          className="dice-control-axis-step"
+          type="button"
+          aria-label={`Decrease ${label}`}
+          onPointerDown={(event) => event.preventDefault()}
+          onClick={() => bump(-1)}
+        >
+          −
+        </button>
+      </span>
+    </label>
+  )
+}
+
 const DiceControlPanelInner = ({
   settings,
   onChange,
@@ -44,6 +138,9 @@ const DiceControlPanelInner = ({
   onDieColor,
   shakeAvailable,
   onShakeToRoll,
+  shakeLive,
+  motionTest,
+  onMotionTest,
 }: {
   settings: DiceControlSettings
   onChange: (patch: Partial<DiceControlSettings>) => void
@@ -51,9 +148,13 @@ const DiceControlPanelInner = ({
   onDieColor: (color: DieColorId) => void
   shakeAvailable: boolean
   onShakeToRoll: () => void
+  shakeLive: boolean
+  motionTest: boolean
+  onMotionTest: () => void
 }) => {
   const [open, setOpen] = useState(false)
   const [referencesOpen, setReferencesOpen] = useState(false)
+  const [sensitivityOpen, setSensitivityOpen] = useState(false)
   return (
     <section className="side-panel">
       <button
@@ -98,6 +199,50 @@ const DiceControlPanelInner = ({
             <span>Shake to Roll</span>
             <span>{settings.shakeToRoll ? 'On' : 'Off'}</span>
           </button>
+          {shakeLive ? (
+            <div className="dice-control-sensitivity">
+              <button
+                className="dice-control-sensitivity-toggle"
+                type="button"
+                aria-expanded={sensitivityOpen}
+                onClick={() => setSensitivityOpen((current) => !current)}
+              >
+                <span>Sensitivity</span>
+                <span aria-hidden="true">{sensitivityOpen ? '▾' : '▸'}</span>
+              </button>
+              {sensitivityOpen ? (
+                <div className="dice-control-sensitivity-body">
+                  <button
+                    className="dice-control-stack"
+                    type="button"
+                    aria-pressed={motionTest}
+                    onClick={onMotionTest}
+                  >
+                    <span>Motion Test Overlay</span>
+                    <span>{motionTest ? 'On' : 'Off'}</span>
+                  </button>
+                  <AxisField
+                    id="shake-axis-x"
+                    label="X side"
+                    value={settings.shakeThresholdX}
+                    onCommit={(shakeThresholdX) => onChange({ shakeThresholdX })}
+                  />
+                  <AxisField
+                    id="shake-axis-y"
+                    label="Y up"
+                    value={settings.shakeThresholdY}
+                    onCommit={(shakeThresholdY) => onChange({ shakeThresholdY })}
+                  />
+                  <AxisField
+                    id="shake-axis-z"
+                    label="Z push"
+                    value={settings.shakeThresholdZ}
+                    onCommit={(shakeThresholdZ) => onChange({ shakeThresholdZ })}
+                  />
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           <label className="dice-control-field" htmlFor="dice-control-color">
             <span>Dice Color</span>
             <select

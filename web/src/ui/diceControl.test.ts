@@ -4,18 +4,19 @@ import {
   DEFAULT_DICE_CONTROL,
   diceControlCharts,
   loadDiceControlSettings,
+  parseShakeAxisInput,
   recordDiceControlRoll,
   saveDiceControlSettings,
+  stepShakeAxis,
   type DiceControlBook,
   type DiceControlSettings,
 } from './diceControl'
 
 const settings = (comeOut: DiceControlSettings['comeOut'], point: DiceControlSettings['point'], stacked = false): DiceControlSettings => ({
+  ...DEFAULT_DICE_CONTROL,
   comeOut,
   point,
   stacked,
-  precisionTargeting: false,
-  shakeToRoll: false,
 })
 
 const roll = (
@@ -139,5 +140,57 @@ describe('dice control settings', () => {
     delete saved.shakeToRoll
     store.set(key, JSON.stringify(saved))
     expect(loadDiceControlSettings().shakeToRoll).toBe(false)
+  })
+
+  it('stores shake axes and restores a missing axis to the factory line', () => {
+    const store = new Map<string, string>()
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        store.set(key, value)
+      },
+      removeItem: (key: string) => {
+        store.delete(key)
+      },
+      clear: () => store.clear(),
+      key: () => null,
+      length: 0,
+    })
+    saveDiceControlSettings({
+      ...DEFAULT_DICE_CONTROL,
+      shakeThresholdX: 12.6,
+      shakeThresholdY: 8,
+      shakeThresholdZ: 30,
+    })
+    expect(loadDiceControlSettings()).toMatchObject({ shakeThresholdX: 12.6, shakeThresholdY: 8, shakeThresholdZ: 30 })
+    const key = [...store.keys()][0]
+    const saved = JSON.parse(store.get(key) ?? '{}') as {
+      shakeThresholdX?: number
+      shakeThresholdY?: number
+      shakeThresholdZ?: number
+    }
+    saved.shakeThresholdX = 30.26
+    saved.shakeThresholdY = 0.2
+    delete saved.shakeThresholdZ
+    store.set(key, JSON.stringify(saved))
+    expect(loadDiceControlSettings()).toMatchObject({ shakeThresholdX: 30, shakeThresholdY: 1, shakeThresholdZ: 10 })
+  })
+})
+
+describe('shake axis entry', () => {
+  it('steps to whole numbers and keeps one decimal from the keyboard', () => {
+    expect(stepShakeAxis(10.6, 1)).toBe(11)
+    expect(stepShakeAxis(10.6, -1)).toBe(10)
+    expect(stepShakeAxis(10, 1)).toBe(11)
+    expect(stepShakeAxis(10, -1)).toBe(9)
+    expect(stepShakeAxis(1, -1)).toBe(1)
+    expect(stepShakeAxis(30, 1)).toBe(30)
+    expect(parseShakeAxisInput('10.64')).toBe(10.6)
+    expect(parseShakeAxisInput('10.65')).toBe(10.7)
+    expect(parseShakeAxisInput('10.')).toBe(10)
+    expect(parseShakeAxisInput('99')).toBe(30)
+    expect(parseShakeAxisInput('0.4')).toBe(1)
+    expect(parseShakeAxisInput('')).toBeNull()
+    expect(parseShakeAxisInput('abc')).toBeNull()
   })
 })

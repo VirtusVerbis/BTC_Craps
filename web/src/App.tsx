@@ -122,6 +122,7 @@ function App() {
   const [diceControl, setDiceControl] = useState(loadDiceControlSettings)
   const diceControlRef = useRef(diceControl)
   diceControlRef.current = diceControl
+  const [motionTest, setMotionTest] = useState(false)
   const [diceControlBook, setDiceControlBook] = useState(loadDiceControlBook)
   const onDiceControl = useCallback((patch: Partial<DiceControlSettings>) => {
     setDiceControl((current) => {
@@ -294,6 +295,10 @@ function App() {
   )
   const shakeSensor = useShakeSensor(diceControl.shakeToRoll)
   const shakeListening = Boolean(diceControl.shakeToRoll && shakeSensor.live)
+  const motionTestOpen = motionTest && shakeSensor.live
+  useEffect(() => {
+    if (!shakeSensor.live) setMotionTest(false)
+  }, [shakeSensor.live])
   useShooterGesture(
     shooting && !precisionOn,
     stageRef,
@@ -311,6 +316,7 @@ function App() {
     }
     shakeSensor.requestEnable(() => onDiceControl({ shakeToRoll: true }))
   }, [diceControl.shakeToRoll, onDiceControl, shakeSensor])
+  const onMotionTest = useCallback(() => setMotionTest((current) => !current), [])
   const shotClockRef = useRef<number | null>(null)
   shotClockRef.current = dice?.shotClockMs ?? null
   const shakeDebug = useShakeThrow(
@@ -321,6 +327,12 @@ function App() {
     shakeBusyRef,
     shotClockRef,
     shakeRestartRef,
+    motionTestOpen,
+    {
+      x: diceControl.shakeThresholdX,
+      y: diceControl.shakeThresholdY,
+      z: diceControl.shakeThresholdZ,
+    },
   )
   useShooterPageLock(manualShooter)
   const onShooterMode = useCallback(() => {
@@ -489,6 +501,9 @@ function App() {
             onDieColor={onDieColor}
             shakeAvailable={shakeSensor.available}
             onShakeToRoll={onShakeToRoll}
+            shakeLive={shakeSensor.live}
+            motionTest={motionTestOpen}
+            onMotionTest={onMotionTest}
           />
           <DiceControlHistogram settings={diceControl} book={diceControlBook} />
           <aside className="repo-links-panel" aria-label="Source repositories">
@@ -508,7 +523,14 @@ function App() {
           </aside>
         </div>
       </div>
-      {shakeDebug ? <ShakeDebugOverlay view={shakeDebug} /> : null}
+      {shakeDebug ? (
+        <ShakeDebugOverlay
+          view={shakeDebug}
+          thresholdX={diceControl.shakeThresholdX}
+          thresholdY={diceControl.shakeThresholdY}
+          thresholdZ={diceControl.shakeThresholdZ}
+        />
+      ) : null}
     </main>
   )
 }

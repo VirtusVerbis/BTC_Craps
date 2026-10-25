@@ -38,6 +38,40 @@ export interface LinearSample {
   gz: number
 }
 
+/** Saved phone readings that should behave like the factory threshold on each axis. */
+export interface ShakeAxisGain {
+  x: number
+  y: number
+  z: number
+}
+
+/** How many times hotter than the factory line this saved reading is. 10 stays at 1. */
+export const shakeAxisScale = (setting: number, factory: number): number => {
+  if (!(factory > 0) || !Number.isFinite(setting) || !(setting > 0)) return 1
+  return setting / factory
+}
+
+/**
+ * Divide a phone sample back into factory units.
+ * A saved X of 20 means a reading of 20 counts as the factory line of 10, and wall, clear, and lean follow.
+ */
+export const scaleSampleToFactory = (sample: LinearSample, gain: ShakeAxisGain): LinearSample => ({
+  ...sample,
+  x: sample.x / shakeAxisScale(gain.x, SHAKE_THRESHOLD_X_MPS2),
+  y: sample.y / shakeAxisScale(gain.y, SHAKE_THRESHOLD_Y_MPS2),
+  z: sample.z / shakeAxisScale(gain.z, SHAKE_THRESHOLD_Z_MPS2),
+})
+
+/** Totals accumulated in factory units, shown again in the phone's own units. */
+export const rawShakeTotals = (
+  totals: { xTotal: number; pushTotal: number; yTotal: number },
+  gain: ShakeAxisGain,
+): { xTotal: number; pushTotal: number; yTotal: number } => ({
+  xTotal: totals.xTotal * shakeAxisScale(gain.x, SHAKE_THRESHOLD_X_MPS2),
+  pushTotal: totals.pushTotal * shakeAxisScale(gain.z, SHAKE_THRESHOLD_Z_MPS2),
+  yTotal: totals.yTotal * shakeAxisScale(gain.y, SHAKE_THRESHOLD_Y_MPS2),
+})
+
 interface OpenBump {
   sign: -1 | 1
   peak: number

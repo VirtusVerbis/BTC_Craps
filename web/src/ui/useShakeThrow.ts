@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import {
-  SHAKE_DEBUG_BARS,
   SHAKE_PROBE_MS,
   SHAKE_THRESHOLD_X_MPS2,
+  SHAKE_THRESHOLD_Y_MPS2,
   SHAKE_THRESHOLD_Z_MPS2,
   SHAKE_WINDOW_MS,
 } from './diceConstants'
@@ -13,10 +13,13 @@ import {
   createShakeState,
   finishShake,
   motionHasNumbers,
+  rawShakeTotals,
   sampleFromEvent,
+  scaleSampleToFactory,
   shakeDebugRead,
   shakeSampleHot,
   stepShake,
+  type ShakeAxisGain,
   type ShakeMode,
 } from './shakeThrow'
 import type { ShooterControls } from './useDiceThrow'
@@ -208,10 +211,17 @@ interface HeldTotals {
   yTotal: number
 }
 
+const FACTORY_GAIN: ShakeAxisGain = {
+  x: SHAKE_THRESHOLD_X_MPS2,
+  y: SHAKE_THRESHOLD_Y_MPS2,
+  z: SHAKE_THRESHOLD_Z_MPS2,
+}
+
 /**
  * Captures motion for one window, then launches.
  * A finger touch does not cancel it. A rail aim restarts the window with empty totals.
- * Returns the debug reading when `SHAKE_DEBUG_BARS` is on.
+ * Returns the debug reading while the Motion Test Overlay is on.
+ * Axis gain scales the sample into the factory wall, clear, and lean lines.
  */
 export const useShakeThrow = (
   enabled: boolean,
@@ -221,22 +231,26 @@ export const useShakeThrow = (
   shakeBusyRef?: RefObject<boolean>,
   shotClockRef?: RefObject<number | null>,
   shakeRestartRef?: RefObject<(() => void) | null>,
+  motionTest = false,
+  axisGain: ShakeAxisGain = FACTORY_GAIN,
 ): ShakeDebugView | null => {
   const debugRef = useRef<ShakeDebugView>(emptyDebug())
   const heldTotals = useRef<HeldTotals | null>(null)
+  const gainRef = useRef(axisGain)
+  gainRef.current = axisGain
   const [debugView, setDebugView] = useState<ShakeDebugView | null>(null)
 
   useEffect(() => {
-    if (!SHAKE_DEBUG_BARS) {
+    if (!motionTest) {
       setDebugView(null)
       return undefined
     }
     const id = window.setInterval(() => setDebugView({ ...debugRef.current }), 100)
     return () => window.clearInterval(id)
-  }, [])
+  }, [motionTest])
 
   useEffect(() => {
-    if (!SHAKE_DEBUG_BARS || enabled) return undefined
+    if (!motionTest || enabled) return undefined
     const filter = createGravityFilter()
     const onMotion = (event: DeviceMotionEvent) => {
       const sample = sampleFromEvent(filter, event)
@@ -253,7 +267,7 @@ export const useShakeThrow = (
     }
     window.addEventListener('devicemotion', onMotion)
     return () => window.removeEventListener('devicemotion', onMotion)
-  }, [enabled])
+  }, [enabled, motionTest])
 
   useEffect(() => {
     if (!enabled) return undefined
@@ -270,8 +284,12 @@ export const useShakeThrow = (
     const publish = (sample: Parameters<typeof shakeDebugRead>[1]) => {
       if (sample) lastSample = sample
       const read = shakeDebugRead(state, lastSample)
+      const shown = rawShakeTotals(read, gainRef.current)
       debugRef.current = {
         ...read,
+        xTotal: shown.xTotal,
+        pushTotal: shown.pushTotal,
+        yTotal: shown.yTotal,
         capturing: !finished,
         remainingMs: deadline > 0 ? Math.max(0, deadline - performance.now()) : 0,
         note,
@@ -299,7 +317,7 @@ export const useShakeThrow = (
       finished = true
       note = 'launched'
       const used = shakeDebugRead(state, lastSample)
-      heldTotals.current = { xTotal: used.xTotal, pushTotal: used.pushTotal, yTotal: used.yTotal }
+      heldTotals.current = rawShakeTotals(used, gainRef.current)
       publish(null)
       if (release.kind === 'precision') {
         const shot = shotRef.current
@@ -326,17 +344,18 @@ export const useShakeThrow = (
 
     const onMotion = (event: DeviceMotionEvent) => {
       const sample = sampleFromEvent(filter, event)
+      const tuned = sample ? scaleSampleToFactory(sample, gainRef.current) : null
       if (shakeBusyRef) {
-        const xHot = sample != null && Math.abs(sample.x) >= Math.max(SHAKE_THRESHOLD_X_MPS2, SHAKE_FINGER_HOLD_MPS2)
-        const zHot = sample != null && Math.abs(sample.z) >= Math.max(SHAKE_THRESHOLD_Z_MPS2, SHAKE_FINGER_HOLD_MPS2)
+        const xHot = tuned != null && Math.abs(tuned.x) >= Math.max(SHAKE_THRESHOLD_X_MPS2, SHAKE_FINGER_HOLD_MPS2)
+        const zHot = tuned != null && Math.abs(tuned.z) >= Math.max(SHAKE_THRESHOLD_Z_MPS2, SHAKE_FINGER_HOLD_MPS2)
         shakeBusyRef.current = !finished && (xHot || zHot)
       }
-      if (!sample || finished) {
+      if (!sample || !tuned || finished) {
         if (sample) publish(sample)
         return
       }
-      stepShake(state, sample)
-      if (shakeSampleHot(sample)) {
+      stepShake(state, tuned)
+      if (shakeSampleHot(tuned)) {
         spiked = true
         window.clearTimeout(timer)
         timer = 0
@@ -361,5 +380,5 @@ export const useShakeThrow = (
     }
   }, [controlsRef, enabled, precision, shakeBusyRef, shakeRestartRef, shotClockRef, shotRef])
 
-  return SHAKE_DEBUG_BARS ? debugView : null
+  return motionTest ? debugView : null
 }

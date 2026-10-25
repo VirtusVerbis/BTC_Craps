@@ -1723,6 +1723,9 @@ html.shooter-gesture-lock body {
 .side-panel-toggle:focus-visible,
 .dice-control-field select:focus-visible,
 .dice-control-stack:focus-visible,
+.dice-control-sensitivity-toggle:focus-visible,
+.dice-control-axis input:focus-visible,
+.dice-control-axis-step:focus-visible,
 .dice-control-references-toggle:focus-visible,
 .dice-control-help-toggle:focus-visible,
 .dice-control-references a:focus-visible {
@@ -1797,6 +1800,87 @@ html.shooter-gesture-lock body {
 .dice-control-stack:disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+.dice-control-sensitivity {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.dice-control-sensitivity-toggle {
+  appearance: none;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.28rem 0.15rem;
+  border: 0;
+  color: #f6f0da;
+  background: transparent;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dice-control-sensitivity-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.dice-control-sensitivity .dice-control-stack {
+  align-items: flex-start;
+  gap: 0.35rem;
+}
+
+.dice-control-sensitivity .dice-control-stack span:first-child {
+  flex: 1;
+  line-height: 1.25;
+}
+
+.dice-control-axis {
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+  color: #f6f0da;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.dice-control-axis-controls {
+  display: grid;
+  grid-template-columns: 1.7rem 1fr 1.7rem;
+  gap: 0.28rem;
+  align-items: center;
+}
+
+.dice-control-axis-step {
+  width: 1.7rem;
+  height: 1.7rem;
+  border: 0;
+  border-radius: 999px;
+  background: #5c4030;
+  color: #f6f0da;
+  font: inherit;
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.dice-control-axis input {
+  width: 100%;
+  min-width: 0;
+  padding: 0.28rem 0.3rem;
+  border: 1px solid rgba(247, 147, 26, 0.38);
+  border-radius: 8px;
+  color: #f6f0da;
+  background: #12111e;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 500;
+  text-align: center;
 }
 
 .dice-control-references ul {
@@ -2182,6 +2266,7 @@ html.shooter-gesture-lock body {
   top: 50%;
   z-index: 80;
   width: min(92vw, 440px);
+  max-height: 90dvh;
   transform: translate(-50%, -50%);
   padding: 22px 18px 16px;
   border-radius: 16px;
@@ -2242,4 +2327,24 @@ html.shooter-gesture-lock body {
 .shake-debug-meta {
   margin: 8px 0 0;
   font-size: 18px;
+}
+
+@media (max-height: 520px) {
+  .shake-debug {
+    padding: 12px 12px 10px;
+    font-size: 16px;
+  }
+
+  .shake-debug-track {
+    height: 22px;
+  }
+
+  .shake-debug-row {
+    margin-bottom: 8px;
+  }
+
+  .shake-debug-totals,
+  .shake-debug-meta {
+    font-size: 14px;
+  }
 }
