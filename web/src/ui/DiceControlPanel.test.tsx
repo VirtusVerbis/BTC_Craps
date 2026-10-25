@@ -6,7 +6,12 @@ import { DiceControlPanel } from './DiceControlPanel'
 import { DEFAULT_DICE_CONTROL } from './diceControl'
 import { DIE_COLOR_LABELS, DIE_COLOR_ORDER, type DieColorId } from './diceColor'
 
-const mount = (dieColor: DieColorId, onDieColor: (color: DieColorId) => void) => {
+const mount = (
+  dieColor: DieColorId,
+  onDieColor: (color: DieColorId) => void,
+  shakeAvailable = false,
+  onShakeToRoll: () => void = () => {},
+) => {
   const host = document.createElement('div')
   document.body.appendChild(host)
   const root: Root = createRoot(host)
@@ -17,6 +22,8 @@ const mount = (dieColor: DieColorId, onDieColor: (color: DieColorId) => void) =>
         onChange={() => {}}
         dieColor={dieColor}
         onDieColor={onDieColor}
+        shakeAvailable={shakeAvailable}
+        onShakeToRoll={onShakeToRoll}
       />,
     )
   })
@@ -32,6 +39,11 @@ const mount = (dieColor: DieColorId, onDieColor: (color: DieColorId) => void) =>
   }
 }
 
+const shakeButton = (host: HTMLElement): HTMLButtonElement | null => {
+  const button = Array.from(host.querySelectorAll('button')).find((el) => el.textContent?.includes('Shake to Roll'))
+  return button ?? null
+}
+
 describe('dice color menu', () => {
   afterEach(() => {
     document.body.innerHTML = ''
@@ -43,11 +55,13 @@ describe('dice color menu', () => {
     const onDieColor = vi.fn()
     const view = mount('orange', onDieColor)
     const kids = Array.from(view.host.querySelector('.side-panel-body')?.children ?? [])
-    const stackAt = kids.findIndex((el) => el.classList.contains('dice-control-stack'))
+    const stacks = kids.filter((el) => el.classList.contains('dice-control-stack'))
     const colorAt = kids.findIndex((el) => el.querySelector('#dice-control-color'))
     const select = view.host.querySelector('#dice-control-color')
     expect(select).toBeInstanceOf(HTMLSelectElement)
-    expect(colorAt).toBe(stackAt + 1)
+    expect(stacks[0]?.textContent).toContain('Dice Stacking')
+    expect(stacks[1]?.textContent).toContain('Shake to Roll')
+    expect(colorAt).toBe(kids.indexOf(stacks[1]) + 1)
     expect(view.host.querySelector('label[for="dice-control-color"] span')?.textContent).toBe('Dice Color')
     expect((select as HTMLSelectElement).value).toBe('orange')
     expect(Array.from((select as HTMLSelectElement).options).map((option) => option.textContent)).toEqual(
@@ -60,5 +74,25 @@ describe('dice color menu', () => {
     })
     expect(onDieColor).toHaveBeenCalledWith('midnight')
     view.unmount()
+  })
+
+  it('greys Shake to Roll until a sensor is available', () => {
+    ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+    const blocked = mount('orange', () => {})
+    const off = shakeButton(blocked.host)
+    expect(off).toBeInstanceOf(HTMLButtonElement)
+    expect(off?.disabled).toBe(true)
+    expect(off?.getAttribute('aria-pressed')).toBe('false')
+    blocked.unmount()
+
+    const onShakeToRoll = vi.fn()
+    const open = mount('orange', () => {}, true, onShakeToRoll)
+    const on = shakeButton(open.host)
+    expect(on?.disabled).toBe(false)
+    act(() => {
+      on?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(onShakeToRoll).toHaveBeenCalledTimes(1)
+    open.unmount()
   })
 })

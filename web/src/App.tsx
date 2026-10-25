@@ -41,6 +41,10 @@ import {
 import { DiceControlHistogram, DiceControlPanel } from './ui/DiceControlPanel'
 import { ShooterScrollNote } from './ui/ShooterScrollNote'
 import { useShooterGesture, useShooterPageLock } from './ui/useShooterGesture'
+import { SHAKE_DISABLE_FLICK } from './ui/diceConstants'
+import { ShakeDebugOverlay } from './ui/ShakeDebugOverlay'
+import { shakeListenEnabled } from './ui/shakeThrow'
+import { useShakeSensor, useShakeThrow } from './ui/useShakeThrow'
 import { usePrecisionPhases } from './ui/usePrecisionPhases'
 import { PrecisionOverlay } from './ui/PrecisionOverlay'
 import type { PrecisionThrow } from './ui/precisionAim'
@@ -106,6 +110,8 @@ function App() {
   const stageRef = useRef<HTMLDivElement | null>(null)
   const displayRef = useRef<HTMLDivElement | null>(null)
   const shooterControlsRef = useRef<ShooterControls | null>(null)
+  const shakeBusyRef = useRef(false)
+  const shakeRestartRef = useRef<(() => void) | null>(null)
   const betControlsRef = useRef<BetControls | null>(null)
   const [betSettings, setBetSettings] = useState<ShooterBetSettings>(loadBetSettings)
   const onBetSettings = useCallback((next: ShooterBetSettings) => {
@@ -276,6 +282,7 @@ function App() {
   const shooting = gestureReady && !betting
   const distractionsPaused = manualShooter || betting
   const precisionOn = diceControl.precisionTargeting
+  const blockFlick = SHAKE_DISABLE_FLICK && diceControl.shakeToRoll
   const precision = usePrecisionPhases(
     shooting && precisionOn,
     precisionOn,
@@ -283,8 +290,38 @@ function App() {
     shooterControlsRef,
     precisionShotRef,
     gestureReady,
+    blockFlick,
   )
-  useShooterGesture(shooting && !precisionOn, stageRef, shooterControlsRef)
+  const shakeSensor = useShakeSensor(diceControl.shakeToRoll)
+  const shakeListening = Boolean(diceControl.shakeToRoll && shakeSensor.live)
+  useShooterGesture(
+    shooting && !precisionOn,
+    stageRef,
+    shooterControlsRef,
+    shakeListening,
+    shakeBusyRef,
+    shakeRestartRef,
+    blockFlick,
+  )
+  const onShakeToRoll = useCallback(() => {
+    if (diceControl.shakeToRoll) {
+      shakeSensor.invalidate()
+      onDiceControl({ shakeToRoll: false })
+      return
+    }
+    shakeSensor.requestEnable(() => onDiceControl({ shakeToRoll: true }))
+  }, [diceControl.shakeToRoll, onDiceControl, shakeSensor])
+  const shotClockRef = useRef<number | null>(null)
+  shotClockRef.current = dice?.shotClockMs ?? null
+  const shakeDebug = useShakeThrow(
+    shakeListenEnabled(diceControl.shakeToRoll, shakeSensor.live, shooting, precisionOn, precision.phase),
+    precisionOn,
+    shooterControlsRef,
+    precisionShotRef,
+    shakeBusyRef,
+    shotClockRef,
+    shakeRestartRef,
+  )
   useShooterPageLock(manualShooter)
   const onShooterMode = useCallback(() => {
     setManualShooter((current) => {
@@ -450,6 +487,8 @@ function App() {
             onChange={onDiceControl}
             dieColor={dieColor}
             onDieColor={onDieColor}
+            shakeAvailable={shakeSensor.available}
+            onShakeToRoll={onShakeToRoll}
           />
           <DiceControlHistogram settings={diceControl} book={diceControlBook} />
           <aside className="repo-links-panel" aria-label="Source repositories">
@@ -469,6 +508,7 @@ function App() {
           </aside>
         </div>
       </div>
+      {shakeDebug ? <ShakeDebugOverlay view={shakeDebug} /> : null}
     </main>
   )
 }

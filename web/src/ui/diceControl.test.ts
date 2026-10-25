@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   addGrids,
+  DEFAULT_DICE_CONTROL,
   diceControlCharts,
+  loadDiceControlSettings,
   recordDiceControlRoll,
+  saveDiceControlSettings,
   type DiceControlBook,
   type DiceControlSettings,
 } from './diceControl'
@@ -12,6 +15,7 @@ const settings = (comeOut: DiceControlSettings['comeOut'], point: DiceControlSet
   point,
   stacked,
   precisionTargeting: false,
+  shakeToRoll: false,
 })
 
 const roll = (
@@ -106,5 +110,34 @@ describe('dice control profiles', () => {
     expect(seven?.gap).toBeGreaterThan(0)
     expect(seven?.solid).toBe(true)
     expect(seven && six ? seven.gap > six.gap : false).toBe(true)
+  })
+})
+
+describe('dice control settings', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('round-trips shake to roll and treats a missing key as off', () => {
+    const store = new Map<string, string>()
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        store.set(key, value)
+      },
+      removeItem: (key: string) => {
+        store.delete(key)
+      },
+      clear: () => store.clear(),
+      key: () => null,
+      length: 0,
+    })
+    saveDiceControlSettings({ ...DEFAULT_DICE_CONTROL, shakeToRoll: true })
+    expect(loadDiceControlSettings().shakeToRoll).toBe(true)
+    const key = [...store.keys()][0]
+    const saved = JSON.parse(store.get(key) ?? '{}') as { shakeToRoll?: boolean }
+    delete saved.shakeToRoll
+    store.set(key, JSON.stringify(saved))
+    expect(loadDiceControlSettings().shakeToRoll).toBe(false)
   })
 })

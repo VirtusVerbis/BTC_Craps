@@ -42,11 +42,15 @@ const DiceControlPanelInner = ({
   onChange,
   dieColor,
   onDieColor,
+  shakeAvailable,
+  onShakeToRoll,
 }: {
   settings: DiceControlSettings
   onChange: (patch: Partial<DiceControlSettings>) => void
   dieColor: DieColorId
   onDieColor: (color: DieColorId) => void
+  shakeAvailable: boolean
+  onShakeToRoll: () => void
 }) => {
   const [open, setOpen] = useState(false)
   const [referencesOpen, setReferencesOpen] = useState(false)
@@ -83,6 +87,16 @@ const DiceControlPanelInner = ({
           >
             <span>Dice Stacking</span>
             <span>{settings.stacked ? 'On' : 'Off'}</span>
+          </button>
+          <button
+            className="dice-control-stack"
+            type="button"
+            aria-pressed={settings.shakeToRoll}
+            disabled={!shakeAvailable}
+            onClick={onShakeToRoll}
+          >
+            <span>Shake to Roll</span>
+            <span>{settings.shakeToRoll ? 'On' : 'Off'}</span>
           </button>
           <label className="dice-control-field" htmlFor="dice-control-color">
             <span>Dice Color</span>

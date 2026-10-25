@@ -751,6 +751,58 @@ const gestureLeanSpin = (lean: number): number => {
 }
 
 /** Flick launch. Both dice share the lean spin. The pair center is the pointer-down x. */
+export interface ShakeThrow {
+  /** Finger-speed units. The wall constant reaches the back wall. */
+  speed: number
+  /** Same lean ratio a sideways flick uses. Full side spin is `GESTURE_MAX_LEAN`. */
+  lean: number
+  /** Upward speed. Zero extra phone lift passes today's arc. */
+  up: number
+}
+
+/** Shake launch. The pair stays on its current rail spot. Lift comes from the phone. */
+export const launchShakeThrow = (
+  state: ThrowState,
+  nowMs: number,
+  release: ShakeThrow,
+  metrics: StageMetrics = stageMetrics(),
+): ThrowState => {
+  if (state.phase !== 'holding') return state
+  const sharedX = clampLaunchX(state.sharedX)
+  const half = DIE_LAUNCH_SIZE_PX / 2
+  const { forward } = gestureLaunchSpeeds(release.speed, metrics)
+  const leanSpin = gestureLeanSpin(release.lean)
+  const left = cloneDie(state.dice[0])
+  const right = cloneDie(state.dice[1])
+  if (state.hold.stacked) {
+    left.x = sharedX
+    right.x = sharedX
+  } else {
+    left.x = sharedX - half
+    right.x = sharedX + half
+    left.h = 0
+    right.h = 0
+  }
+  applyGestureLaunch(left, forward, release.up, leanSpin)
+  applyGestureLaunch(right, forward, release.up, leanSpin)
+  return {
+    ...state,
+    phase: 'flying',
+    phaseStartedMs: nowMs,
+    sharedX,
+    flightMs: 0,
+    result: null,
+    reachZ: [0, 0],
+    reachTracked: true,
+    manualHold: false,
+    aimLocked: false,
+    requireWallContact: true,
+    controlSnap: controlSnapOf(state),
+    dice: [left, right],
+  }
+}
+
+/** Flick launch. Both dice share the lean spin. The pair center is the pointer-down x. */
 export const launchGestureThrow = (
   state: ThrowState,
   nowMs: number,

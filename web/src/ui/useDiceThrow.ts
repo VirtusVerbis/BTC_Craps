@@ -58,6 +58,7 @@ import {
   launchGestureThrow,
   launchHeldAuto,
   launchPrecisionThrow,
+  launchShakeThrow,
   reseatHeldDice,
   dieScreenCenter,
   quatToCssMatrix,
@@ -69,6 +70,7 @@ import {
   type ArcDisplay,
   type Die,
   type DicePoseHook,
+  type ShakeThrow,
   type ThrowResult,
   type ThrowState,
   type VolumeTotals,
@@ -178,6 +180,7 @@ export interface ShooterControls {
   aimLaunchX: (stageX: number) => void
   releaseGesture: (stroke: GestureStroke) => void
   releasePrecision: (shot: PrecisionThrow) => void
+  releaseShake: (release: ShakeThrow) => void
   launchAutoNow: () => void
 }
 
@@ -185,6 +188,7 @@ type ShooterCommand =
   | { kind: 'aim'; x: number }
   | { kind: 'gesture'; stroke: GestureStroke }
   | { kind: 'precision'; shot: PrecisionThrow }
+  | { kind: 'shake'; release: ShakeThrow }
   | { kind: 'auto' }
 
 const emptyVolume = (): VolumeTotals => ({
@@ -436,6 +440,9 @@ export const useDiceThrow = (
       releasePrecision: (shot) => {
         commandRef.current.push({ kind: 'precision', shot })
       },
+      releaseShake: (release) => {
+        commandRef.current.push({ kind: 'shake', release })
+      },
       launchAutoNow: () => {
         commandRef.current.push({ kind: 'auto' })
       },
@@ -591,6 +598,8 @@ export const useDiceThrow = (
           stateRef.current = launchGestureThrow(stateRef.current, now, command.stroke, metrics)
         } else if (command.kind === 'precision' && stateRef.current.manualHold) {
           stateRef.current = launchPrecisionThrow(stateRef.current, now, command.shot, metrics)
+        } else if (command.kind === 'shake' && stateRef.current.manualHold) {
+          stateRef.current = launchShakeThrow(stateRef.current, now, command.release, metrics)
         } else if (command.kind === 'auto') {
           stateRef.current = launchHeldAuto(stateRef.current, now, lastVolumeRef.current, metrics)
         }

@@ -26,11 +26,16 @@ export const useShooterGesture = (
   enabled: boolean,
   stageRef: RefObject<HTMLElement | null>,
   controlsRef: RefObject<ShooterControls | null>,
+  shakeListening = false,
+  shakeBusyRef?: RefObject<boolean>,
+  shakeRestartRef?: RefObject<(() => void) | null>,
+  blockFlick = false,
 ) => {
   useEffect(() => {
     if (!enabled) return undefined
     let pointerId: number | null = null
     let points: StrokePoint[] = []
+    let aimed = false
 
     const finish = (event: PointerEvent) => {
       if (event.pointerId !== pointerId) return
@@ -40,18 +45,21 @@ export const useShooterGesture = (
       const stroke = gestureFromStroke(points)
       pointerId = null
       points = []
-      if (stroke) controlsRef.current?.releaseGesture(stroke)
+      aimed = false
+      if (stroke && !blockFlick) controlsRef.current?.releaseGesture(stroke)
     }
 
     const onDown = (event: PointerEvent) => {
       if (pointerId !== null || blockedTarget(event.target)) return
+      if (shakeListening && shakeBusyRef?.current) return
       const stage = stageRef.current
       if (!stage) return
       const point = stagePoint(stage, event.clientX, event.clientY)
       if (!point) return
       pointerId = event.pointerId
       points = [{ ...point, t: event.timeStamp }]
-      controlsRef.current?.aimLaunchX(point.x)
+      aimed = !shakeListening
+      if (!shakeListening) controlsRef.current?.aimLaunchX(point.x)
     }
 
     const onMove = (event: PointerEvent) => {
@@ -61,6 +69,14 @@ export const useShooterGesture = (
       const point = stagePoint(stage, event.clientX, event.clientY)
       if (!point) return
       points.push({ ...point, t: event.timeStamp })
+      if (!shakeListening || aimed || shakeBusyRef?.current || points.length < 2) return
+      const dx = point.x - points[0].x
+      const dy = point.y - points[0].y
+      if (Math.abs(dx) >= 48 && Math.abs(dx) > Math.abs(dy)) {
+        aimed = true
+        controlsRef.current?.aimLaunchX(point.x)
+        shakeRestartRef?.current?.()
+      }
     }
 
     window.addEventListener('pointerdown', onDown)
@@ -73,7 +89,7 @@ export const useShooterGesture = (
       window.removeEventListener('pointerup', finish)
       window.removeEventListener('pointercancel', finish)
     }
-  }, [controlsRef, enabled, stageRef])
+  }, [blockFlick, controlsRef, enabled, shakeBusyRef, shakeListening, shakeRestartRef, stageRef])
 }
 
 /**

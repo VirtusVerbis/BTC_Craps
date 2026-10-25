@@ -146,6 +146,45 @@ export const GESTURE_MAX_LEAN = 0.3//0.65
 /** Forward tumble on every flick, including a straight one. Side lean is added on top. */
 export const GESTURE_BASE_SPIN = 4
 
+/** A bump must peak at least this hard, in m/s², before it is added. */
+export const SHAKE_THRESHOLD_MPS2 = 10
+
+/** Quiet time after the last spike before the dice launch. The shot clock is the long listen. */
+export const SHAKE_WINDOW_MS = 400//3000
+
+/**
+ * While Shake to Roll is on, a finger flick does not throw. The shake window is the only launch.
+ * Set this false to let a flick throw again.
+ */
+export const SHAKE_DISABLE_FLICK = true
+
+/** Center-screen bars for the live axes and the totals that launch. */
+export const SHAKE_DEBUG_BARS = true
+
+/** After a finger lifts, ignore motion this long so the flick's follow-through cannot launch. */
+export const SHAKE_POINTER_TAIL_MS = 280
+
+/** How long a tap waits for a real motion sample before the switch stays off. */
+export const SHAKE_PROBE_MS = 2500
+
+/** Hammer launch peak that maps to a back-wall throw. A harder peak clears the wall. */
+export const SHAKE_HAMMER_WALL_MPS2 = 14
+export const SHAKE_HAMMER_CLEAR_MPS2 = 26
+
+/** Extra upward speed, in px/s, for each m/s² of upward acceleration. Capped. */
+export const SHAKE_HAMMER_LIFT_GAIN = 40
+export const SHAKE_HAMMER_LIFT_MAX = 1800
+
+/** Sideways acceleration, in m/s², that becomes a full side spin. */
+export const SHAKE_HAMMER_LEAN_MPS2 = 10
+
+/** Book launch peak that maps to a back-wall throw. A push reads lower than a hammer flick. */
+export const SHAKE_BOOK_WALL_MPS2 = 12
+export const SHAKE_BOOK_CLEAR_MPS2 = 24
+export const SHAKE_BOOK_LIFT_GAIN = 40
+export const SHAKE_BOOK_LIFT_MAX = 1800
+export const SHAKE_BOOK_LEAN_MPS2 = 10
+
 /** Yellow used for the precision reticle, arc, and angle ray. */
 export const PRECISION_AIM_COLOR = '#FFE566'
 

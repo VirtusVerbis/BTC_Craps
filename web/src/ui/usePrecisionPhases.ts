@@ -58,6 +58,7 @@ export const usePrecisionPhases = (
   shotRef: { current: Omit<PrecisionThrow, 'speed' | 'lean'> | null },
   /** False once the dice leave the hold. A bet clock suspends `enabled` without resetting the phase. */
   holdActive = true,
+  blockFlick = false,
 ) => {
   const [phase, setPhase] = useState<PrecisionPhase>('target')
   const [target, setTarget] = useState<StagePoint>(defaultPrecisionTarget)
@@ -166,6 +167,7 @@ export const usePrecisionPhases = (
         setSpin(next)
         return
       }
+      if (blockFlick) return
       const stroke = gestureFromStroke(strokePoints)
       const shot = shotRef.current
       if (!stroke || !shot) return
@@ -182,7 +184,7 @@ export const usePrecisionPhases = (
       window.removeEventListener('pointerup', finish)
       window.removeEventListener('pointercancel', finish)
     }
-  }, [controlsRef, enabled, shotRef, stageRef])
+  }, [blockFlick, controlsRef, enabled, shotRef, stageRef])
 
   return { phase, target, angle, spin, accept }
 }

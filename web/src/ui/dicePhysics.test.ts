@@ -50,6 +50,7 @@ import {
   launchGestureThrow,
   launchHeldAuto,
   launchPrecisionThrow,
+  launchShakeThrow,
   launchSpeeds,
   probeGestureArc,
   logUnit,
@@ -851,6 +852,24 @@ describe('gesture launch', () => {
     expect(aimed.sharedX).toBe(800)
     expect(aimed.aimLocked).toBe(true)
     expect(aimed.dice[0].q).toEqual(state.dice[0].q)
+  })
+
+  it('keeps a shake on the current rail spot and uses the phone lift', () => {
+    const state = createThrowState(0, 540)
+    const speeds = gestureLaunchSpeeds(GESTURE_SPEED_WALL_PX_PER_S)
+    const launched = launchShakeThrow(state, 1000, {
+      speed: GESTURE_SPEED_WALL_PX_PER_S,
+      lean: 0.3,
+      up: 1400,
+    })
+    expect(launched.phase).toBe('flying')
+    expect(launched.requireWallContact).toBe(true)
+    expect(launched.sharedX).toBe(540)
+    expect(launched.dice[0].vh).toBe(1400)
+    expect(launched.dice[1].vh).toBe(1400)
+    expect(launched.dice[0].vz).toBeCloseTo(speeds.forward)
+    expect(launched.dice[0].x).toBeCloseTo(540 - DIE_LAUNCH_SIZE_PX / 2)
+    expect(launched.dice[1].x).toBeCloseTo(540 + DIE_LAUNCH_SIZE_PX / 2)
   })
 
   it('keeps a precision toss on the rail spot and uses the spin phase for the roll', () => {

@@ -1794,6 +1794,11 @@ html.shooter-gesture-lock body {
   color: #f7931a;
 }
 
+.dice-control-stack:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 .dice-control-references ul {
   margin: 0.4rem 0 0;
   padding: 0;
@@ -2169,4 +2174,72 @@ html.shooter-gesture-lock body {
   background: #5c4030;
   color: #f6f0da;
   cursor: pointer;
+}
+
+.shake-debug {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 80;
+  width: min(92vw, 440px);
+  transform: translate(-50%, -50%);
+  padding: 22px 18px 16px;
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #f6f0da;
+  pointer-events: none;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.shake-debug-row {
+  display: grid;
+  grid-template-columns: 28px 1fr 72px;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.shake-debug-track {
+  position: relative;
+  height: 36px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.shake-debug-fill {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: #f0c14a;
+}
+
+.shake-debug-zero {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.shake-debug-threshold {
+  position: absolute;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  background: rgba(255, 120, 120, 0.95);
+}
+
+.shake-debug-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.shake-debug-totals,
+.shake-debug-meta {
+  margin: 8px 0 0;
+  font-size: 18px;
 }
