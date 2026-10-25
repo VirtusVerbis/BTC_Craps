@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useRef, useState, type MutableRefObject, type RefObject } from 'react'
 import {
   SHAKE_PROBE_MS,
   SHAKE_THRESHOLD_X_MPS2,
@@ -236,9 +236,9 @@ export const useShakeThrow = (
   precision: boolean,
   controlsRef: RefObject<ShooterControls | null>,
   shotRef: RefObject<Omit<PrecisionThrow, 'speed' | 'lean'> | null>,
-  shakeBusyRef?: RefObject<boolean>,
+  shakeBusyRef?: MutableRefObject<boolean>,
   shotClockRef?: RefObject<number | null>,
-  shakeRestartRef?: RefObject<(() => void) | null>,
+  shakeRestartRef?: MutableRefObject<(() => void) | null>,
   motionTest = false,
   axisGain: ShakeAxisGain = FACTORY_GAIN,
 ): ShakeDebugView | null => {
