@@ -275,6 +275,9 @@ function App() {
     eyeMarkApplyRef,
     betControlsRef,
   )
+  useEffect(() => {
+    if (dice?.wipedOut) setManualShooter(false)
+  }, [dice?.wipedOut])
   const gestureReady = manualShooter && dice?.phase === 'holding'
   const betting = dice?.betClockSec != null
   useEffect(() => {
@@ -415,7 +418,9 @@ function App() {
               shooter={dice?.shooter ?? loadShooterBook()}
               bonusStakes={dice?.bonusStakes ?? emptyBonusStakes()}
               rollStreak={dice?.rollStreak ?? emptyRollStreakView()}
+              lastRoll={dice?.lastRoll ?? null}
               shooterMode={manualShooter}
+              wipedOut={dice?.wipedOut ?? false}
               session={dice?.session ?? emptySessionPnl()}
               status={feed.status}
             />
@@ -423,6 +428,8 @@ function App() {
               active={dice?.phase === 'holding'}
               betClockSec={dice?.betClockSec ?? null}
               purse={dice?.purse ?? 0}
+              showPurse={manualShooter}
+              banked={manualShooter}
               felt={dice?.felt ?? []}
               point={dice?.point ?? null}
               controlsRef={betControlsRef}

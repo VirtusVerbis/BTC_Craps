@@ -51,6 +51,10 @@ export const emptyRollStreak = (): RollStreak => ({ longest: 0, current: 0 })
 
 export const formatRollStreak = (current: number, longest: number): string => `Roll Streak ${current} / ${longest}`
 
+/** Persistent total after the dice readout leaves. An em dash until the first roll. */
+export const formatLastRoll = (total: number | null): string =>
+  total == null ? 'Last Roll: —' : `Last Roll: ${total}`
+
 export const rollStreakNeedsRainbow = (current: number): boolean => current > ROLL_STREAK_THRESHOLD
 
 /** Color slot for one character. `step` advances with `ROLL_STREAK_COLOR_STEP_MS`. */

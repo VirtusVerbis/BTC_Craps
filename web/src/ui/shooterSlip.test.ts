@@ -9,11 +9,14 @@ import {
   canClear,
   oddsSpotOpen,
   clearBet,
+  closeSnapshot,
   defaultBetSettings,
   deleteRule,
   emptySlip,
   minimumDollars,
   oddsMinimumDollars,
+  openSnapshot,
+  ruleMinusAction,
   addBlankRule,
   addRule,
   kindExhausted,
@@ -138,14 +141,15 @@ describe('shooter slip', () => {
     expect(oddsSpotOpen([line('dontCome', 4, red)], 'dontComeOdds', 4, null)).toBe(true)
   })
 
-  it('pays the field on the come-out and refills the purse after a seven out', () => {
+  it('pays the field on the come-out and keeps the bank after a seven out', () => {
     let slip = beginRoll(emptySlip(), defaultBetSettings(), null)
     slip = addChip(slip, 'field', null, null, 'red', null)
     const comeOut = settleSlip(slip, null, 2, false)
     expect(comeOut.profit).toBe(red * 3)
     const pointed = beginRoll(comeOut.slip, defaultBetSettings(), 6)
     const out = settleSlip(pointed, 6, 7, false)
-    expect(out.slip.purse).toBe(SHOOTER_BANK)
+    expect(out.slip.purse).toBe(SHOOTER_BANK + red * 2)
+    expect(out.bankProfit).toBe(0)
     expect(out.slip.bets).toEqual([])
     expect(out.slip.handOpen).toBe(false)
   })
@@ -325,6 +329,72 @@ describe('shooter slip', () => {
       ['passOddsnull', 'odds'],
       ['fieldnull', null],
     ])
+  })
+
+  it('resets a raised rule and deletes one that is already at its minimum', () => {
+    const rule = (dollars: number, locked = false, kind: ShooterRule['kind'] = 'field'): ShooterRule => ({
+      id: 'rule',
+      phase: 'comeOut',
+      kind,
+      number: null,
+      spot: null,
+      dollars,
+      locked,
+    })
+    expect(ruleMinusAction(rule(red * 2))).toBe('reset')
+    expect(ruleMinusAction(rule(red))).toBe('delete')
+    expect(ruleMinusAction(rule(SHOOTER_WHITE))).toBe('reset')
+    expect(ruleMinusAction(rule(red, true, 'pass'))).toBe('none')
+    expect(ruleMinusAction(rule(red * 3, true, 'pass'))).toBe('reset')
+    expect(ruleMinusAction(rule(0, false, null))).toBe('delete')
+  })
+
+  it('places auto rules without spending the bank', () => {
+    const slip = beginRoll(emptySlip(), defaultBetSettings(), null, false)
+    expect(slip.purse).toBe(SHOOTER_BANK)
+    expect(slip.bets.every((bet) => !bet.banked)).toBe(true)
+    expect(slip.wiped).toBe(false)
+  })
+
+  it('scales a saved rule to the cash left and leaves the preset alone', () => {
+    const base = withLockedRule({ ...defaultBetSettings(), sameBet: true, comeOut: [] })
+    const added = addRule(base, 'point', 'place')
+    const place = added.point.find((rule) => rule.kind === 'place')
+    expect(place).toBeTruthy()
+    const settings = setRuleDollars(added, place?.id ?? '', red * 10)
+    const opened = beginRoll({ ...emptySlip(), snapshot: true }, settings, null, true)
+    const short = { ...opened, purse: red + SHOOTER_WHITE }
+    const point = beginRoll(short, settings, 4, true)
+    expect(point.bets.find((bet) => bet.kind === 'place')?.dollars).toBe(red + SHOOTER_WHITE)
+    expect(point.purse).toBe(0)
+    expect(settings.point.find((rule) => rule.kind === 'place')?.dollars).toBe(red * 10)
+  })
+
+  it('skips a rule when the bank cannot cover its minimum', () => {
+    const base = withLockedRule({ ...defaultBetSettings(), sameBet: true, comeOut: [] })
+    const added = addRule(base, 'point', 'place')
+    const place = added.point.find((rule) => rule.kind === 'place')
+    const settings = setRuleDollars(added, place?.id ?? '', red * 4)
+    const pointRules = settings.point.map((rule) => (rule.kind === 'place' ? { ...rule, number: 6 } : rule))
+    const slip = beginRoll({ ...emptySlip(), purse: SHOOTER_WHITE, snapshot: true }, { ...settings, point: pointRules }, 8, true)
+    expect(slip.bets.some((bet) => bet.kind === 'place')).toBe(false)
+  })
+
+  it('wipes a come-out that cannot post one red', () => {
+    const settings = withLockedRule({ ...defaultBetSettings(), sameBet: true, comeOut: [] })
+    const slip = beginRoll({ ...emptySlip(), purse: SHOOTER_WHITE, snapshot: true }, settings, null, true)
+    expect(slip.wiped).toBe(true)
+    expect(slip.snapshot).toBe(false)
+    expect(slip.bets.some((bet) => bet.kind === 'pass' || bet.kind === 'dont')).toBe(false)
+  })
+
+  it('keeps a bank that still has chips and opens a fresh one otherwise', () => {
+    const live = { ...emptySlip(), snapshot: true, purse: red, bets: [{ id: 'p', kind: 'pass' as const, number: null, spot: null, dollars: red, preset: red, banked: true }] }
+    expect(openSnapshot(live).purse).toBe(red)
+    expect(closeSnapshot(live).snapshot).toBe(true)
+    const clear = closeSnapshot({ ...live, bets: [] })
+    expect(clear.snapshot).toBe(false)
+    expect(openSnapshot(clear).purse).toBe(SHOOTER_BANK)
   })
 
   it('rejects a chip the purse cannot cover', () => {

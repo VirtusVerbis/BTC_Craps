@@ -8,7 +8,7 @@ import { resolveMobileAssetUrl } from './mobileAssetUrls'
 import { formatElapsed, formatExchangePriceLabel, formatLiqBtc, formatLiqUsd } from './format'
 import { HotShooterTicker } from './HotShooterTicker'
 import { LiqTicker } from './LiqTicker'
-import { NewShooterBanner } from './NewShooterBanner'
+import { NewShooterBanner, ShooterWipedBanner } from './NewShooterBanner'
 import { LIQ_LABEL_X, LIQ_LABEL_Y, OI_LABEL_FONT_REM, OI_LABEL_X, OI_LABEL_Y } from './overlayConstants'
 import { SHOOTER_ON } from './characterBetConstants'
 import {
@@ -22,6 +22,7 @@ import {
 } from './shooterProfile'
 import {
   ROLL_STREAK_COLOR_STEP_MS,
+  formatLastRoll,
   formatRollStreak,
   rollStreakNeedsRainbow,
   type RollStreakView,
@@ -34,8 +35,11 @@ interface OverlayProps {
   shooter: ShooterBook
   bonusStakes: BonusStakes
   rollStreak: RollStreakView
+  /** Last decided total. Null until the first roll of this visit. */
+  lastRoll: number | null
   /** True while the Shooter button has switched the table into manual throws. */
   shooterMode: boolean
+  wipedOut: boolean
   session: { usd: number; btc: number }
   status: {
     binance: FeedStatus
@@ -161,7 +165,9 @@ export const Overlay = ({
   shooter,
   bonusStakes,
   rollStreak,
+  lastRoll,
   shooterMode,
+  wipedOut,
   session,
   status,
 }: OverlayProps) => {
@@ -380,6 +386,11 @@ export const Overlay = ({
             </p>
           ) : null}
           {SHOOTER_ON ? <RollStreakLabel view={rollStreak} /> : null}
+          {SHOOTER_ON ? (
+            <p className="shooter-hud" style={{ fontSize: `${OI_LABEL_FONT_REM}rem` }}>
+              {formatLastRoll(lastRoll)}
+            </p>
+          ) : null}
           {SHOOTER_ON && shooterMode ? (
             <p className="shooter-hud shooter-hud-pnl" style={{ fontSize: `${OI_LABEL_FONT_REM}rem` }}>
               <span className="shooter-hud-tag">Session P/L </span>
@@ -448,6 +459,7 @@ export const Overlay = ({
       </div>
       {SHOOTER_ON ? <HotShooterTicker current={rollStreak.current} /> : null}
       <NewShooterBanner enabled={shooterMode} />
+      <ShooterWipedBanner visible={wipedOut} />
       <LiqTicker snapshot={openInterest} />
       <div
         className="overlay-oi overlay-liq"

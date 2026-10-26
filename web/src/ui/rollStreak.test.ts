@@ -5,6 +5,7 @@ import {
   ROLL_STREAK_THRESHOLD,
   applyRollStreak,
   emptyRollStreak,
+  formatLastRoll,
   formatRollStreak,
   loadRollStreakLongest,
   rollStreakColorIndex,
@@ -77,6 +78,8 @@ describe('roll streak', () => {
     expect(rollStreakNeedsRainbow(ROLL_STREAK_THRESHOLD)).toBe(false)
     expect(rollStreakNeedsRainbow(ROLL_STREAK_THRESHOLD + 1)).toBe(true)
     expect(rollStreakNeedsRainbow(0)).toBe(false)
+    expect(formatLastRoll(null)).toBe('Last Roll: —')
+    expect(formatLastRoll(8)).toBe('Last Roll: 8')
     expect(formatRollStreak(10, 36)).toBe('Roll Streak 10 / 36')
     expect(formatRollStreak(0, 36)).toBe('Roll Streak 0 / 36')
   })

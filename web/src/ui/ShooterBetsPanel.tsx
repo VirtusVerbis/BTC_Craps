@@ -17,6 +17,7 @@ import {
   firstFreeVariant,
   kindExhausted,
   minimumDollars,
+  ruleMinusAction,
   setRuleDollars,
   setTableSide,
   variantTaken,
@@ -53,14 +54,17 @@ const RuleRow = ({
   kinds,
   onChange,
   onDelete,
+  onReset,
 }: {
   rule: ShooterRule
   rules: readonly ShooterRule[]
   kinds: readonly FeltKind[]
   onChange: (rule: ShooterRule) => void
   onDelete: () => void
+  onReset: () => void
 }) => {
   const numbers = rule.kind ? numbersFor(rule.kind) : []
+  const minus = ruleMinusAction(rule)
   const takenNumber = (number: number) =>
     rule.kind != null && variantTaken(rules, rule.id, rule.kind, number, rule.spot) && number !== rule.number
   return (
@@ -138,9 +142,14 @@ const RuleRow = ({
           <span className="shooter-rule-total">{chipCount(rule.dollars)}</span>
         </>
       )}
-      {rule.locked ? null : (
-        <button className="shooter-rule-minus" type="button" aria-label="Remove rule" onClick={onDelete}>
-          −
+      {minus === 'none' ? null : (
+        <button
+          className="shooter-rule-minus"
+          type="button"
+          aria-label={minus === 'reset' ? 'Reset bet' : 'Remove rule'}
+          onClick={minus === 'reset' ? onReset : onDelete}
+        >
+          − {minus === 'reset' ? 'Reset' : 'Delete'}
         </button>
       )}
     </div>
@@ -155,6 +164,7 @@ const RuleList = ({
   onAdd,
   onCommit,
   onDelete,
+  onReset,
 }: {
   title: string
   phase: RulePhase
@@ -163,6 +173,7 @@ const RuleList = ({
   onAdd: () => void
   onCommit: (rule: ShooterRule) => void
   onDelete: (id: string) => void
+  onReset: (rule: ShooterRule) => void
 }) => (
   <section className="shooter-rule-list" aria-label={phase}>
     <div className="shooter-rule-heading">
@@ -183,6 +194,7 @@ const RuleList = ({
         kinds={kinds}
         onChange={onCommit}
         onDelete={() => onDelete(rule.id)}
+        onReset={() => onReset(rule)}
       />
     ))}
   </section>
@@ -259,6 +271,10 @@ export const ShooterBetsPanel = ({
             onAdd={() => onChange(addBlankRule(settings, 'comeOut'))}
             onCommit={(rule) => commit('comeOut', rule)}
             onDelete={(id) => onChange(deleteRule(settings, id))}
+            onReset={(rule) => {
+              if (rule.kind == null) return
+              onChange(setRuleDollars(settings, rule.id, minimumDollars(rule.kind, rule.number)))
+            }}
           />
           <RuleList
             title="Point Phase"
@@ -268,6 +284,10 @@ export const ShooterBetsPanel = ({
             onAdd={() => onChange(addBlankRule(settings, 'point'))}
             onCommit={(rule) => commit('point', rule)}
             onDelete={(id) => onChange(deleteRule(settings, id))}
+            onReset={(rule) => {
+              if (rule.kind == null) return
+              onChange(setRuleDollars(settings, rule.id, minimumDollars(rule.kind, rule.number)))
+            }}
           />
         </div>
       ) : null}

@@ -39,6 +39,12 @@ export const PL_DELTA_FADE_RATE = 1
 /** Size of the rising delta line, in stage pixels. */
 export const PL_DELTA_FONT_PX = PL_LABEL_FONT_PX
 
+/** Shooter floater is 20% larger than a character floater. */
+export const SHOOTER_DELTA_FONT_PX = PL_DELTA_FONT_PX * 1.2
+
+/** Shooter floater shadow offsets and blur, as a multiple of the character shadow. */
+export const SHOOTER_DELTA_SHADOW_SCALE = 1.3
+
 /** Hide a floater smaller than this many bitcoin. Zero shows every amount that still formats. */
 export const PL_DELTA_MIN_BTC = 0
 
@@ -68,3 +74,16 @@ export const PL_DELTA_ANCHOR: Record<ChipCharacter, { x: number; y: number; capY
   cat: { x: CAT_DELTA_X, y: CAT_DELTA_Y, capY: CAT_DELTA_CAP_Y },
   oldMan: { x: OLD_MAN_DELTA_X, y: OLD_MAN_DELTA_Y, capY: OLD_MAN_DELTA_CAP_Y },
 }
+
+/**
+ * Shooter floater birth point. Middle of the near rail, stage pixels (1080×1920).
+ * X is the stage center. Y is the screen center of a die resting on that rail.
+ */
+export const SHOOTER_DELTA_X = 540
+export const SHOOTER_DELTA_Y = 1886
+
+/**
+ * Y where the shooter floater is fully gone. Y grows downward, so a smaller
+ * number is higher on the table. 1526 is the top edge of the Come box.
+ */
+export const SHOOTER_DELTA_CAP_Y = 1526

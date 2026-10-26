@@ -15,6 +15,8 @@ interface ShooterBetLayerProps {
   active: boolean
   betClockSec: number | null
   purse: number
+  showPurse: boolean
+  banked: boolean
   felt: readonly FeltBet[]
   point: number | null
   controlsRef: { current: BetControls | null }
@@ -38,6 +40,8 @@ export const ShooterBetLayer = ({
   active,
   betClockSec,
   purse,
+  showPurse,
+  banked,
   felt,
   point,
   controlsRef,
@@ -106,7 +110,7 @@ export const ShooterBetLayer = ({
           : null}
         {betting
           ? SHOOTER_HITS.map((hit) => {
-              const open = isOddsHit(hit) && oddsSpotOpen(felt, hit.kind, hit.number, point)
+              const open = isOddsHit(hit) && oddsSpotOpen(felt, hit.kind, hit.number, point, banked)
               return (
                 <g
                   key={`hit-${hit.id}`}
@@ -144,7 +148,7 @@ export const ShooterBetLayer = ({
           className="shooter-bet-ui"
           style={{ right: `calc(100% - ${OI_LABEL_X}px)`, bottom: `calc(100% - ${OI_LABEL_Y - 8}px)` }}
         >
-          <p className="shooter-bet-purse">{formatLiqUsd(purse)}</p>
+          {showPurse ? <p className="shooter-bet-purse">{formatLiqUsd(purse)}</p> : null}
           <p className="shooter-bet-clock">{formatShotClock((betClockSec ?? 0) * 1000)}</p>
           <div className="shooter-chip-tray" role="listbox" aria-label="Chip tray">
             {TRAY.map((chip) => (

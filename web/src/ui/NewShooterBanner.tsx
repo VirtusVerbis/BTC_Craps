@@ -31,3 +31,13 @@ export const NewShooterBanner = ({ enabled }: { enabled: boolean }) => {
     </div>
   )
 }
+
+/** Holds the table long enough to read the loss before Auto rolls again. */
+export const ShooterWipedBanner = ({ visible }: { visible: boolean }) => {
+  if (!visible) return null
+  return (
+    <div className="shooter-wiped-banner" role="status" aria-label="Shooter wiped out">
+      Shooter wiped out!
+    </div>
+  )
+}
