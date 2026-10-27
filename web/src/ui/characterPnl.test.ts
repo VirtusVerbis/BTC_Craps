@@ -273,8 +273,9 @@ describe('P/L labels', () => {
   it('formats the two lines without a minus sign', () => {
     expect(formatPnlBtc(0.5)).toBe('0.5 BTC')
     expect(formatPnlBtc(-0.5)).toBe('0.5 BTC')
-    expect(formatPnlUsd(30_000)).toBe('30k USD')
-    expect(formatPnlUsd(-9_000_000)).toBe('9m USD')
+    expect(formatPnlUsd(30_000)).toBe('$30K USD')
+    expect(formatPnlUsd(-9_000_000)).toBe('$9M USD')
+    expect(formatPnlUsd(1_200_000_000)).toBe('$1.2B USD')
   })
 
   it('uses green for a profit and red for a loss', () => {

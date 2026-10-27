@@ -19,26 +19,43 @@ export const formatExchangePriceLabel = (price: number): string => {
   return price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-const compactUsd = (value: number, unit: 'M' | 'K'): string => {
-  const digits = value >= 10 ? 0 : 1
-  const text = value.toFixed(digits).replace(/\.0$/, '')
-  return `$${text}${unit}`
+export type CompactSuffix = 'B' | 'M' | 'K'
+
+/**
+ * B from one billion, M from one million, K from one thousand.
+ * Null when the absolute value is under 1,000.
+ */
+export const compactAmount = (value: number): { amount: number; suffix: CompactSuffix } | null => {
+  const abs = Math.abs(value)
+  if (abs >= 1_000_000_000) return { amount: abs / 1_000_000_000, suffix: 'B' }
+  if (abs >= 1_000_000) return { amount: abs / 1_000_000, suffix: 'M' }
+  if (abs >= 1_000) return { amount: abs / 1_000, suffix: 'K' }
+  return null
 }
 
-/** Liquidation notional. Millions from $1M, thousands below that. */
+/** One decimal under 10, otherwise none. Trailing zeros trimmed. */
+export const formatCompactAmount = (amount: number, suffix: CompactSuffix): string => {
+  const digits = amount >= 10 ? 0 : 1
+  const text = amount.toFixed(digits).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '')
+  return `${text}${suffix}`
+}
+
+/** Liquidation notional. `$` plus B/M/K from one thousand up. */
 export const formatLiqUsd = (usd: number): string => {
   if (!Number.isFinite(usd) || usd < 0) return '—'
-  if (usd >= 1_000_000) return compactUsd(usd / 1_000_000, 'M')
-  if (usd >= 1_000) return compactUsd(usd / 1_000, 'K')
+  const compact = compactAmount(usd)
+  if (compact) return `$${formatCompactAmount(compact.amount, compact.suffix)}`
   return `$${Math.round(usd).toLocaleString('en-US')}`
 }
 
 /**
- * Whole BTC, matching the O/I figure.
+ * B/M/K from 1,000 BTC up. Whole coins below that.
  * A fraction of 1 BTC stays visible so a small bar does not read as 0 next to a dollar amount.
  */
 export const formatLiqBtc = (btc: number): string => {
   if (!Number.isFinite(btc) || btc < 0) return '—'
+  const compact = compactAmount(btc)
+  if (compact) return formatCompactAmount(compact.amount, compact.suffix)
   if (btc > 0 && btc < 1) return btc.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   return Math.round(btc).toLocaleString('en-US')
 }

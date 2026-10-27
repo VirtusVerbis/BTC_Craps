@@ -1,4 +1,5 @@
 import { betDollars } from './chipBets'
+import { compactAmount, formatCompactAmount } from './format'
 import type { ChipCharacter } from './chipConstants'
 import type { ProfileBet } from './characterProfiles'
 import { PL_FLAT_COLOR, PL_LOSS_COLOR, PL_PROFIT_COLOR } from './characterPnlConstants'
@@ -240,13 +241,8 @@ const trimNumber = (text: string): string => text.replace(/(\.\d*?)0+$/, '$1').r
 export const formatPnlAmount = (value: number): string => {
   const abs = Math.abs(value)
   if (!Number.isFinite(abs) || abs < 0.005) return '0'
-  const scaled = (amount: number, suffix: string): string => {
-    const digits = amount >= 10 ? 0 : 1
-    return `${trimNumber(amount.toFixed(digits))}${suffix}`
-  }
-  if (abs >= 1_000_000_000) return scaled(abs / 1_000_000_000, 'b')
-  if (abs >= 1_000_000) return scaled(abs / 1_000_000, 'm')
-  if (abs >= 1_000) return scaled(abs / 1_000, 'k')
+  const compact = compactAmount(abs)
+  if (compact) return formatCompactAmount(compact.amount, compact.suffix)
   if (abs >= 100) return trimNumber(abs.toFixed(0))
   if (abs >= 10) return trimNumber(abs.toFixed(1))
   return trimNumber(abs.toFixed(2))
@@ -254,4 +250,4 @@ export const formatPnlAmount = (value: number): string => {
 
 export const formatPnlBtc = (btc: number): string => `${formatPnlAmount(btc)} BTC`
 
-export const formatPnlUsd = (usd: number): string => `${formatPnlAmount(usd)} USD`
+export const formatPnlUsd = (usd: number): string => `$${formatPnlAmount(usd)} USD`

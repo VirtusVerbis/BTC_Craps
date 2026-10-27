@@ -2,14 +2,16 @@ import { describe, expect, it } from 'vitest'
 import { formatLiqBtc, formatLiqCountdown, formatLiqUsd, liqSwapAtMs } from './format'
 
 describe('liquidation labels', () => {
-  it('rounds BTC to a whole number and keeps a fraction of 1 BTC', () => {
-    expect(formatLiqBtc(1240.4)).toBe('1,240')
+  it('compacts BTC from 1,000 and keeps a fraction of 1 BTC', () => {
+    expect(formatLiqBtc(1240.4)).toBe('1.2K')
     expect(formatLiqBtc(2.55)).toBe('3')
     expect(formatLiqBtc(0.053)).toBe('0.05')
     expect(formatLiqBtc(0)).toBe('0')
   })
 
-  it('prints millions from $1M and thousands below that', () => {
+  it('prints billions, millions, and thousands', () => {
+    expect(formatLiqUsd(10_223_000_000)).toBe('$10B')
+    expect(formatLiqUsd(1_200_000_000)).toBe('$1.2B')
     expect(formatLiqUsd(84_000_000)).toBe('$84M')
     expect(formatLiqUsd(2_000_000)).toBe('$2M')
     expect(formatLiqUsd(1_200_000)).toBe('$1.2M')

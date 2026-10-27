@@ -29,8 +29,8 @@ const roll = (character: CharacterRollDelta['character'], btc: number, usd: numb
 
 describe('balance delta copy', () => {
   it('puts a sign in front and a slash between the amounts', () => {
-    expect(formatBalanceDelta(57, 5_000_000)).toBe('+ 57 BTC\n5m USD')
-    expect(formatBalanceDelta(-37, -3_000_000)).toBe('- 37 BTC\n3m USD')
+    expect(formatBalanceDelta(57, 5_000_000)).toBe('+ 57 BTC\n$5M USD')
+    expect(formatBalanceDelta(-37, -3_000_000)).toBe('- 37 BTC\n$3M USD')
   })
 
   it('hides a flat amount, dust, and anything under the minimum', () => {
@@ -83,7 +83,7 @@ describe('balance delta motion', () => {
     expect(frame.frames[1].y).toBeCloseTo(PL_DELTA_ANCHOR.cat.y)
     expect(frame.frames[0].color).toBe(PL_PROFIT_COLOR)
     expect(frame.frames[1].color).toBe(PL_LOSS_COLOR)
-    expect(frame.frames[1].text).toBe('- 10 BTC\n700k USD')
+    expect(frame.frames[1].text).toBe('- 10 BTC\n$700K USD')
   })
 
   it('fades out sooner when the fade rate is higher', () => {

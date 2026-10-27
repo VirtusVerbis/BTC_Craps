@@ -197,6 +197,6 @@ describe('shooter profile', () => {
     expect(shooterFigureColor(lost)).toBe(PL_LOSS_COLOR)
     const paid = applyShooterRoll(emptyShooterBook(), 4, 6, almostAll(), PRICE)
     expect(shooterFigureColor(paid)).toBe(PL_PROFIT_COLOR)
-    expect(formatShooterPnl(paid)).toBe('3.8k BTC $375M USD')
+    expect(formatShooterPnl(paid)).toBe('3.8K BTC $375M USD')
   })
 })

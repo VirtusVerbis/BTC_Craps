@@ -918,6 +918,11 @@ body {
   text-align: right;
   line-height: 1.25;
   pointer-events: none;
+  text-shadow:
+    0 1.69px 0 #000,
+    0 3.38px 6.76px #000,
+    0 0 13.52px rgba(0, 0, 0, 1),
+    0 0 30.42px rgba(0, 0, 0, 0.95);
 }
 
 .overlay-oi p {
@@ -929,10 +934,10 @@ body {
   transform: none;
   text-align: left;
   text-shadow:
-    0 1px 0 #000,
-    0 2px 4px #000,
-    0 0 8px rgba(0, 0, 0, 1),
-    0 0 18px rgba(0, 0, 0, 0.95);
+    0 2.921px 0 #000,
+    0 5.84px 11.681px #000,
+    0 0 23.363px #000,
+    0 0 52.566px #000;
 }
 
 .overlay-liq-row {
@@ -1039,9 +1044,9 @@ body {
   letter-spacing: 0.01em;
   pointer-events: none;
   text-shadow:
-    0 1px 0 #000,
-    0 2px 4px #000,
-    0 0 8px rgba(0, 0, 0, 1);
+    0 1.3px 0 #000,
+    0 2.6px 5.2px #000,
+    0 0 10.4px rgba(0, 0, 0, 1);
 }
 
 .character-pnl p {

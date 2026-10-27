@@ -37,7 +37,7 @@ export interface BalanceDeltaFrame {
 /** Two lines. The sign sits on the bitcoin line only. */
 export const formatBalanceDelta = (btc: number, usd: number): string => {
   const sign = btc < 0 ? '-' : '+'
-  return `${sign} ${formatPnlAmount(btc)} BTC\n${formatPnlAmount(usd)} USD`
+  return `${sign} ${formatPnlAmount(btc)} BTC\n$${formatPnlAmount(usd)} USD`
 }
 
 /** A flat, tiny, or sub-minimum bitcoin result does not get a floater. */
