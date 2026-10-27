@@ -919,6 +919,14 @@ body {
   line-height: 1.25;
   pointer-events: none;
   text-shadow:
+    -2px 0 0 #000,
+    2px 0 0 #000,
+    0 -2px 0 #000,
+    0 2px 0 #000,
+    -2px -2px 0 #000,
+    2px -2px 0 #000,
+    -2px 2px 0 #000,
+    2px 2px 0 #000,
     0 1.69px 0 #000,
     0 3.38px 6.76px #000,
     0 0 13.52px rgba(0, 0, 0, 1),
@@ -934,6 +942,14 @@ body {
   transform: none;
   text-align: left;
   text-shadow:
+    -2px 0 0 #000,
+    2px 0 0 #000,
+    0 -2px 0 #000,
+    0 2px 0 #000,
+    -2px -2px 0 #000,
+    2px -2px 0 #000,
+    -2px 2px 0 #000,
+    2px 2px 0 #000,
     0 2.921px 0 #000,
     0 5.84px 11.681px #000,
     0 0 23.363px #000,
