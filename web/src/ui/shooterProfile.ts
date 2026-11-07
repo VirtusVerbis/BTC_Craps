@@ -1,6 +1,14 @@
 import { BONUS_ALL_PAYS } from './bonusConstants'
 import { applyBonusRoll, emptyBonusHand, type BonusHand } from './bonusCraps'
-import { BONUS_FIELD_SIZE_PX, BONUS_SMALL_X, BONUS_SMALL_Y, BONUS_TALL_X, BONUS_TALL_Y } from './bonusFieldConstants'
+import {
+  BONUS_ALL_X,
+  BONUS_ALL_Y,
+  BONUS_FIELD_SIZE_PX,
+  BONUS_SMALL_X,
+  BONUS_SMALL_Y,
+  BONUS_TALL_X,
+  BONUS_TALL_Y,
+} from './bonusFieldConstants'
 import {
   BONUS_STAKE_LABELS_ON,
   SHOOTER_ALL_X,
@@ -175,22 +183,13 @@ export const shooterFigureColor = (book: ShooterBook): string => {
 export const formatShooterPnl = (book: ShooterBook): string =>
   `${formatPnlBtc(book.pnl.btc)} ${formatLiqUsd(Math.abs(book.pnl.usd))} USD`
 
-/**
- * Stake while the bet is up. After a win the line stays off until the next red,
- * unless `showEmpty` keeps the name on screen for a visibility check.
- */
-export const formatMakeEmAll = (working: boolean, showEmpty = BONUS_STAKE_LABELS_ON): string | null => {
-  if (working) return `Make 'Em All ${formatLiqUsd(SHOOTER_RED)}`
-  if (showEmpty) return "Make 'Em All"
-  return null
-}
-
 export interface BonusStakes {
   tall: number
   small: number
+  all: number
 }
 
-export const emptyBonusStakes = (): BonusStakes => ({ tall: 0, small: 0 })
+export const emptyBonusStakes = (): BonusStakes => ({ tall: 0, small: 0, all: 0 })
 
 const onBonusSquare = (bet: ChipBet, x: number, y: number): boolean => {
   const anchor = bet.anchor
@@ -199,19 +198,25 @@ const onBonusSquare = (bet: ChipBet, x: number, y: number): boolean => {
   return Math.abs(anchor.x - x) <= reach && Math.abs(anchor.y - y) <= reach
 }
 
-/** Dollars sitting on the All Tall and All Small squares. */
+/** Dollars sitting on the All Tall, Make 'Em All, and All Small squares. */
 export const bonusStakeDollars = (bets: readonly ChipBet[]): BonusStakes => {
   let tall = 0
   let small = 0
+  let all = 0
   for (const bet of bets) {
     const onTall = bet.side === 'tall' || onBonusSquare(bet, BONUS_TALL_X, BONUS_TALL_Y)
+    const onAll = bet.side === 'all' || onBonusSquare(bet, BONUS_ALL_X, BONUS_ALL_Y)
     const onSmall = bet.side === 'small' || onBonusSquare(bet, BONUS_SMALL_X, BONUS_SMALL_Y)
-    if (onTall && !onSmall) tall += bet.dollars
-    else if (onSmall && !onTall) small += bet.dollars
-    else if (bet.side === 'tall') tall += bet.dollars
+    const hits = Number(onTall) + Number(onAll) + Number(onSmall)
+    if (hits === 1) {
+      if (onTall) tall += bet.dollars
+      else if (onAll) all += bet.dollars
+      else small += bet.dollars
+    } else if (bet.side === 'tall') tall += bet.dollars
+    else if (bet.side === 'all') all += bet.dollars
     else if (bet.side === 'small') small += bet.dollars
   }
-  return { tall, small }
+  return { tall, small, all }
 }
 
 /**
@@ -219,7 +224,7 @@ export const bonusStakeDollars = (bets: readonly ChipBet[]): BonusStakes => {
  * An empty square is hidden, unless `showEmpty` keeps the name on screen.
  */
 export const formatBonusStakeLabel = (
-  name: 'All Tall' | 'All Small',
+  name: 'All Tall' | "Make 'Em All" | 'All Small',
   dollars: number,
   showEmpty = BONUS_STAKE_LABELS_ON,
 ): string | null => {
@@ -229,5 +234,7 @@ export const formatBonusStakeLabel = (
 }
 
 export const formatAllTall = (dollars: number): string | null => formatBonusStakeLabel('All Tall', dollars)
+
+export const formatMakeEmAll = (dollars: number): string | null => formatBonusStakeLabel("Make 'Em All", dollars)
 
 export const formatAllSmall = (dollars: number): string | null => formatBonusStakeLabel('All Small', dollars)

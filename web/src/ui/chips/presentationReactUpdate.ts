@@ -14,7 +14,11 @@ export const dicePresentationReactChanged = (
   if (prev.speech !== next.speech && !shallowSpeechEqual(prev.speech, next.speech)) return true
   if (prev.pnl !== next.pnl) return true
   if (prev.shooter !== next.shooter) return true
-  if (prev.bonusStakes.tall !== next.bonusStakes.tall || prev.bonusStakes.small !== next.bonusStakes.small) return true
+  if (
+    prev.bonusStakes.tall !== next.bonusStakes.tall
+    || prev.bonusStakes.small !== next.bonusStakes.small
+    || prev.bonusStakes.all !== next.bonusStakes.all
+  ) return true
   if (prev.rollStreak.current !== next.rollStreak.current) return true
   if (prev.rollStreak.longest !== next.rollStreak.longest) return true
   if (prev.lastRoll !== next.lastRoll) return true

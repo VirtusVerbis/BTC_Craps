@@ -29,7 +29,7 @@ const frame = (patch: Partial<DicePresentation> = {}): DicePresentation => ({
   speech: [],
   pnl,
   shooter,
-  bonusStakes: { tall: 0, small: 0 },
+  bonusStakes: { tall: 0, small: 0, all: 0 },
   rollStreak: { current: 0, longest: 0 },
   lastRoll: null,
   phase: 'holding',
@@ -64,7 +64,8 @@ describe('dicePresentationReactChanged', () => {
 
   it('re-renders bonus stakes only when the amounts change', () => {
     const prev = frame()
-    expect(dicePresentationReactChanged(prev, frame({ bonusStakes: { tall: 0, small: 0 } }))).toBe(false)
-    expect(dicePresentationReactChanged(prev, frame({ bonusStakes: { tall: 5, small: 0 } }))).toBe(true)
+    expect(dicePresentationReactChanged(prev, frame({ bonusStakes: { tall: 0, small: 0, all: 0 } }))).toBe(false)
+    expect(dicePresentationReactChanged(prev, frame({ bonusStakes: { tall: 5, small: 0, all: 0 } }))).toBe(true)
+    expect(dicePresentationReactChanged(prev, frame({ bonusStakes: { tall: 0, small: 0, all: 5 } }))).toBe(true)
   })
 })

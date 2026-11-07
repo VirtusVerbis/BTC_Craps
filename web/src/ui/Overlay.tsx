@@ -171,7 +171,7 @@ export const Overlay = ({
   session,
   status,
 }: OverlayProps) => {
-  const makeEmAll = SHOOTER_ON ? formatMakeEmAll(shooter.allWorking) : null
+  const makeEmAll = SHOOTER_ON ? formatMakeEmAll(bonusStakes.all) : null
   const allTall = formatAllTall(bonusStakes.tall)
   const allSmall = formatAllSmall(bonusStakes.small)
   const openInterest = useOpenInterest()

@@ -108,8 +108,7 @@ describe('shooter profile', () => {
     expect(next.pnl.usd).toBe(SHOOTER_RED * BONUS_ALL_PAYS)
     expect(next.pnl.btc).toBeCloseTo((SHOOTER_RED * BONUS_ALL_PAYS) / PRICE)
     expect(next.allWorking).toBe(false)
-    expect(formatMakeEmAll(false)).toBe("Make 'Em All")
-    expect(formatMakeEmAll(false, false)).toBeNull()
+    expect(formatMakeEmAll(0)).toBeNull()
   })
 
   it('does not charge the ending 7 after Make \'Em All has paid', () => {
@@ -120,12 +119,13 @@ describe('shooter profile', () => {
     expect(next.pnl.usd).toBe(won.pnl.usd)
     expect(next.pnl.btc).toBe(won.pnl.btc)
     expect(next.allWorking).toBe(true)
-    expect(formatMakeEmAll(true)).toBe(`Make 'Em All $2.5M`)
+    expect(formatMakeEmAll(SHOOTER_RED)).toBe(`Make 'Em All $2.5M`)
+    expect(formatMakeEmAll(5_000_000)).toBe(`Make 'Em All $5M`)
   })
 
   it('shows All Tall and All Small with the same stake wording', () => {
-    expect(formatAllTall(0)).toBe('All Tall')
-    expect(formatAllSmall(0)).toBe('All Small')
+    expect(formatAllTall(0)).toBeNull()
+    expect(formatAllSmall(0)).toBeNull()
     expect(formatAllTall(SHOOTER_RED)).toBe('All Tall $2.5M')
     expect(formatAllSmall(5_000_000)).toBe('All Small $5M')
     expect(formatBonusStakeLabel('All Tall', 0, false)).toBeNull()
@@ -149,10 +149,11 @@ describe('shooter profile', () => {
       chip('all', 'all', SHOOTER_RED, 990, 980),
       chip('pass', 'pass', 500_000, 500, 1895),
     ])
-    expect(stakes).toEqual({ tall: 2_500_000, small: 1_000_000 })
+    expect(stakes).toEqual({ tall: 2_500_000, small: 1_000_000, all: SHOOTER_RED })
     expect(bonusStakeDollars([chip('small-square', 'pass', 3_000_000, BONUS_SMALL_X, BONUS_SMALL_Y)])).toEqual({
       tall: 0,
       small: 3_000_000,
+      all: 0,
     })
   })
 
