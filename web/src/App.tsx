@@ -99,9 +99,35 @@ const ReleaseNote = ({ wideTop = false }: { wideTop?: boolean }) => (
     Released on 2026-Oct-10
     <br />
     Bitcoin was $82k.
-    <br />
-    Website is work in progress...
   </p>
+)
+
+const RELATED_SITES = [
+  { href: 'https://bitcoinpunchup.com', domain: 'bitcoinpunchup.com', tagline: 'BTC Price Visualizer' },
+  { href: 'https://bitcoinbloodhound.com', domain: 'bitcoinbloodhound.com', tagline: 'Track Coldcard Hack' },
+] as const
+
+const RelatedSites = () => (
+  <section className="related-sites" aria-labelledby="related-sites-heading">
+    <h2 id="related-sites-heading" className="related-sites-heading">
+      Related Sites
+    </h2>
+    <ul className="related-sites-list">
+      {RELATED_SITES.map((site) => (
+        <li key={site.href} className="related-sites-item">
+          <a
+            className="related-sites-domain"
+            href={site.href}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {site.domain}
+          </a>
+          <span className="related-sites-tagline">{site.tagline}</span>
+        </li>
+      ))}
+    </ul>
+  </section>
 )
 
 function App() {
@@ -513,7 +539,7 @@ function App() {
             onMotionTest={onMotionTest}
           />
           <DiceControlHistogram settings={diceControl} book={diceControlBook} />
-          <aside className="repo-links-panel" aria-label="Source repositories">
+          <aside className="repo-links-panel" aria-label="Repository and related sites">
           <div className="repo-link-lnurl" aria-label="LNURL address">
             <img className="lnurl-badge" src="/mobile/lnurl_address.jpg.jpeg" alt="LNURL address" draggable={false} />
           </div>
@@ -527,6 +553,7 @@ function App() {
             <span>GitHub Repo</span>
           </a>
           <ReleaseNote />
+          <RelatedSites />
           </aside>
         </div>
       </div>

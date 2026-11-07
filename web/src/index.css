@@ -1576,6 +1576,57 @@ html.shooter-gesture-lock body {
   display: none;
 }
 
+.related-sites {
+  margin: 0;
+  padding: 0 0.72rem;
+}
+
+.related-sites-heading {
+  margin: 0 0 0.45rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: rgba(246, 240, 218, 0.72);
+}
+
+.related-sites-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.related-sites-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+}
+
+.related-sites-domain {
+  font-size: 0.82rem;
+  line-height: 1.3;
+  color: #f7931a;
+  text-decoration: none;
+}
+
+.related-sites-domain:hover {
+  text-decoration: underline;
+}
+
+.related-sites-domain:focus-visible {
+  outline: 2px solid #f7931a;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.related-sites-tagline {
+  font-size: 0.76rem;
+  line-height: 1.3;
+  color: rgba(246, 240, 218, 0.58);
+}
+
 .repo-link {
   display: inline-flex;
   align-items: center;
