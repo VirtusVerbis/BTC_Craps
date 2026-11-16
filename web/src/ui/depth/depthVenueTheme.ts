@@ -29,21 +29,6 @@ export const depthVenueColorAsk: Record<VenueId, string> = {
   hyperliquid: 'rgba(186, 104, 200, 0.45)',
 }
 
-/** Opaque fills for depth timeline overlap (larger size paints over smaller). */
-export const depthVenueColorBidOpaque: Record<VenueId, string> = {
-  binancePerp: 'rgb(255, 183, 77)',
-  binanceSpot: 'rgb(255, 235, 59)',
-  coinbase: 'rgb(100, 181, 246)',
-  hyperliquid: 'rgb(186, 104, 200)',
-}
-
-export const depthVenueColorAskOpaque: Record<VenueId, string> = {
-  binancePerp: 'rgb(255, 183, 77)',
-  binanceSpot: 'rgb(255, 235, 59)',
-  coinbase: 'rgb(100, 181, 246)',
-  hyperliquid: 'rgb(186, 104, 200)',
-}
-
 export const depthVenueMissingColor: Record<VenueId, string> = {
   binancePerp: 'rgba(255, 183, 77, 0.35)',
   binanceSpot: 'rgba(255, 235, 59, 0.35)',

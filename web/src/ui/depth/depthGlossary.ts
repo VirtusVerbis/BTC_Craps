@@ -83,11 +83,11 @@ export const depthGlossary: Record<DepthGlossaryKey, GlossaryEntry> = {
   },
   mergedTimeline: {
     title: 'Merged depth timeline',
-    body: 'All venues on one clock: bids above the midline, asks below. Columns are fixed wall-clock slices (merged 5s samples). Older slices keep the same height until that interval’s sample changes; Y scale only ratchets up during the session so new spikes do not shrink history.',
+    body: 'All venues on one clock: bids above the midline, asks below. A bright line marks the bid/ask split at mid. Columns are fixed wall-clock slices (merged 5s samples). Older slices keep the same height until that interval’s sample changes; Y scale only ratchets up during the session so new spikes do not shrink history.',
   },
   timelineLayerMode: {
     title: 'Overlap vs stack',
-    body: 'Overlap draws each venue’s bar in the same column (opaque colors; larger size on top). Stack builds one column from the midline with semi-opaque segments that add up.',
+    body: 'Overlap draws each venue’s bar in the same column (larger size on top; bid/ask use the same alpha as stack). Stack builds one column from the midline with segments that add up.',
   },
   timelineWindow: {
     title: 'Timeline window',

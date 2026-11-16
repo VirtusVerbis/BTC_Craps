@@ -21,9 +21,7 @@ import { DepthInfoIcon } from './DepthInfoIcon'
 import {
   DEPTH_VENUE_ORDER,
   depthVenueColorAsk,
-  depthVenueColorAskOpaque,
   depthVenueColorBid,
-  depthVenueColorBidOpaque,
   depthVenueMissingColor,
   depthVenueShort,
 } from './depthVenueTheme'
@@ -96,7 +94,7 @@ const drawColumn = (
     for (const { venue, value } of sorted) {
       const h = (value / maxVal) * halfH
       if (h < 0.5) continue
-      ctx.fillStyle = side === 'bid' ? depthVenueColorBidOpaque[venue] : depthVenueColorAskOpaque[venue]
+      ctx.fillStyle = side === 'bid' ? depthVenueColorBid[venue] : depthVenueColorAsk[venue]
       if (side === 'bid') {
         ctx.fillRect(x, midY - h, Math.max(1, colW - 0.5), h)
       } else {
@@ -208,12 +206,6 @@ export const DepthMergedTimeline = ({ micro }: DepthMergedTimelineProps) => {
     const h = canvas.height
     ctx.clearRect(0, 0, w, h)
 
-    ctx.strokeStyle = 'rgba(246, 240, 218, 0.2)'
-    ctx.beginPath()
-    ctx.moveTo(0, h / 2)
-    ctx.lineTo(w, h / 2)
-    ctx.stroke()
-
     const displayCols = layoutCols
     const colW = metrics.colWidth
     const midY = h / 2
@@ -224,6 +216,14 @@ export const DepthMergedTimeline = ({ micro }: DepthMergedTimelineProps) => {
       drawColumn(ctx, DEPTH_VENUE_ORDER, cellsByVenue, col, x, colW, midY, halfH, maxVal, layerMode, 'bid')
       drawColumn(ctx, DEPTH_VENUE_ORDER, cellsByVenue, col, x, colW, midY, halfH, maxVal, layerMode, 'ask')
     }
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.92)'
+    ctx.lineWidth = 1.25
+    ctx.beginPath()
+    ctx.moveTo(0, midY + 0.5)
+    ctx.lineTo(w, midY + 0.5)
+    ctx.stroke()
+    ctx.lineWidth = 1
 
     const scrollEl = scrollRef.current
     if (metrics.scrollable && scrollEl && scrollEl.scrollWidth > scrollEl.clientWidth) {
@@ -245,17 +245,17 @@ export const DepthMergedTimeline = ({ micro }: DepthMergedTimelineProps) => {
         <div className="depth-timeline-actions" role="group" aria-label="Timeline display options">
           <button
             type="button"
-            className={layerMode === 'overlap' ? 'depth-toggle depth-toggle-active' : 'depth-toggle'}
-            onClick={() => setLayerMode('overlap')}
-          >
-            Overlap
-          </button>
-          <button
-            type="button"
             className={layerMode === 'stack' ? 'depth-toggle depth-toggle-active' : 'depth-toggle'}
             onClick={() => setLayerMode('stack')}
           >
             Stack
+          </button>
+          <button
+            type="button"
+            className={layerMode === 'overlap' ? 'depth-toggle depth-toggle-active' : 'depth-toggle'}
+            onClick={() => setLayerMode('overlap')}
+          >
+            Overlap
           </button>
           <span className="depth-toggle-sep" aria-hidden />
           <button
