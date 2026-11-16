@@ -28,6 +28,7 @@ export class SafeWebSocketClient<T = void> {
   }
 
   connect() {
+    this.shouldReconnect = true
     if (this.socket) {
       const rs = this.socket.readyState
       if (rs === WebSocket.CONNECTING || rs === WebSocket.OPEN) return

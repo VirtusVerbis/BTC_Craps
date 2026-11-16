@@ -25,6 +25,14 @@ export default defineConfig({
         secure: true,
         rewrite: (path) => path.replace(/^\/ws-binance/, ''),
       },
+      /** Same-origin Coinbase Exchange feed (avoids dev aborts on direct `wss://ws-feed…`). */
+      '/ws-coinbase': {
+        target: 'wss://ws-feed.exchange.coinbase.com',
+        changeOrigin: true,
+        ws: true,
+        secure: true,
+        rewrite: (path) => path.replace(/^\/ws-coinbase/, ''),
+      },
       /** Coinalyze snapshot from `npm run oi:dev` (wrangler on port 8787). */
       '/oi': {
         target: 'http://127.0.0.1:8787',

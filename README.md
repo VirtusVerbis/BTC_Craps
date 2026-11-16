@@ -159,6 +159,10 @@ Open interest, the long/short account ratio, and liquidation history for the agg
 
 Last price and the buy/sell tape come from [Binance](https://www.binance.com) and [Coinbase](https://www.coinbase.com). The block clock reads the chain tip from [mempool.space](https://mempool.space).
 
+## Depth panel
+
+The **Depth** tab (bottom left) opens a full-screen readout of order-book walls, 15-minute taker flow, and cross-venue context. Sampling runs in the browser from public feeds only: Binance spot and USDⓈ-M futures WebSockets, Coinbase level-2 (shared with the price feed), and Hyperliquid public `info` requests. Open interest and liquidations in the Depth header still come from the Coinalyze worker snapshot at `/oi`. No trading keys or extra worker storage are used for Depth. Production CSP allows `fstream.binance.com`, `fapi.binance.com`, and `api.hyperliquid.xyz` for these connections.
+
 ## Run it locally
 
 From `web/`:

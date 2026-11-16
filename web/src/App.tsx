@@ -3,6 +3,11 @@ import { REFERENCE_HEIGHT, REFERENCE_WIDTH } from './config/constants'
 import { fetchBinanceBtc1mKlines, type Candle } from './data/candles'
 import { BlockHeightService, type BlockState } from './data/blockHeight'
 import { MarketDataService, type MarketFeedUpdate } from './data/marketData'
+import { MicrostructureService } from './data/microstructure/microstructureService'
+import { useOpenInterest } from './data/openInterest'
+import { DepthPanel } from './ui/depth/DepthPanel'
+import { DepthTab } from './ui/depth/DepthTab'
+import { useMicrostructure } from './ui/depth/useMicrostructure'
 import { emptyCharacterPnl } from './ui/characterPnl'
 import { emptyBonusStakes, loadShooterBook } from './ui/shooterProfile'
 import { loadDieColor, nextDieColor, saveDieColor, type DieColorId } from './ui/diceColor'
@@ -165,6 +170,7 @@ function App() {
     })
   }, [])
   const [manualShooter, setManualShooter] = useState(false)
+  const [depthOpen, setDepthOpen] = useState(false)
   const [betClockOpen, setBetClockOpen] = useState(false)
   const [splashDone, setSplashDone] = useState(false)
   const onSplashDone = useCallback(() => setSplashDone(true), [])
@@ -379,6 +385,13 @@ function App() {
     [],
   )
 
+  const microstructureService = useMemo(
+    () => new MicrostructureService(marketService),
+    [marketService],
+  )
+  const microstructure = useMicrostructure(microstructureService)
+  const openInterest = useOpenInterest()
+
   useEffect(() => {
     const blockService = new BlockHeightService(setBlockState)
     blockService.start()
@@ -386,9 +399,23 @@ function App() {
   }, [])
 
   useEffect(() => {
+    microstructureService.start()
     marketService.start()
-    return () => marketService.stop()
-  }, [marketService])
+    return () => {
+      marketService.stop()
+      microstructureService.stop()
+    }
+  }, [marketService, microstructureService])
+
+  useEffect(() => {
+    microstructureService.setBasisPrices(feed.market.binance.price, feed.market.coinbase.price)
+  }, [feed.market.binance.price, feed.market.coinbase.price, microstructureService])
+
+  const onDepthOpen = useCallback(() => {
+    if (manualShooter) shooterControlsRef.current?.launchAutoNow()
+    setManualShooter(false)
+    setDepthOpen(true)
+  }, [manualShooter])
 
   useEffect(() => {
     const load = () => {
@@ -482,6 +509,13 @@ function App() {
                 sceneHeightPx={sceneHeightPx}
               />
             ) : null}
+            <DepthPanel
+              open={depthOpen}
+              onClose={() => setDepthOpen(false)}
+              micro={microstructure}
+              openInterest={openInterest}
+            />
+            <DepthTab onOpen={onDepthOpen} panelOpen={depthOpen} />
           </Stage>
         </div>
 

@@ -1,18 +1,33 @@
 import { env } from '../config/env'
 import type { ExchangeSnapshot, MarketSnapshot } from '../game/types'
-import { EXCHANGE_EMIT_THROTTLE_MS, VOLUME_RESET_INTERVAL_MS } from './exchangeConstants'
+import {
+  COINBASE_WS_MAX_PAYLOAD_BYTES,
+  EXCHANGE_EMIT_THROTTLE_MS,
+  VOLUME_RESET_INTERVAL_MS,
+} from './exchangeConstants'
 import {
   aggregateCoinbaseTradesVolumes,
   binanceTradeSchema,
   normalizeCoinbaseMatch,
   parseBinanceTickerClosePrice,
   parseCoinbaseLevel2Snapshot,
+  parseCoinbaseLevel2Update,
   parseCoinbaseTickerPrice,
   unwrapBinanceWebSocketPayload,
 } from './schemas'
 import { SafeWebSocketClient } from './websocketClient'
 
 export type FeedStatus = 'connecting' | 'connected' | 'disconnected'
+
+export interface MicrostructureFeedHooks {
+  onCoinbaseBookSnapshot?: (
+    bids: { price: number; size: number }[],
+    asks: { price: number; size: number }[],
+  ) => void
+  onCoinbaseL2Change?: (side: 'buy' | 'sell', price: number, size: number) => void
+  onBinanceSpotTrade?: (isSell: boolean, qtyBtc: number) => void
+  onCoinbaseTrade?: (isSell: boolean, qtyBtc: number) => void
+}
 
 export interface MarketFeedUpdate {
   market: MarketSnapshot
@@ -77,6 +92,7 @@ export class MarketDataService {
 
   private readonly coinbaseClient = new SafeWebSocketClient({
     url: env.coinbaseWsUrl,
+    maxPayloadBytes: COINBASE_WS_MAX_PAYLOAD_BYTES,
     onJsonMessage: (payload) => {
       this.applyCoinbasePayload(payload)
     },
@@ -93,7 +109,13 @@ export class MarketDataService {
     },
   })
 
+  private microHooks: MicrostructureFeedHooks = {}
+
   constructor(private readonly onUpdate: (update: MarketFeedUpdate) => void) {}
+
+  setMicrostructureHooks(hooks: MicrostructureFeedHooks): void {
+    this.microHooks = hooks
+  }
 
   private setStatus(exchange: 'binance' | 'coinbase', status: FeedStatus) {
     this.status = { ...this.status, [exchange]: status }
@@ -156,6 +178,7 @@ export class MarketDataService {
       const isSell = parsed.data.m ?? false
       if (isSell) this.binanceSellAcc += qty
       else this.binanceBuyAcc += qty
+      this.microHooks.onBinanceSpotTrade?.(isSell, qty)
       if (parsed.data.p > 0) this.latestBinancePrice = parsed.data.p
       return
     }
@@ -189,6 +212,19 @@ export class MarketDataService {
       const parsed = parseCoinbaseLevel2Snapshot(payload)
       if (!parsed.success) return
       if (parsed.data.product_id !== env.coinbaseProductId) return
+      this.microHooks.onCoinbaseBookSnapshot?.(
+        parsed.data.bids.map(([p, s]) => ({ price: Number(p), size: Number(s) })),
+        parsed.data.asks.map(([p, s]) => ({ price: Number(p), size: Number(s) })),
+      )
+      return
+    }
+    if (type === 'l2update') {
+      const parsed = parseCoinbaseLevel2Update(payload)
+      if (!parsed.success) return
+      if (parsed.data.product_id !== env.coinbaseProductId) return
+      for (const [side, p, s] of parsed.data.changes) {
+        this.microHooks.onCoinbaseL2Change?.(side, Number(p), Number(s))
+      }
       return
     }
     if (type === 'match') {
@@ -197,6 +233,9 @@ export class MarketDataService {
       if (root.product_id && root.product_id !== env.coinbaseProductId) return
       this.coinbaseBuyAcc += snap.buyVolume
       this.coinbaseSellAcc += snap.sellVolume
+      const isSell = snap.sellVolume > 0
+      const qty = isSell ? snap.sellVolume : snap.buyVolume
+      this.microHooks.onCoinbaseTrade?.(isSell, qty)
     }
   }
 

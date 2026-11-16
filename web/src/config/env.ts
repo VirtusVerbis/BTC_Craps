@@ -1,4 +1,7 @@
 const BINANCE_STREAMS_PATH = 'stream?streams=btcusdt@trade/btcusdt@ticker/btcusdt@bookTicker'
+const BINANCE_SPOT_DEPTH_STREAMS = 'stream?streams=btcusdt@depth@100ms'
+const BINANCE_FSTREAM_PATH =
+  'stream?streams=btcusdt@depth@100ms/btcusdt@aggTrade'
 
 const resolveBinanceWsUrl = (): string => {
   const override = import.meta.env.VITE_BINANCE_WS_URL as string | undefined
@@ -10,7 +13,10 @@ const resolveBinanceWsUrl = (): string => {
 const resolveCoinbaseWsUrl = (): string => {
   const override = import.meta.env.VITE_COINBASE_WS_URL as string | undefined
   if (override) return override
-  /** Keep Coinbase direct; Binance proxy is the path currently showing upstream aborts. */
+  if (import.meta.env.DEV && typeof window !== 'undefined') {
+    const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    return `${wsProto}//${window.location.host}/ws-coinbase`
+  }
   return 'wss://ws-feed.exchange.coinbase.com'
 }
 
@@ -31,4 +37,20 @@ export const env = {
    */
   binanceApiOrigin:
     (import.meta.env.VITE_BINANCE_API_ORIGIN as string | undefined) ?? 'https://api.binance.com',
+  get binanceFstreamWsUrl() {
+    const override = import.meta.env.VITE_BINANCE_FSTREAM_WS_URL as string | undefined
+    if (override) return override
+    return `wss://fstream.binance.com/${BINANCE_FSTREAM_PATH}`
+  },
+  get binanceSpotDepthWsUrl() {
+    const override = import.meta.env.VITE_BINANCE_SPOT_DEPTH_WS_URL as string | undefined
+    if (override) return override
+    return `wss://stream.binance.com:9443/${BINANCE_SPOT_DEPTH_STREAMS}`
+  },
+  hyperliquidInfoUrl:
+    (import.meta.env.VITE_HL_INFO_URL as string | undefined) ??
+    'https://api.hyperliquid.xyz/info',
+  binanceFapiOrigin:
+    (import.meta.env.VITE_BINANCE_FAPI_ORIGIN as string | undefined) ??
+    'https://fapi.binance.com',
 }

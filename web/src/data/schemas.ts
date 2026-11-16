@@ -170,6 +170,47 @@ export const coinbaseSnapshotTop50Volumes = (
 
 export const parseCoinbaseLevel2Snapshot = (payload: unknown) => coinbaseLevel2SnapshotSchema.safeParse(payload)
 
+const coinbaseL2ChangeRow = z
+  .tuple([z.enum(['buy', 'sell']), z.union([z.string(), z.number()]), z.union([z.string(), z.number()])])
+
+export const coinbaseLevel2UpdateSchema = z.object({
+  type: z.literal('l2update'),
+  product_id: z.string(),
+  changes: z.array(coinbaseL2ChangeRow),
+})
+
+export const parseCoinbaseLevel2Update = (payload: unknown) => coinbaseLevel2UpdateSchema.safeParse(payload)
+
+const coinbaseRestBookRow = z
+  .array(z.union([z.string(), z.number()]))
+  .min(2)
+  .transform((row) => [String(row[0]), String(row[1])] as [string, string])
+
+export const coinbaseRestBookSchema = z.object({
+  bids: z.array(coinbaseRestBookRow),
+  asks: z.array(coinbaseRestBookRow),
+})
+
+export const parseCoinbaseRestBook = (payload: unknown) => coinbaseRestBookSchema.safeParse(payload)
+
+export const coinbaseLevelsToBook = (
+  bids: [string, string][],
+  asks: [string, string][],
+): { price: number; size: number; side: 'bid' | 'ask' }[] => {
+  const out: { price: number; size: number; side: 'bid' | 'ask' }[] = []
+  for (const [px, sz] of bids) {
+    const price = Number(px)
+    const size = Number(sz)
+    if (price > 0 && size >= 0) out.push({ price, size, side: 'bid' })
+  }
+  for (const [px, sz] of asks) {
+    const price = Number(px)
+    const size = Number(sz)
+    if (price > 0 && size >= 0) out.push({ price, size, side: 'ask' })
+  }
+  return out
+}
+
 /** One row from `GET /products/{id}/trades` (Coinbase Exchange REST). */
 const coinbaseRestTradeRowSchema = z
   .object({
