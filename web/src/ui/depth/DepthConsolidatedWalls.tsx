@@ -1,12 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { MicrostructureState, WallEvent, WallRecord } from '../../data/microstructure/types'
 import { DepthBookChart } from './DepthBookChart'
+import { DepthSessionHeatmap } from './DepthSessionHeatmap'
 import { DepthInfoIcon } from './DepthInfoIcon'
 import { buildDisplayWallsFromMicro } from './depthLiveBookWalls'
 import { depthVenueShort } from './depthVenueTheme'
 import { DEPTH_WALL_TAPE_MAX_ROWS } from './depthUiConstants'
 import { renderWallSize } from './depthWallRowMetrics'
 import { wallEventKey, wallStage1Highlight, wallStage2Flash } from './depthWallHighlight'
+import {
+  persistLiveWallsOpen,
+  persistTapeOpen,
+  readLiveWallsOpen,
+  readTapeOpen,
+} from './depthWallSectionToggles'
 
 const wallReasonLabel: Record<string, string> = {
   active: 'Active',
@@ -28,9 +35,6 @@ const liveWallKey = (w: WallRecord): string => `${w.venue}:${w.side}:${w.price}`
 const eventPeakBtc = (e: WallEvent): number =>
   e.peakBtc > 0 ? e.peakBtc : e.price > 0 ? e.peakUsd / e.price : 0
 
-const sortByPeakBtcDesc = <T extends { peakBtc: number }>(rows: readonly T[]): T[] =>
-  [...rows].sort((a, b) => b.peakBtc - a.peakBtc)
-
 const sortEventsByPeakBtcDesc = (rows: readonly WallEvent[]): WallEvent[] =>
   [...rows].sort((a, b) => eventPeakBtc(b) - eventPeakBtc(a))
 
@@ -42,6 +46,18 @@ export const DepthConsolidatedWalls = ({ micro }: DepthConsolidatedWallsProps) =
   const now = micro.sampledAt
   const prevLivePeaksRef = useRef<Map<string, number>>(new Map())
   const [livePulseKeys, setLivePulseKeys] = useState<Set<string>>(() => new Set())
+  const [liveWallsOpen, setLiveWallsOpen] = useState(readLiveWallsOpen)
+  const [tapeOpen, setTapeOpen] = useState(readTapeOpen)
+
+  const chartsGrow = !liveWallsOpen || !tapeOpen
+
+  useEffect(() => {
+    persistLiveWallsOpen(liveWallsOpen)
+  }, [liveWallsOpen])
+
+  useEffect(() => {
+    persistTapeOpen(tapeOpen)
+  }, [tapeOpen])
 
   const { chartWalls, liveBids, liveAsks } = useMemo(() => buildDisplayWallsFromMicro(micro), [micro])
 
@@ -109,53 +125,84 @@ export const DepthConsolidatedWalls = ({ micro }: DepthConsolidatedWallsProps) =
     )
   }
 
+  const toggleLiveWalls = () => setLiveWallsOpen((v) => !v)
+  const toggleTape = () => setTapeOpen((v) => !v)
+
   return (
-    <section className="depth-consolidated-walls">
-      <DepthBookChart micro={micro} topWalls={chartWalls} />
+    <section
+      className={
+        chartsGrow ? 'depth-consolidated-walls depth-consolidated-walls--charts-grow' : 'depth-consolidated-walls'
+      }
+    >
+      <DepthBookChart micro={micro} topWalls={chartWalls} fillAvailableHeight={chartsGrow} />
 
       <h3 className="depth-wall-subhead">
+        <button
+          type="button"
+          className="depth-wall-section-toggle"
+          onClick={toggleLiveWalls}
+          aria-expanded={liveWallsOpen}
+          aria-label={liveWallsOpen ? 'Collapse live walls' : 'Expand live walls'}
+        >
+          <span aria-hidden>{liveWallsOpen ? '▾' : '▸'}</span>
+        </button>
         <DepthInfoIcon glossaryKey="wallLiveSection" label="Live walls" />
       </h3>
-      {liveBids.length === 0 && liveAsks.length === 0 ? (
-        <p className="depth-muted depth-wall-split-empty">No resting size within the near-mid band.</p>
-      ) : (
-        <div className="depth-wall-split">
-          <div className="depth-wall-split-col">
-            <p className="depth-wall-split-label">BID</p>
-            <ul className="depth-wall-list depth-wall-list--split">
-              {liveBids.length === 0 ? <li className="depth-muted">—</li> : liveBids.map(renderLiveRow)}
-            </ul>
+      {liveWallsOpen ? (
+        liveBids.length === 0 && liveAsks.length === 0 ? (
+          <p className="depth-muted depth-wall-split-empty">No resting size within the near-mid band.</p>
+        ) : (
+          <div className="depth-wall-split">
+            <div className="depth-wall-split-col">
+              <p className="depth-wall-split-label">BID</p>
+              <ul className="depth-wall-list depth-wall-list--split">
+                {liveBids.length === 0 ? <li className="depth-muted">—</li> : liveBids.map(renderLiveRow)}
+              </ul>
+            </div>
+            <div className="depth-wall-split-col">
+              <p className="depth-wall-split-label">ASK</p>
+              <ul className="depth-wall-list depth-wall-list--split">
+                {liveAsks.length === 0 ? <li className="depth-muted">—</li> : liveAsks.map(renderLiveRow)}
+              </ul>
+            </div>
           </div>
-          <div className="depth-wall-split-col">
-            <p className="depth-wall-split-label">ASK</p>
-            <ul className="depth-wall-list depth-wall-list--split">
-              {liveAsks.length === 0 ? <li className="depth-muted">—</li> : liveAsks.map(renderLiveRow)}
-            </ul>
-          </div>
-        </div>
-      )}
+        )
+      ) : null}
 
       <h3 className="depth-wall-subhead">
+        <button
+          type="button"
+          className="depth-wall-section-toggle"
+          onClick={toggleTape}
+          aria-expanded={tapeOpen}
+          aria-label={tapeOpen ? 'Collapse wall tape' : 'Expand wall tape'}
+        >
+          <span aria-hidden>{tapeOpen ? '▾' : '▸'}</span>
+        </button>
         <DepthInfoIcon glossaryKey="wallTapeSection" label="Tape" />
       </h3>
-      {tapeBids.length === 0 && tapeAsks.length === 0 ? (
-        <p className="depth-muted depth-wall-split-empty">No recent wall events.</p>
-      ) : (
-        <div className="depth-wall-split">
-          <div className="depth-wall-split-col">
-            <p className="depth-wall-split-label">BID</p>
-            <ul className="depth-wall-list depth-wall-list--split">
-              {tapeBids.length === 0 ? <li className="depth-muted">—</li> : tapeBids.map(renderTapeRow)}
-            </ul>
+      {tapeOpen ? (
+        tapeBids.length === 0 && tapeAsks.length === 0 ? (
+          <p className="depth-muted depth-wall-split-empty">No recent wall events.</p>
+        ) : (
+          <div className="depth-wall-split">
+            <div className="depth-wall-split-col">
+              <p className="depth-wall-split-label">BID</p>
+              <ul className="depth-wall-list depth-wall-list--split">
+                {tapeBids.length === 0 ? <li className="depth-muted">—</li> : tapeBids.map(renderTapeRow)}
+              </ul>
+            </div>
+            <div className="depth-wall-split-col">
+              <p className="depth-wall-split-label">ASK</p>
+              <ul className="depth-wall-list depth-wall-list--split">
+                {tapeAsks.length === 0 ? <li className="depth-muted">—</li> : tapeAsks.map(renderTapeRow)}
+              </ul>
+            </div>
           </div>
-          <div className="depth-wall-split-col">
-            <p className="depth-wall-split-label">ASK</p>
-            <ul className="depth-wall-list depth-wall-list--split">
-              {tapeAsks.length === 0 ? <li className="depth-muted">—</li> : tapeAsks.map(renderTapeRow)}
-            </ul>
-          </div>
-        </div>
-      )}
+        )
+      ) : null}
+
+      <DepthSessionHeatmap micro={micro} />
     </section>
   )
 }

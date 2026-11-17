@@ -8,14 +8,28 @@ export interface Candle {
   close: number
 }
 
+export type BinanceKlineInterval = '1s' | '1m'
+
 /** Binance kline REST — in dev, Vite proxies `/binance-api` to `https://api.binance.com`. */
-export const fetchBinanceBtc1mKlines = async (limit = 200): Promise<Candle[]> => {
+export const fetchBinanceBtcKlines = async (
+  interval: BinanceKlineInterval = '1m',
+  limit = 200,
+  startTime?: number,
+): Promise<Candle[]> => {
   const devPrefix = import.meta.env.DEV ? '/binance-api' : ''
   const prodOrigin = env.binanceApiOrigin
   const base = import.meta.env.DEV ? devPrefix : prodOrigin
   if (!base) return []
 
-  const url = `${base}/api/v3/klines?symbol=BTCUSDT&interval=1m&limit=${limit}`
+  const params = new URLSearchParams({
+    symbol: 'BTCUSDT',
+    interval,
+    limit: String(Math.min(1000, Math.max(1, limit))),
+  })
+  if (startTime != null && Number.isFinite(startTime) && startTime > 0) {
+    params.set('startTime', String(Math.floor(startTime)))
+  }
+  const url = `${base}/api/v3/klines?${params}`
   const res = await fetch(url)
   if (!res.ok) return []
 
@@ -44,3 +58,6 @@ export const fetchBinanceBtc1mKlines = async (limit = 200): Promise<Candle[]> =>
   }
   return out
 }
+
+export const fetchBinanceBtc1mKlines = (limit = 200, startTime?: number): Promise<Candle[]> =>
+  fetchBinanceBtcKlines('1m', limit, startTime)

@@ -6,6 +6,7 @@ import {
   coarsenTimelineGrid,
   DEPTH_BUCKET_MS,
   snapTimelineNow,
+  heatmapCanvasMetricsFit,
   timelineCanvasMetrics,
   timelineDisplayPlan,
   timelineHistoryLayoutCols,
@@ -17,7 +18,15 @@ describe('alignDepthSamplesToGrid', () => {
   it('places samples into buckets by time', () => {
     const bucketCount = 4
     const t0 = now - bucketCount * DEPTH_BUCKET_MS
-    const samples = [{ at: t0 + DEPTH_BUCKET_MS * 0.5, mid: 1, bidNotionalNear: 100, askNotionalNear: 50 }]
+    const samples = [
+      {
+        at: t0 + DEPTH_BUCKET_MS * 0.5,
+        mid: 1,
+        bidNotionalNear: 100,
+        askNotionalNear: 50,
+        priceBuckets: [],
+      },
+    ]
     const grid = alignDepthSamplesToGrid(samples, bucketCount, now, 'connected')
     expect(grid[0].bidNotionalNear).toBe(100)
     expect(grid[0].askNotionalNear).toBe(50)
@@ -32,6 +41,7 @@ describe('alignDepthSamplesToGrid', () => {
         mid: 1,
         bidNotionalNear: 80,
         askNotionalNear: 40,
+        priceBuckets: [],
       },
     ]
     const grid = alignDepthSamplesToGrid(samples, bucketCount, now, 'connected')
@@ -80,7 +90,7 @@ describe('alignDepthSamplesToGrid', () => {
     const rangeEnd = 1_000_000
     const rangeStart = Math.floor((rangeEnd - Math.ceil(bucketCount / groupSize) * groupMs) / groupMs) * groupMs
     const midSlot = rangeStart + groupMs + DEPTH_BUCKET_MS * 0.5
-    const samples = [{ at: midSlot, mid: 1, bidNotionalNear: 77, askNotionalNear: 33 }]
+    const samples = [{ at: midSlot, mid: 1, bidNotionalNear: 77, askNotionalNear: 33, priceBuckets: [] }]
     const a = buildEpochCoarseTimeline(samples, bucketCount, rangeEnd, groupSize, 'connected')
     const b = buildEpochCoarseTimeline(samples, bucketCount, rangeEnd + DEPTH_BUCKET_MS, groupSize, 'connected')
     const col = 1
@@ -93,9 +103,9 @@ describe('alignDepthSamplesToGrid', () => {
     const maxCols = 90
     const now = 1_000_000
     expect(timelineHistoryLayoutCols(null, now, groupSize, maxCols)).toBe(1)
-    const first = now - 8 * 5_000 * 2
+    const first = now - 8 * DEPTH_BUCKET_MS * 2
     expect(timelineHistoryLayoutCols(first, now, groupSize, maxCols)).toBe(3)
-    expect(timelineHistoryLayoutCols(now - 8 * 5_000 * maxCols, now, groupSize, maxCols)).toBe(maxCols)
+    expect(timelineHistoryLayoutCols(now - 8 * DEPTH_BUCKET_MS * maxCols, now, groupSize, maxCols)).toBe(maxCols)
   })
 
   it('fits timeline to viewport until min column width', () => {
@@ -109,10 +119,16 @@ describe('alignDepthSamplesToGrid', () => {
     expect(scroll.colWidth).toBe(8)
   })
 
-  it('reduces 720 buckets to roughly DEPTH_TIMELINE_TARGET_DISPLAY_COLS columns', () => {
-    const plan = timelineDisplayPlan(720)
+  it('reduces 1440 buckets to roughly DEPTH_TIMELINE_TARGET_DISPLAY_COLS columns', () => {
+    const plan = timelineDisplayPlan(1440)
     expect(plan.groupSize).toBeGreaterThan(1)
-    expect(plan.displayCols).toBeLessThanOrEqual(96)
-    expect(plan.canvasWidth).toBeGreaterThanOrEqual(plan.displayCols * 8)
+    expect(plan.displayCols).toBeLessThanOrEqual(180)
+    expect(plan.canvasWidth).toBeGreaterThanOrEqual(plan.displayCols * 6)
+  })
+
+  it('heatmap canvas metrics always fit viewport', () => {
+    const fit = heatmapCanvasMetricsFit(180, 400)
+    expect(fit.width).toBe(400)
+    expect(fit.colWidth).toBeCloseTo(400 / 180)
   })
 })

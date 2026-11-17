@@ -25,7 +25,7 @@ export const DepthPanel = ({ open, onClose, micro, openInterest }: DepthPanelPro
           Close
         </button>
       </div>
-      <div className="depth-panel-scroll" role="region" aria-label="Depth microstructure">
+      <div className="depth-panel-scroll depth-panel-scroll--fill" role="region" aria-label="Depth microstructure">
         <DepthGlobalHeader micro={micro} openInterest={openInterest} />
         <DepthMergedTimeline micro={micro} />
         <DepthConsolidatedWalls micro={micro} />

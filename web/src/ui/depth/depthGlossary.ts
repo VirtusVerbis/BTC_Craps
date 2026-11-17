@@ -21,6 +21,7 @@ export type DepthGlossaryKey =
   | 'timelineWindow'
   | 'wallLiveSection'
   | 'wallTapeSection'
+  | 'depthSessionHeatmap'
   | 'wallDepthChart'
   | 'wallChartMode'
   | 'wallChartXScale'
@@ -79,7 +80,7 @@ export const depthGlossary: Record<DepthGlossaryKey, GlossaryEntry> = {
   },
   timelineHeatmap: {
     title: 'Depth timeline',
-    body: 'Bid vs ask notional near price over the last hour (5-second samples). Bright bands show where size piled up.',
+    body: 'Bid vs ask notional near price over the last hour (~2.5s samples). Bright bands show where size piled up.',
   },
   mergedTimeline: {
     title: 'Merged depth timeline',
@@ -91,11 +92,11 @@ export const depthGlossary: Record<DepthGlossaryKey, GlossaryEntry> = {
   },
   timelineWindow: {
     title: 'Timeline window',
-    body: 'Shows the last 15, 30, or 60 minutes of 5-second depth samples retained in memory.',
+    body: 'Shows the last 15, 30, or 60 minutes of depth samples retained in memory (~2.5s grid).',
   },
   wallDepthChart: {
     title: 'Live book depth',
-    body: 'Cumulative resting liquidity near mid from Binance perp/spot, Coinbase, and Hyperliquid. Refreshes about every 5 seconds with depth sampling.',
+    body: 'Cumulative resting liquidity near mid from Binance perp/spot, Coinbase, and Hyperliquid. Refreshes about every 2.5 seconds with depth sampling.',
     items: [
       {
         label: 'Curves',
@@ -133,6 +134,11 @@ export const depthGlossary: Record<DepthGlossaryKey, GlossaryEntry> = {
     title: 'Live walls',
     body:
       'Largest resting bid and ask within ~50 bps of each venue’s mid—no $500k minimum. Same levels as Live book depth markers; updates every book refresh.',
+  },
+  depthSessionHeatmap: {
+    title: 'Depth heatmap (price × time)',
+    body:
+      'Session-only Coinglass-style view: time across the bottom, BTC USD price up the side ($25 ticks by default). Resting liquidity within ~180 bps of each venue mid is binned at absolute prices and merged across venues; Binance BTCUSDT 1m candles are drawn on top. Brighter depth color = more resting USD; faint dashed line = Binance perp mid. Color scale max ratchets up during the session.',
   },
   wallTapeSection: {
     title: 'Wall tape',

@@ -324,17 +324,24 @@ const drawWallMarkers = (
   }
 }
 
+const BOOK_CHART_STACK_ROW_H = 76
+const BOOK_CHART_OVERLAP_H = 200
+
+const defaultBookChartHeight = (mode: BookChartMode): number =>
+  mode === 'stack' ? BOOK_CHART_STACK_ROW_H * DEPTH_VENUE_ORDER.length + 8 : BOOK_CHART_OVERLAP_H
+
 interface DepthBookChartProps {
   micro: MicrostructureState
   topWalls: WallRecord[]
+  fillAvailableHeight?: boolean
 }
 
-export const DepthBookChart = ({ micro, topWalls }: DepthBookChartProps) => {
+export const DepthBookChart = ({ micro, topWalls, fillAvailableHeight = false }: DepthBookChartProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const [mode, setMode] = useState<BookChartMode>(readBookMode)
   const [xScale, setXScale] = useState<BookChartXScale>(readXScale)
-  const [viewWidth, setViewWidth] = useState(900)
+  const [viewSize, setViewSize] = useState({ w: 900, h: BOOK_CHART_OVERLAP_H })
 
   const bookChartMaxBps =
     xScale === 'stretch' ? DEPTH_BOOK_CHART_STRETCH_MAX_BPS : DEPTH_BOOK_CHART_MAX_BPS
@@ -385,12 +392,20 @@ export const DepthBookChart = ({ micro, topWalls }: DepthBookChartProps) => {
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
-    const measure = () => setViewWidth(Math.max(320, Math.floor(el.clientWidth)))
+    const measure = () => {
+      const w = Math.max(320, Math.floor(el.clientWidth))
+      const baseH = defaultBookChartHeight(mode)
+      const h =
+        fillAvailableHeight && el.clientHeight > 0
+          ? Math.max(baseH, Math.floor(el.clientHeight))
+          : baseH
+      setViewSize({ w, h })
+    }
     measure()
     const ro = new ResizeObserver(measure)
     ro.observe(el)
     return () => ro.disconnect()
-  }, [])
+  }, [fillAvailableHeight, mode])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -398,12 +413,16 @@ export const DepthBookChart = ({ micro, topWalls }: DepthBookChartProps) => {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    const w = viewWidth
-    const stackRowH = 76
-    const h = mode === 'stack' ? stackRowH * DEPTH_VENUE_ORDER.length + 8 : 200
+    const w = viewSize.w
+    const h = viewSize.h
+    const stackRowH =
+      mode === 'stack' && h > defaultBookChartHeight('stack')
+        ? Math.max(BOOK_CHART_STACK_ROW_H, Math.floor((h - 4) / DEPTH_VENUE_ORDER.length))
+        : BOOK_CHART_STACK_ROW_H
     canvas.width = w
     canvas.height = h
     canvas.style.width = '100%'
+    canvas.style.height = fillAvailableHeight ? '100%' : `${h}px`
     ctx.clearRect(0, 0, w, h)
 
     const padX = 4
@@ -413,6 +432,7 @@ export const DepthBookChart = ({ micro, topWalls }: DepthBookChartProps) => {
       venueCurves.forEach(({ venue, curve, sideExtents }, i) => {
         const y = i * stackRowH + 4
         const rowH = stackRowH - 4
+        const venueMaxCum = maxCumulativeBtc([curve])
         const extents = xScale === 'stretch' ? sideExtents : { bidExtentBps: 0, askExtentBps: 0 }
         drawVenueChart(
           ctx,
@@ -424,7 +444,7 @@ export const DepthBookChart = ({ micro, topWalls }: DepthBookChartProps) => {
           rowH,
           xScale,
           extents,
-          maxCum,
+          venueMaxCum,
           depthVenueShort[venue],
         )
         const venueWalls = topWalls.filter((wal) => wal.venue === venue)
@@ -438,7 +458,7 @@ export const DepthBookChart = ({ micro, topWalls }: DepthBookChartProps) => {
           rowH,
           xScale,
           extents,
-          maxCum,
+          venueMaxCum,
           rowH - 18,
           { [venue]: curve },
         )
@@ -532,7 +552,7 @@ export const DepthBookChart = ({ micro, topWalls }: DepthBookChartProps) => {
         drawFixedAxisLabels(ctx, padX, chartW, DEPTH_BOOK_CHART_MAX_BPS, h - 6)
       }
     }
-  }, [micro, mode, xScale, topWalls, viewWidth, maxCum, venueCurves, venueExtentsById])
+  }, [micro, mode, xScale, topWalls, viewSize, fillAvailableHeight, maxCum, venueCurves, venueExtentsById])
 
   const captionBps =
     xScale === 'stretch'
@@ -542,7 +562,7 @@ export const DepthBookChart = ({ micro, topWalls }: DepthBookChartProps) => {
       : `±${DEPTH_BOOK_CHART_MAX_BPS} bps fixed`
 
   return (
-    <div className="depth-book-chart-wrap">
+    <div className={fillAvailableHeight ? 'depth-book-chart-wrap depth-book-chart-wrap--grow' : 'depth-book-chart-wrap'}>
       <div className="depth-timeline-toolbar">
         <DepthInfoIcon glossaryKey="wallDepthChart" label="Live book depth" />
         <div className="depth-timeline-legend">
@@ -579,11 +599,18 @@ export const DepthBookChart = ({ micro, topWalls }: DepthBookChartProps) => {
           </button>
         </div>
       </div>
-      <div ref={scrollRef} className="depth-timeline-scroll" role="img" aria-label="Cumulative depth chart">
-        <canvas ref={canvasRef} className="depth-timeline-canvas depth-book-chart-canvas" width={900} height={200} />
+      <div
+        ref={scrollRef}
+        className={
+          fillAvailableHeight ? 'depth-timeline-scroll depth-book-chart-scroll-grow' : 'depth-timeline-scroll'
+        }
+        role="img"
+        aria-label="Cumulative depth chart"
+      >
+        <canvas ref={canvasRef} className="depth-timeline-canvas depth-book-chart-canvas" width={900} height={viewSize.h} />
       </div>
       <p className="depth-muted depth-timeline-caption">
-        Refreshes ~5s · X = bps from mid ({captionBps}) · Y = cumulative BTC · X scale
+        Refreshes ~2.5s · X = bps from mid ({captionBps}) · Y = cumulative BTC · X scale
       </p>
     </div>
   )

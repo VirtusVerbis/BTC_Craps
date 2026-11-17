@@ -16,6 +16,7 @@ import {
   type TimelineGridCell,
   type TimelineScaleState,
 } from '../../data/microstructure/depthTimelineGrid'
+import { DEPTH_BUCKET_MS } from '../../data/microstructure/depthDisplayConstants'
 import type { MicrostructureState, VenueId } from '../../data/microstructure/types'
 import { formatWallUsd } from './depthWallRowMetrics'
 import { DepthInfoIcon } from './DepthInfoIcon'
@@ -326,7 +327,8 @@ export const DepthMergedTimeline = ({ micro }: DepthMergedTimelineProps) => {
       </div>
       <p className="depth-muted depth-timeline-caption">
         Bids above · asks below · Y: USD notional within 50 bps of mid (full band height) · columns ≈{' '}
-        {displayPlan.groupSize * 5}s · widens to fit until {DEPTH_TIMELINE_MIN_COL_PX}px cols · stack sums venues per
+        {displayPlan.groupSize * (DEPTH_BUCKET_MS / 1000)}s · widens to fit until {DEPTH_TIMELINE_MIN_COL_PX}px cols ·
+        stack sums venues per
         column
       </p>
     </section>

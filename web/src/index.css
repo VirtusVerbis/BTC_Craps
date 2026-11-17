@@ -2513,6 +2513,25 @@ html.shooter-gesture-lock body {
   line-height: var(--depth-line-height);
 }
 
+.depth-panel-scroll--fill {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding-bottom: 0.85rem;
+}
+
+.depth-panel-scroll--fill > .depth-global,
+.depth-panel-scroll--fill > .depth-merged-timeline {
+  flex-shrink: 0;
+}
+
+.depth-panel-scroll--fill > .depth-consolidated-walls {
+  flex: 1;
+  min-height: 0;
+  margin-bottom: 0;
+}
+
 .depth-global,
 .depth-venue-block {
   margin-bottom: 1.25rem;
@@ -2699,6 +2718,136 @@ html.shooter-gesture-lock body {
   font-size: var(--depth-font-sm);
 }
 
+.depth-consolidated-walls {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.depth-consolidated-walls > :not(.depth-session-heatmap):not(.depth-book-chart-wrap) {
+  flex-shrink: 0;
+}
+
+.depth-consolidated-walls:not(.depth-consolidated-walls--charts-grow) .depth-book-chart-wrap {
+  flex-shrink: 0;
+}
+
+.depth-consolidated-walls--charts-grow .depth-book-chart-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.depth-book-chart-wrap--grow .depth-book-chart-scroll-grow {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.depth-book-chart-wrap--grow .depth-book-chart-canvas {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+}
+
+.depth-consolidated-walls--charts-grow .depth-session-heatmap {
+  flex: 1;
+}
+
+.depth-session-heatmap {
+  margin-top: 0.75rem;
+  max-width: 100%;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.depth-session-heatmap .depth-timeline-toolbar,
+.depth-session-heatmap .depth-timeline-caption {
+  flex-shrink: 0;
+}
+
+.depth-session-heatmap .depth-timeline-chart-row {
+  flex: 1;
+  min-height: 12.5rem;
+  max-width: 100%;
+  min-width: 0;
+  align-items: stretch;
+}
+
+.depth-heatmap-scroll-fit {
+  overflow: hidden;
+  max-width: 100%;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.depth-session-heatmap .depth-heatmap-price-axis {
+  flex-shrink: 0;
+  min-height: 0;
+  align-self: stretch;
+}
+
+.depth-heatmap-legend {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--depth-font-sm);
+  color: rgba(246, 240, 218, 0.82);
+}
+
+.depth-heatmap-legend-label {
+  white-space: nowrap;
+}
+
+.depth-heatmap-legend-ramp {
+  flex: 1 1 6rem;
+  max-width: 10rem;
+  height: 0.55rem;
+  border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    rgb(10, 14, 23) 0%,
+    rgb(30, 58, 95) 22%,
+    rgb(45, 212, 191) 48%,
+    rgb(251, 191, 36) 72%,
+    rgb(239, 68, 68) 100%
+  );
+  border: 1px solid rgba(246, 240, 218, 0.2);
+}
+
+.depth-heatmap-legend-max {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.depth-heatmap-price-axis .depth-timeline-axis-tick {
+  font-size: 0.62rem;
+  max-width: 4.5rem;
+  text-align: right;
+  line-height: 1.15;
+}
+
+.depth-heatmap-canvas {
+  min-height: 0;
+  max-width: 100%;
+  width: 100%;
+  height: 100%;
+  flex: 1;
+  display: block;
+}
+
 .depth-book-chart-wrap {
   margin: 0.5rem 0 1rem;
 }
@@ -2708,14 +2857,34 @@ html.shooter-gesture-lock body {
   min-height: 4rem;
 }
 
-.depth-consolidated-walls {
-  margin-bottom: 1.25rem;
-}
-
 .depth-wall-subhead {
   margin: 0.75rem 0 0.35rem;
   font-size: var(--depth-font-base);
   font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.depth-wall-section-toggle {
+  border: 0;
+  background: transparent;
+  color: rgba(246, 240, 218, 0.85);
+  font: inherit;
+  font-size: 1.05em;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.15rem 0.35rem 0.15rem 0;
+  border-radius: 4px;
+}
+
+.depth-wall-section-toggle:hover {
+  background: rgba(246, 240, 218, 0.08);
+}
+
+.depth-wall-section-toggle:focus-visible {
+  outline: 2px solid rgba(247, 147, 26, 0.75);
+  outline-offset: 2px;
 }
 
 .depth-wall-split {

@@ -33,6 +33,8 @@ export interface DepthSample {
   mid: number
   bidNotionalNear: number
   askNotionalNear: number
+  /** Resting USD at tick-aligned absolute prices (heatmap). */
+  priceBuckets: { p: number; usd: number }[]
 }
 
 export interface TakerRollup {

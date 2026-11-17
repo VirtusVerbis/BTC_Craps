@@ -239,4 +239,14 @@ export const timelineCanvasMetrics = (
   return { width: packedW, colWidth: minColPx, scrollable: true }
 }
 
+/** Heatmap: always fit viewport width (no horizontal chart scroll). */
+export const heatmapCanvasMetricsFit = (
+  layoutCols: number,
+  viewWidth: number,
+): { width: number; colWidth: number } => {
+  const cols = Math.max(1, layoutCols)
+  const w = Math.max(1, viewWidth)
+  return { width: w, colWidth: w / cols }
+}
+
 export { DEPTH_TIMELINE_MIN_COL_PX }

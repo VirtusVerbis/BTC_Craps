@@ -8,16 +8,19 @@ import { RingBuffer } from './ringBuffer'
 import { TakerRollup15m } from './takerRollup'
 import type { BookLevel, FeedStatus, MicrostructureState, VenueId, VenueSnapshot } from './types'
 import { HL_TRADES_SUBSCRIBE, parseHyperliquidTradesMessage } from './hyperliquidTrades'
+import {
+  DEPTH_EMIT_MS,
+  DEPTH_SAMPLE_CAP,
+  DEPTH_SAMPLE_MS,
+} from './depthDisplayConstants'
+import { binBookToPriceBuckets } from './depthHeatmapPriceBins'
 import { WALL_BAND_BPS, WallTracker, bandNotional } from './wallTracker'
 
 const HL_TRADE_TID_CAP = 4_000
 
-const SAMPLE_MS = 5_000
 const HL_META_MS = 30_000
-const EMIT_MS = 2_500
 /** REST level-2 book when WS handshake fails or Strict Mode aborts the socket. */
 const COINBASE_BOOK_REST_MS = 10_000
-const DEPTH_SAMPLE_CAP = 720
 
 const emptyVenue = (venue: VenueId): VenueSnapshot => ({
   venue,
@@ -65,7 +68,16 @@ export class MicrostructureService {
     hyperliquid: new WallTracker('hyperliquid'),
   }
 
-  private readonly depthSamples: Record<VenueId, RingBuffer<{ at: number; mid: number; bid: number; ask: number }>> = {
+  private readonly depthSamples: Record<
+    VenueId,
+    RingBuffer<{
+      at: number
+      mid: number
+      bid: number
+      ask: number
+      priceBuckets: { p: number; usd: number }[]
+    }>
+  > = {
     binancePerp: new RingBuffer(DEPTH_SAMPLE_CAP),
     binanceSpot: new RingBuffer(DEPTH_SAMPLE_CAP),
     coinbase: new RingBuffer(DEPTH_SAMPLE_CAP),
@@ -207,10 +219,10 @@ export class MicrostructureService {
     void this.pollHyperliquid()
 
     if (this.sampleTimer === null) {
-      this.sampleTimer = window.setInterval(() => this.sampleVenues(), SAMPLE_MS)
+      this.sampleTimer = window.setInterval(() => this.sampleVenues(), DEPTH_SAMPLE_MS)
     }
     if (this.emitTimer === null) {
-      this.emitTimer = window.setInterval(() => this.emit(), EMIT_MS)
+      this.emitTimer = window.setInterval(() => this.emit(), DEPTH_EMIT_MS)
     }
     if (this.hlTimer === null) {
       this.hlTimer = window.setInterval(() => void this.pollHyperliquid(), HL_META_MS)
@@ -312,6 +324,7 @@ export class MicrostructureService {
       mid,
       bid: bandNotional(mid, bids, WALL_BAND_BPS),
       ask: bandNotional(mid, asks, WALL_BAND_BPS),
+      priceBuckets: binBookToPriceBuckets(mid, bids, asks),
     })
   }
 
@@ -446,6 +459,7 @@ export class MicrostructureService {
           mid: s.mid,
           bidNotionalNear: s.bid,
           askNotionalNear: s.ask,
+          priceBuckets: s.priceBuckets,
         })),
         bookBids: this.chartBooks[venue].bids,
         bookAsks: this.chartBooks[venue].asks,
