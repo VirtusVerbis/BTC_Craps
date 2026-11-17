@@ -19,18 +19,21 @@ export type BookChartXScale = 'fixed' | 'stretch'
 
 const readBookMode = (): BookChartMode => {
   try {
-    return sessionStorage.getItem(STORAGE_BOOK_MODE) === 'overlap' ? 'overlap' : 'stack'
+    const v = sessionStorage.getItem(STORAGE_BOOK_MODE)
+    if (v === 'stack') return 'stack'
+    return 'overlap'
   } catch {
-    return 'stack'
+    return 'overlap'
   }
 }
 
 const readXScale = (): BookChartXScale => {
   try {
     const v = sessionStorage.getItem(STORAGE_BOOK_X_SCALE)
-    return v === 'stretch' || v === 'fit' ? 'stretch' : 'fixed'
+    if (v === 'fixed') return 'fixed'
+    return 'stretch'
   } catch {
-    return 'fixed'
+    return 'stretch'
   }
 }
 

@@ -49,9 +49,10 @@ const readWindowMin = (): TimelineWindowMin => {
     const v = sessionStorage.getItem(STORAGE_WINDOW)
     if (v === '15') return 15
     if (v === '30') return 30
-    return 60
+    if (v === '60') return 60
+    return 15
   } catch {
-    return 60
+    return 15
   }
 }
 

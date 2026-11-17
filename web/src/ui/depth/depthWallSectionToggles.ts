@@ -3,21 +3,17 @@ const STORAGE_TAPE_OPEN = 'depthTapeOpen'
 
 export const readLiveWallsOpen = (): boolean => {
   try {
-    const v = sessionStorage.getItem(STORAGE_LIVE_OPEN)
-    if (v === '0') return false
-    return true
+    return sessionStorage.getItem(STORAGE_LIVE_OPEN) === '1'
   } catch {
-    return true
+    return false
   }
 }
 
 export const readTapeOpen = (): boolean => {
   try {
-    const v = sessionStorage.getItem(STORAGE_TAPE_OPEN)
-    if (v === '0') return false
-    return true
+    return sessionStorage.getItem(STORAGE_TAPE_OPEN) === '1'
   } catch {
-    return true
+    return false
   }
 }
 
