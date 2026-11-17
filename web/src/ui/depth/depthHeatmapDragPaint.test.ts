@@ -27,13 +27,33 @@ describe('carriedUsdPerColumnForRow', () => {
     expect(usd).toEqual([5_000_000, 5_000_000, 5_000_000])
   })
 
-  it('clears when a sample has no liquidity on that row', () => {
+  it('holds carry when non-gap column has no bucket snapshot', () => {
     const columns = [
       col(false, [{ p: wallPrice, usd: 3_000_000 }]),
       col(false, []),
       col(false, [{ p: wallPrice, usd: 1_000_000 }]),
     ]
     const usd = carriedUsdPerColumnForRow(columns, row, axis)
-    expect(usd).toEqual([3_000_000, 0, 1_000_000])
+    expect(usd).toEqual([3_000_000, 3_000_000, 1_000_000])
+  })
+
+  it('holds carry when bucketed sample has liquidity elsewhere but not on that price row', () => {
+    const columns = [
+      col(false, [{ p: wallPrice, usd: 3_000_000 }]),
+      col(false, [{ p: 99_950, usd: 500_000 }]),
+      col(false, [{ p: wallPrice, usd: 1_000_000 }]),
+    ]
+    const usd = carriedUsdPerColumnForRow(columns, row, axis)
+    expect(usd).toEqual([3_000_000, 3_000_000, 1_000_000])
+  })
+
+  it('clears when snapshot includes the price tick with zero USD', () => {
+    const columns = [
+      col(false, [{ p: wallPrice, usd: 3_000_000 }]),
+      col(false, [{ p: wallPrice, usd: 0 }]),
+      col(false, [{ p: wallPrice, usd: 2_000_000 }]),
+    ]
+    const usd = carriedUsdPerColumnForRow(columns, row, axis)
+    expect(usd).toEqual([3_000_000, 0, 2_000_000])
   })
 })
