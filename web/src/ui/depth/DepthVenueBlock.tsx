@@ -75,7 +75,6 @@ export const DepthVenueBlock = ({ snapshot }: DepthVenueBlockProps) => {
         </span>
       </p>
 
-      <DepthInfoIcon glossaryKey="wallRadar" label="Wall radar" />
       <ul className="depth-wall-list">
         {snapshot.activeWalls.length === 0 && snapshot.recentEvents.length === 0 ? (
           <li className="depth-muted">No large walls in band.</li>

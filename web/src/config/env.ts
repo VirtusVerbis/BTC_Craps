@@ -50,6 +50,8 @@ export const env = {
   hyperliquidInfoUrl:
     (import.meta.env.VITE_HL_INFO_URL as string | undefined) ??
     'https://api.hyperliquid.xyz/info',
+  hyperliquidWsUrl:
+    (import.meta.env.VITE_HL_WS_URL as string | undefined) ?? 'wss://api.hyperliquid.xyz/ws',
   binanceFapiOrigin:
     (import.meta.env.VITE_BINANCE_FAPI_ORIGIN as string | undefined) ??
     'https://fapi.binance.com',

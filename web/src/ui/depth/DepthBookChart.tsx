@@ -90,6 +90,51 @@ const drawFixedAxisLabels = (
   ctx.fillText(`+${maxBps}`, x + w - 26, labelY)
 }
 
+const CURVE_LABEL_FONT = '11px sans-serif'
+const CURVE_LABEL_LINE_H = 13
+
+const venueLabelColor = (venue: VenueId, side: 'bid' | 'ask'): string => {
+  const raw = side === 'bid' ? depthVenueColorBid[venue] : depthVenueColorAsk[venue]
+  return raw.replace(/,\s*[\d.]+\)$/, ', 0.95)')
+}
+
+const venueSideMaxCumulative = (points: readonly { bps: number; cumulativeBtc: number }[]): number =>
+  points.length > 0 ? points[points.length - 1].cumulativeBtc : 0
+
+interface CurveLabelSpec {
+  venue: VenueId
+  side: 'bid' | 'ask'
+  text: string
+  x: number
+  y: number
+  color: string
+}
+
+const resolveLabelCollisions = (labels: CurveLabelSpec[], minY: number, maxY: number): void => {
+  if (labels.length === 0) return
+  labels.sort((a, b) => a.y - b.y)
+  for (let i = 1; i < labels.length; i++) {
+    const minYNext = labels[i - 1].y + CURVE_LABEL_LINE_H
+    if (labels[i].y < minYNext) labels[i].y = minYNext
+  }
+  if (labels[labels.length - 1].y > maxY) {
+    const overflow = labels[labels.length - 1].y - maxY
+    for (const label of labels) label.y -= overflow
+  }
+  if (labels[0].y < minY) {
+    const under = minY - labels[0].y
+    for (const label of labels) label.y += under
+  }
+}
+
+const paintCurveLabels = (ctx: CanvasRenderingContext2D, labels: readonly CurveLabelSpec[]) => {
+  ctx.font = CURVE_LABEL_FONT
+  for (const spec of labels) {
+    ctx.fillStyle = spec.color
+    ctx.fillText(spec.text, spec.x, spec.y)
+  }
+}
+
 const drawCurve = (
   ctx: CanvasRenderingContext2D,
   points: { bps: number; cumulativeBtc: number }[],
@@ -103,6 +148,8 @@ const drawCurve = (
   maxCum: number,
   fillStyle: string,
   side: 'bid' | 'ask',
+  venue?: VenueId,
+  labelCollector?: CurveLabelSpec[],
 ) => {
   if (points.length < 2) return
   const pointX = (bps: number) => xFromBps(midX, halfW, bps, xScale, fixedMaxBps, sideExtents)
@@ -131,11 +178,22 @@ const drawCurve = (
     else ctx.lineTo(px, py)
   }
   ctx.stroke()
-  if (last.cumulativeBtc > 0) {
-    ctx.fillStyle = 'rgba(246, 240, 218, 0.75)'
-    ctx.font = '11px sans-serif'
-    const textX = side === 'bid' ? lastX + 4 : lastX - 52
-    ctx.fillText(`${last.cumulativeBtc.toFixed(1)} BTC`, textX, baseY - chartH * 0.5)
+  if (last.cumulativeBtc > 0 && venue) {
+    const labelY = baseY - (last.cumulativeBtc / maxCum) * chartH - 2
+    const text = `${depthVenueShort[venue]} ${last.cumulativeBtc.toFixed(1)} BTC`
+    const color = venueLabelColor(venue, side)
+    ctx.font = CURVE_LABEL_FONT
+    const textW = ctx.measureText(text).width
+    const textX =
+      side === 'bid'
+        ? Math.min(lastX + 4, midX - textW - 6)
+        : Math.max(lastX - textW - 4, midX + 6)
+    const spec: CurveLabelSpec = { venue, side, text, x: textX, y: labelY, color }
+    if (labelCollector) labelCollector.push(spec)
+    else {
+      ctx.fillStyle = color
+      ctx.fillText(text, textX, labelY)
+    }
   }
 }
 
@@ -187,6 +245,7 @@ const drawVenueChart = (
     maxCum,
     bidFill,
     'bid',
+    snap.venue,
   )
   drawCurve(
     ctx,
@@ -201,12 +260,17 @@ const drawVenueChart = (
     maxCum,
     askFill,
     'ask',
+    snap.venue,
   )
 
   if (xScale === 'stretch') {
     drawStretchAxisLabels(ctx, x, w, y + h - 1, sideExtents.bidExtentBps, sideExtents.askExtentBps)
   }
 }
+
+type VenueCurve = { bids: { bps: number; cumulativeBtc: number }[]; asks: { bps: number; cumulativeBtc: number }[] }
+
+const WALL_MARKER_MIN_PX = 6
 
 const drawWallMarkers = (
   ctx: CanvasRenderingContext2D,
@@ -218,6 +282,9 @@ const drawWallMarkers = (
   h: number,
   xScale: BookChartXScale,
   sideExtents: CurveSideExtents,
+  maxCum: number,
+  chartInnerH: number,
+  curvesByVenue: Readonly<Partial<Record<VenueId, VenueCurve>>>,
   venueExtents?: Readonly<Partial<Record<VenueId, CurveSideExtents>>>,
 ) => {
   const midX = x + w / 2
@@ -231,15 +298,29 @@ const drawWallMarkers = (
     if (xScale === 'fixed' && Math.abs(bps) > DEPTH_BOOK_CHART_MAX_BPS) continue
     const extents = venueExtents?.[wall.venue] ?? sideExtents
     const px = xFromBps(midX, halfW, bps, xScale, DEPTH_BOOK_CHART_MAX_BPS, extents)
+    const curve = curvesByVenue[wall.venue]
+    const points = curve ? (wall.side === 'bid' ? curve.bids : curve.asks) : []
+    const venueMaxCum = venueSideMaxCumulative(points)
+    const topY =
+      venueMaxCum > 0
+        ? baseY - (venueMaxCum / maxCum) * chartInnerH
+        : baseY - WALL_MARKER_MIN_PX
     ctx.strokeStyle = wall.side === 'bid' ? 'rgba(76, 175, 80, 0.9)' : 'rgba(244, 67, 54, 0.9)'
     ctx.setLineDash([3, 3])
     ctx.beginPath()
-    ctx.moveTo(px, y + 16)
+    ctx.moveTo(px, topY)
     ctx.lineTo(px, baseY)
     ctx.stroke()
     ctx.setLineDash([])
-    ctx.fillStyle = 'rgba(255, 235, 120, 0.95)'
-    ctx.fillText(`${depthVenueShort[wall.venue]} ${wall.side === 'bid' ? 'B' : 'A'}`, px + 2, y + 26)
+    const text = `${depthVenueShort[wall.venue]} ${wall.side === 'bid' ? 'B' : 'A'}`
+    ctx.fillStyle = venueLabelColor(wall.venue, wall.side)
+    const textW = ctx.measureText(text).width
+    const labelY = topY - 2
+    const labelX =
+      wall.side === 'bid'
+        ? Math.min(px + 3, midX - textW - 4)
+        : Math.max(px - textW - 3, midX + 4)
+    ctx.fillText(text, labelX, labelY)
   }
 }
 
@@ -347,7 +428,20 @@ export const DepthBookChart = ({ micro, topWalls }: DepthBookChartProps) => {
           depthVenueShort[venue],
         )
         const venueWalls = topWalls.filter((wal) => wal.venue === venue)
-        drawWallMarkers(ctx, venueWalls, micro.venues, padX, y, chartW, rowH, xScale, extents)
+        drawWallMarkers(
+          ctx,
+          venueWalls,
+          micro.venues,
+          padX,
+          y,
+          chartW,
+          rowH,
+          xScale,
+          extents,
+          maxCum,
+          rowH - 18,
+          { [venue]: curve },
+        )
       })
       if (xScale === 'fixed') {
         drawFixedAxisLabels(ctx, padX, chartW, DEPTH_BOOK_CHART_MAX_BPS, h - 2)
@@ -370,6 +464,11 @@ export const DepthBookChart = ({ micro, topWalls }: DepthBookChartProps) => {
       ctx.lineTo(midX, y + chartH)
       ctx.stroke()
 
+      const bidLabels: CurveLabelSpec[] = []
+      const askLabels: CurveLabelSpec[] = []
+      const labelMinY = y + 14
+      const labelMaxY = baseY - 4
+
       for (const { venue, curve, sideExtents } of venueCurves) {
         const bidFill = depthVenueColorBid[venue].replace(/[\d.]+\)$/, '0.22)')
         const askFill = depthVenueColorAsk[venue].replace(/[\d.]+\)$/, '0.22)')
@@ -387,6 +486,8 @@ export const DepthBookChart = ({ micro, topWalls }: DepthBookChartProps) => {
           maxCum,
           bidFill,
           'bid',
+          venue,
+          bidLabels,
         )
         drawCurve(
           ctx,
@@ -401,8 +502,17 @@ export const DepthBookChart = ({ micro, topWalls }: DepthBookChartProps) => {
           maxCum,
           askFill,
           'ask',
+          venue,
+          askLabels,
         )
       }
+
+      resolveLabelCollisions(bidLabels, labelMinY, labelMaxY)
+      resolveLabelCollisions(askLabels, labelMinY, labelMaxY)
+      paintCurveLabels(ctx, bidLabels)
+      paintCurveLabels(ctx, askLabels)
+      const curvesByVenue: Partial<Record<VenueId, VenueCurve>> = {}
+      for (const { venue, curve } of venueCurves) curvesByVenue[venue] = curve
       drawWallMarkers(
         ctx,
         topWalls,
@@ -413,6 +523,9 @@ export const DepthBookChart = ({ micro, topWalls }: DepthBookChartProps) => {
         chartH,
         xScale,
         fixedExtents,
+        maxCum,
+        chartHInner,
+        curvesByVenue,
         xScale === 'stretch' ? venueExtentsById : undefined,
       )
       if (xScale === 'fixed') {
@@ -470,8 +583,7 @@ export const DepthBookChart = ({ micro, topWalls }: DepthBookChartProps) => {
         <canvas ref={canvasRef} className="depth-timeline-canvas depth-book-chart-canvas" width={900} height={200} />
       </div>
       <p className="depth-muted depth-timeline-caption">
-        Refreshes ~5s · X = bps from mid ({captionBps}) · Y = cumulative BTC ·{' '}
-        <DepthInfoIcon glossaryKey="wallChartXScale" label="X scale" />
+        Refreshes ~5s · X = bps from mid ({captionBps}) · Y = cumulative BTC · X scale
       </p>
     </div>
   )

@@ -4,7 +4,6 @@ import { DEPTH_PANEL_SLIDE_MS } from './depthConstants'
 import { DepthConsolidatedWalls } from './DepthConsolidatedWalls'
 import { DepthGlobalHeader } from './DepthGlobalHeader'
 import { DepthMergedTimeline } from './DepthMergedTimeline'
-import { DepthVenueStrip } from './DepthVenueStrip'
 
 interface DepthPanelProps {
   open: boolean
@@ -30,7 +29,6 @@ export const DepthPanel = ({ open, onClose, micro, openInterest }: DepthPanelPro
         <DepthGlobalHeader micro={micro} openInterest={openInterest} />
         <DepthMergedTimeline micro={micro} />
         <DepthConsolidatedWalls micro={micro} />
-        <DepthVenueStrip micro={micro} />
       </div>
     </div>
   )

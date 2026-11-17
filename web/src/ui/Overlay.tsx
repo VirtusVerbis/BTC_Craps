@@ -6,6 +6,7 @@ import type { MarketSnapshot } from '../game/types'
 import { mobileAssetManifest } from './mobileAssetManifest'
 import { resolveMobileAssetUrl } from './mobileAssetUrls'
 import { formatElapsed, formatExchangePriceLabel, formatLiqBtc, formatLiqUsd } from './format'
+import { FeedGlyph } from './FeedGlyph'
 import { HotShooterTicker } from './HotShooterTicker'
 import { LiqTicker } from './LiqTicker'
 import { NewShooterBanner, ShooterWipedBanner } from './NewShooterBanner'
@@ -101,21 +102,6 @@ const deriveEffectiveStatus = (
   if (raw === 'connected' || raw === 'connecting') return raw
   const hasLiveData = (Number.isFinite(price) && price > 0) || buyVolume > 0 || sellVolume > 0
   return hasLiveData ? 'connected' : 'disconnected'
-}
-
-const FeedGlyph = ({ status }: { status: FeedStatus }) => {
-  const on = status === 'connected'
-  const color = on ? '#4caf50' : status === 'connecting' ? '#ffc107' : '#757575'
-  return (
-    <span className="feed-glyph" style={{ color }} title={status} aria-hidden>
-      <svg className="feed-glyph-svg" viewBox="0 0 24 24" role="img" aria-label="wifi status">
-        <path
-          fill="currentColor"
-          d="M12 18.5a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2Zm0-2.8a5.9 5.9 0 0 1 4.2 1.8l1.3-1.4a7.8 7.8 0 0 0-11 0l1.3 1.4A5.9 5.9 0 0 1 12 15.7Zm0-4.4a10.2 10.2 0 0 1 7.3 3l1.3-1.4a12.1 12.1 0 0 0-17.2 0l1.3 1.4a10.2 10.2 0 0 1 7.3-3Zm0-4.4c-4 0-7.8 1.6-10.6 4.4L2.7 8.7a14.9 14.9 0 0 1 18.6 0l1.3-1.4A14.8 14.8 0 0 0 12 6.9Z"
-        />
-      </svg>
-    </span>
-  )
 }
 
 const VolumeBar = ({

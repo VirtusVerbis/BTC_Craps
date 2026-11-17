@@ -4,7 +4,6 @@ export type DepthGlossaryKey =
   | 'longShortRatio'
   | 'liquidationsBar'
   | 'takerFlow15m'
-  | 'wallRadar'
   | 'wallPulled'
   | 'wallAtTouch'
   | 'wallConsumed'
@@ -22,14 +21,19 @@ export type DepthGlossaryKey =
   | 'timelineWindow'
   | 'wallLiveSection'
   | 'wallTapeSection'
-  | 'venueStrip'
   | 'wallDepthChart'
   | 'wallChartMode'
   | 'wallChartXScale'
 
+export interface GlossaryItem {
+  label: string
+  detail: string
+}
+
 export interface GlossaryEntry {
   title: string
   body: string
+  items?: readonly GlossaryItem[]
 }
 
 export const depthGlossary: Record<DepthGlossaryKey, GlossaryEntry> = {
@@ -53,10 +57,6 @@ export const depthGlossary: Record<DepthGlossaryKey, GlossaryEntry> = {
     title: 'Taker flow (15m)',
     body: 'Net aggressive buy vs sell volume over the last 15 minutes on this venue’s tape. Taker buys lift offers; taker sells hit bids.',
   },
-  wallRadar: {
-    title: 'Wall radar',
-    body: 'Large resting limit size near the current price on this order book. Walls can be real liquidity or quotes that disappear before they trade.',
-  },
   wallPulled: {
     title: 'Pulled',
     body: 'Size fell before price reached the level—quote was removed, not filled.',
@@ -74,8 +74,8 @@ export const depthGlossary: Record<DepthGlossaryKey, GlossaryEntry> = {
     body: 'After a bid (or ask) vanished, a large opposite-side quote appeared at the same price.',
   },
   feedStatus: {
-    title: 'Feed status',
-    body: 'Whether live data from this venue is connected. Disconnected rows may be stale or empty.',
+    title: 'Live feeds',
+    body: 'Wifi icon on each venue: green live, amber reconnecting, gray disconnected (same as the main overlay). Mids update with depth sampling; stale feeds may show Mid — or zero taker flow.',
   },
   timelineHeatmap: {
     title: 'Depth timeline',
@@ -83,7 +83,7 @@ export const depthGlossary: Record<DepthGlossaryKey, GlossaryEntry> = {
   },
   mergedTimeline: {
     title: 'Merged depth timeline',
-    body: 'All venues on one clock: bids above the midline, asks below. A bright line marks the bid/ask split at mid. Columns are fixed wall-clock slices (merged 5s samples). Older slices keep the same height until that interval’s sample changes; Y scale only ratchets up during the session so new spikes do not shrink history.',
+    body: 'All venues on one clock: bids above the midline, asks below. Each column is a time slice; bar height is USD notional resting within 50 bps of that venue’s mid (sum of price × size on that side). The left axis shows the session scale max—a full band height in overlap. In stack, venue bands add so a column can exceed one band height. Y only ratchets up during the session so history does not shrink when a new spike appears.',
   },
   timelineLayerMode: {
     title: 'Overlap vs stack',
@@ -94,8 +94,32 @@ export const depthGlossary: Record<DepthGlossaryKey, GlossaryEntry> = {
     body: 'Shows the last 15, 30, or 60 minutes of 5-second depth samples retained in memory.',
   },
   wallDepthChart: {
-    title: 'Cumulative book depth',
-    body: 'Resting size from the L2 book near mid, refreshed about every 5 seconds (same as depth sampling). Under the hood, quotes can change faster on the wire; this view is smoothed for readability. X is bps from mid; Y is cumulative BTC.',
+    title: 'Live book depth',
+    body: 'Cumulative resting liquidity near mid from Binance perp/spot, Coinbase, and Hyperliquid. Refreshes about every 5 seconds with depth sampling.',
+    items: [
+      {
+        label: 'Curves',
+        detail: 'Bid (left) and ask (right) from mid; height is cumulative BTC; colors match the venue legend.',
+      },
+      {
+        label: 'Wall dashes',
+        detail:
+          'Largest bid (green) and ask (red) within ~50 bps per venue—same as Live walls (no $500k tape minimum).',
+      },
+      {
+        label: 'Dash position',
+        detail:
+          'Across: bps where that level sits. Up: that venue’s full cumulative depth on that side (top of the colored curve), for visibility.',
+      },
+      {
+        label: 'Labels',
+        detail: 'BN-P B / HL A etc. in venue legend colors.',
+      },
+      {
+        label: 'Layout',
+        detail: 'Stack, overlap, fixed bps, and stretch are explained by the other i buttons on this chart.',
+      },
+    ],
   },
   wallChartMode: {
     title: 'Stack vs overlap (book)',
@@ -107,15 +131,24 @@ export const depthGlossary: Record<DepthGlossaryKey, GlossaryEntry> = {
   },
   wallLiveSection: {
     title: 'Live walls',
-    body: 'Large resting size still in the book near each venue’s price, sorted by notional (largest first). Updates as quotes change.',
+    body:
+      'Largest resting bid and ask within ~50 bps of each venue’s mid—no $500k minimum. Same levels as Live book depth markers; updates every book refresh.',
   },
   wallTapeSection: {
     title: 'Wall tape',
-    body: 'Recent wall events across venues, newest first: pulled, at touch, consumed, or flipped.',
-  },
-  venueStrip: {
-    title: 'Venue strip',
-    body: 'Compact feed status, mid price, and 15m taker net per venue. Hyperliquid includes OI and funding.',
+    body: 'Tape shows finished walls (largest peak size first, BID and ASK columns).',
+    items: [
+      { label: 'Pulled', detail: 'Quote removed before price hit.' },
+      {
+        label: 'At touch',
+        detail: 'Size collapsed while price was near the wall (fill vs cancel unknown on L2).',
+      },
+      { label: 'Consumed', detail: 'Liquidity traded or absorbed.' },
+      {
+        label: 'Flipped',
+        detail: 'One side’s wall vanished and a large opposite-side quote appeared at the same price.',
+      },
+    ],
   },
   hyperliquidOi: {
     title: 'Hyperliquid OI',

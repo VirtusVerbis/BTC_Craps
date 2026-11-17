@@ -7,7 +7,10 @@ import { OrderBook } from './orderBook'
 import { RingBuffer } from './ringBuffer'
 import { TakerRollup15m } from './takerRollup'
 import type { BookLevel, FeedStatus, MicrostructureState, VenueId, VenueSnapshot } from './types'
+import { HL_TRADES_SUBSCRIBE, parseHyperliquidTradesMessage } from './hyperliquidTrades'
 import { WALL_BAND_BPS, WallTracker, bandNotional } from './wallTracker'
+
+const HL_TRADE_TID_CAP = 4_000
 
 const SAMPLE_MS = 5_000
 const HL_META_MS = 30_000
@@ -104,12 +107,15 @@ export class MicrostructureService {
   private hlTimer: number | null = null
   private coinbaseBookRestTimer: number | null = null
   private coinbaseWsBookAt = 0
+  private readonly hlSeenTids = new Set<number>()
+  private readonly hlSeenTidOrder: number[] = []
   private listeners = new Set<(state: MicrostructureState) => void>()
   private state: MicrostructureState = this.buildState()
   private readonly onVisibility = (): void => {
     if (document.visibilityState === 'visible') {
       this.perpClient.connect()
       this.spotDepthClient.connect()
+      this.hlTradesClient.connect()
     }
   }
 
@@ -129,6 +135,19 @@ export class MicrostructureService {
     onJsonMessage: (payload) => this.onSpotDepthMessage(payload),
     onStatus: (s) => {
       this.status.binanceSpot = s
+      this.emit()
+    },
+  })
+
+  private readonly hlTradesClient = new SafeWebSocketClient({
+    url: env.hyperliquidWsUrl,
+    onJsonMessage: (payload) => this.onHyperliquidTradesMessage(payload),
+    onOpen: (socket) => {
+      socket.send(HL_TRADES_SUBSCRIBE)
+    },
+    onStatus: (s) => {
+      if (s === 'connected') this.status.hyperliquid = 'connected'
+      else if (s === 'disconnected' && this.hlBook.mid() <= 0) this.status.hyperliquid = 'disconnected'
       this.emit()
     },
   })
@@ -184,6 +203,7 @@ export class MicrostructureService {
 
     this.perpClient.connect()
     this.spotDepthClient.connect()
+    this.hlTradesClient.connect()
     void this.pollHyperliquid()
 
     if (this.sampleTimer === null) {
@@ -218,6 +238,30 @@ export class MicrostructureService {
     this.coinbaseBookRestTimer = null
     this.perpClient.disconnect()
     this.spotDepthClient.disconnect()
+    this.hlTradesClient.disconnect()
+  }
+
+  private rememberHlTradeTid(tid: number): boolean {
+    if (this.hlSeenTids.has(tid)) return false
+    this.hlSeenTids.add(tid)
+    this.hlSeenTidOrder.push(tid)
+    if (this.hlSeenTidOrder.length > HL_TRADE_TID_CAP) {
+      const drop = this.hlSeenTidOrder.shift()
+      if (drop !== undefined) this.hlSeenTids.delete(drop)
+    }
+    return true
+  }
+
+  private onHyperliquidTradesMessage(payload: unknown): void {
+    const ticks = parseHyperliquidTradesMessage(payload)
+    if (ticks.length === 0) return
+    let added = false
+    for (const tick of ticks) {
+      if (!this.rememberHlTradeTid(tick.tid)) continue
+      this.takers.hyperliquid.add(tick.isSell, tick.qtyBtc, tick.at)
+      added = true
+    }
+    if (added) this.emit()
   }
 
   private onPerpMessage(payload: unknown): void {

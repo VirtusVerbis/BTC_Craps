@@ -73,7 +73,7 @@ const SECURITY_HEADERS: Record<string, string> = {
     "font-src 'self'",
     "media-src 'self' blob: https://www.youtube.com",
     "frame-src https://www.youtube.com https://www.youtube-nocookie.com",
-    "connect-src 'self' https://api.binance.com wss://stream.binance.com:9443 https://fapi.binance.com wss://fstream.binance.com https://api.exchange.coinbase.com wss://ws-feed.exchange.coinbase.com https://api.hyperliquid.xyz https://mempool.space https://www.youtube.com https://s.ytimg.com",
+    "connect-src 'self' https://api.binance.com wss://stream.binance.com:9443 https://fapi.binance.com wss://fstream.binance.com https://api.exchange.coinbase.com wss://ws-feed.exchange.coinbase.com https://api.hyperliquid.xyz wss://api.hyperliquid.xyz https://mempool.space https://www.youtube.com https://s.ytimg.com",
     'upgrade-insecure-requests',
   ].join('; '),
 }

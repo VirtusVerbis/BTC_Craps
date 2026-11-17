@@ -1,7 +1,20 @@
 import type { OpenInterestSnapshot } from '../../data/openInterest'
-import type { MicrostructureState } from '../../data/microstructure/types'
+import type { MicrostructureState, VenueId } from '../../data/microstructure/types'
 import { formatLiqBtc, formatLiqUsd } from '../format'
 import { DepthInfoIcon } from './DepthInfoIcon'
+import { DepthVenueFeedMids } from './DepthVenueFeedMids'
+import { DEPTH_VENUE_ORDER, depthVenueColorBid, depthVenueShort } from './depthVenueTheme'
+
+const venueLabelColor = (venue: VenueId): string =>
+  depthVenueColorBid[venue].replace(/,\s*[\d.]+\)$/, ', 0.95)')
+
+const formatTakerBtc = (n: number): string => n.toFixed(1)
+
+const formatTakerNet = (buy: number, sell: number): string => {
+  const net = buy - sell
+  const sign = net >= 0 ? '+' : ''
+  return `${sign}${net.toFixed(1)}`
+}
 
 const formatOi = (value: number): string => Math.round(value).toLocaleString('en-US')
 const formatPct = (value: number): string => `${Math.round(value)}%`
@@ -47,14 +60,39 @@ export const DepthGlobalHeader = ({ micro, openInterest }: DepthGlobalHeaderProp
           <DepthInfoIcon glossaryKey="liquidationsBar" label="Last liq bar" />
           <span>{liq}</span>
         </p>
-        <p className="depth-row depth-global-span">
+        <section className="depth-taker-section depth-global-col-left">
           <DepthInfoIcon glossaryKey="takerFlow15m" label="Taker 15m (all venues)" />
-          <span className="depth-taker-strip">
-            BN-P {venues.binancePerp.taker15m.buyBtc.toFixed(1)}/{venues.binancePerp.taker15m.sellBtc.toFixed(1)} · S{' '}
-            {venues.binanceSpot.taker15m.buyBtc.toFixed(1)}/{venues.binanceSpot.taker15m.sellBtc.toFixed(1)} · CB{' '}
-            {venues.coinbase.taker15m.buyBtc.toFixed(1)}/{venues.coinbase.taker15m.sellBtc.toFixed(1)}
-          </span>
-        </p>
+          <table className="depth-taker-table">
+            <thead>
+              <tr>
+                <th scope="col">Venue</th>
+                <th scope="col">Buy</th>
+                <th scope="col">Sell</th>
+                <th scope="col">Net</th>
+              </tr>
+            </thead>
+            <tbody>
+              {DEPTH_VENUE_ORDER.map((venue) => {
+                const snap = venues[venue]
+                const { buyBtc, sellBtc } = snap.taker15m
+                return (
+                  <tr key={venue}>
+                    <th scope="row" className="depth-taker-venue" style={{ color: venueLabelColor(venue) }}>
+                      {depthVenueShort[venue]}
+                    </th>
+                    <td>{formatTakerBtc(buyBtc)}</td>
+                    <td>{formatTakerBtc(sellBtc)}</td>
+                    <td>{formatTakerNet(buyBtc, sellBtc)}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </section>
+        <section className="depth-live-feeds-section depth-global-col-right">
+          <DepthInfoIcon glossaryKey="feedStatus" label="Live feeds" />
+          <DepthVenueFeedMids venues={venues} />
+        </section>
       </div>
     </header>
   )

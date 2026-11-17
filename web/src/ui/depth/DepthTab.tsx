@@ -10,7 +10,7 @@ export const DepthTab = ({ onOpen, panelOpen }: DepthTabProps) => {
   return (
     <button
       type="button"
-      className="depth-tab"
+      className="shooter-bet-action depth-tab"
       style={{ left: DEPTH_TAB_X, top: DEPTH_TAB_Y }}
       onClick={onOpen}
       aria-expanded={false}

@@ -17,6 +17,7 @@ import {
   type TimelineScaleState,
 } from '../../data/microstructure/depthTimelineGrid'
 import type { MicrostructureState, VenueId } from '../../data/microstructure/types'
+import { formatWallUsd } from './depthWallRowMetrics'
 import { DepthInfoIcon } from './DepthInfoIcon'
 import {
   DEPTH_VENUE_ORDER,
@@ -52,6 +53,11 @@ const readWindowMin = (): TimelineWindowMin => {
     return 60
   }
 }
+
+const DEPTH_TIMELINE_CHART_H = 160
+const TIMELINE_HALF_H_RATIO = 0.48
+const TIMELINE_AXIS_BID_TOP_PCT = (0.5 - TIMELINE_HALF_H_RATIO) * 100
+const TIMELINE_AXIS_ASK_BOTTOM_PCT = (0.5 + TIMELINE_HALF_H_RATIO) * 100
 
 const bucketCountForWindow = (windowMin: TimelineWindowMin): number => {
   if (windowMin === 15) return DEPTH_WINDOW_15_MIN_BUCKETS
@@ -130,6 +136,7 @@ export const DepthMergedTimeline = ({ micro }: DepthMergedTimelineProps) => {
   const [layerMode, setLayerMode] = useState<DepthTimelineLayerMode>(readMode)
   const [windowMin, setWindowMin] = useState<TimelineWindowMin>(readWindowMin())
   const [viewWidth, setViewWidth] = useState(900)
+  const [axisMaxUsd, setAxisMaxUsd] = useState(1)
 
   const bucketCount = bucketCountForWindow(windowMin)
   const displayPlan = useMemo(() => timelineDisplayPlan(bucketCount), [bucketCount])
@@ -209,7 +216,7 @@ export const DepthMergedTimeline = ({ micro }: DepthMergedTimelineProps) => {
     const displayCols = layoutCols
     const colW = metrics.colWidth
     const midY = h / 2
-    const halfH = h * 0.48
+    const halfH = h * TIMELINE_HALF_H_RATIO
 
     for (let col = 0; col < displayCols; col++) {
       const x = col * colW
@@ -225,11 +232,15 @@ export const DepthMergedTimeline = ({ micro }: DepthMergedTimelineProps) => {
     ctx.stroke()
     ctx.lineWidth = 1
 
+    setAxisMaxUsd(maxVal)
+
     const scrollEl = scrollRef.current
     if (metrics.scrollable && scrollEl && scrollEl.scrollWidth > scrollEl.clientWidth) {
       scrollEl.scrollLeft = scrollEl.scrollWidth - scrollEl.clientWidth
     }
   }, [micro, bucketCount, displayPlan, timelineNow, layerMode, windowMin, viewWidth])
+
+  const axisMaxLabel = formatWallUsd(axisMaxUsd)
 
   return (
     <section className="depth-merged-timeline">
@@ -281,20 +292,42 @@ export const DepthMergedTimeline = ({ micro }: DepthMergedTimelineProps) => {
           </button>
         </div>
       </div>
-      <div
-        ref={scrollRef}
-        className="depth-timeline-scroll"
-        tabIndex={0}
-        role="region"
-        aria-label="Depth timeline chart"
-      >
-        <canvas ref={canvasRef} className="depth-timeline-canvas depth-timeline-canvas-hero" width={900} height={160} />
+      <div className="depth-timeline-chart-row">
+        <div
+          ref={scrollRef}
+          className="depth-timeline-scroll depth-timeline-scroll--chart"
+          tabIndex={0}
+          role="region"
+          aria-label={`Depth timeline chart; scale ${axisMaxLabel} near-mid notional per venue band`}
+        >
+          <canvas
+            ref={canvasRef}
+            className="depth-timeline-canvas depth-timeline-canvas-hero"
+            width={900}
+            height={DEPTH_TIMELINE_CHART_H}
+          />
+        </div>
+        <div
+          className="depth-timeline-axis"
+          style={{ height: DEPTH_TIMELINE_CHART_H }}
+          aria-hidden
+          title="Near-mid resting notional USD (50 bps); full band height"
+        >
+          <span className="depth-timeline-axis-tick" style={{ top: `${TIMELINE_AXIS_BID_TOP_PCT}%` }}>
+            {axisMaxLabel}
+          </span>
+          <span className="depth-timeline-axis-tick depth-timeline-axis-mid" style={{ top: '50%' }}>
+            $0
+          </span>
+          <span className="depth-timeline-axis-tick" style={{ top: `${TIMELINE_AXIS_ASK_BOTTOM_PCT}%` }}>
+            {axisMaxLabel}
+          </span>
+        </div>
       </div>
       <p className="depth-muted depth-timeline-caption">
-        Bids above · asks below · columns ≈ {displayPlan.groupSize * 5}s · widens to fit until{' '}
-        {DEPTH_TIMELINE_MIN_COL_PX}px cols ·{' '}
-        <DepthInfoIcon glossaryKey="timelineLayerMode" label="layer mode" /> ·{' '}
-        <DepthInfoIcon glossaryKey="timelineWindow" label="window" />
+        Bids above · asks below · Y: USD notional within 50 bps of mid (full band height) · columns ≈{' '}
+        {displayPlan.groupSize * 5}s · widens to fit until {DEPTH_TIMELINE_MIN_COL_PX}px cols · stack sums venues per
+        column
       </p>
     </section>
   )

@@ -149,6 +149,7 @@ export class WallTracker {
       venue: this.venue,
       side: wall.side,
       price: wall.price,
+      peakBtc: wall.peakBtc,
       peakUsd: wall.peakUsd,
       reason,
       at,

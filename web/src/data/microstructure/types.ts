@@ -22,6 +22,7 @@ export interface WallEvent {
   venue: VenueId
   side: 'bid' | 'ask'
   price: number
+  peakBtc: number
   peakUsd: number
   reason: WallEndReason
   at: number
