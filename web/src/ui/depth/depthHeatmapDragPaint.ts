@@ -53,10 +53,10 @@ export const drawDraggedHeatmapDepth = (
       const column = columns[i]!
       const x0 = heatmapTimeToX(column.intervalStart, w, timeRange)
       const x1 = heatmapTimeToX(column.intervalEnd, w, timeRange)
-      const cellW = Math.max(1, x1 - x0 - 0.5)
+      const cellW = Math.max(1, x1 - x0)
       if (x1 < 0 || x0 > w) continue
       ctx.fillStyle = heatmapColor01(carriedUsd / maxVal)
-      ctx.fillRect(x0, row * rowH, cellW, Math.max(1, rowH - 0.25))
+      ctx.fillRect(x0, row * rowH, cellW, rowH)
     }
   }
 }
