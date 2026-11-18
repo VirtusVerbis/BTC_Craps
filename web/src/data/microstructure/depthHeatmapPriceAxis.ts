@@ -14,6 +14,10 @@ export type HeatmapPriceAxis = {
   rows: number
 }
 
+export type HeatmapPriceAxisOpts = {
+  minHalfBps?: number
+}
+
 const snapDown = (price: number, tick: number): number => Math.floor(price / tick) * tick
 const snapUp = (price: number, tick: number): number => Math.ceil(price / tick) * tick
 
@@ -22,6 +26,7 @@ export const heatmapPriceAxis = (
   extentPrices: readonly number[],
   refMids: readonly number[],
   tick = HEATMAP_PRICE_TICK_USD,
+  opts?: HeatmapPriceAxisOpts,
 ): HeatmapPriceAxis => {
   let lo = Infinity
   let hi = -Infinity
@@ -44,8 +49,14 @@ export const heatmapPriceAxis = (
   }
   const center = (lo + hi) / 2
   const dataHalf = Math.max(tick, (hi - lo) / 2)
-  const minHalf = (center * HEATMAP_PRICE_AXIS_MIN_HALF_BPS) / 10_000
-  const half = Math.max(dataHalf, minHalf)
+  const minHalfBps = opts?.minHalfBps ?? HEATMAP_PRICE_AXIS_MIN_HALF_BPS
+  const minHalf = (center * minHalfBps) / 10_000
+  let half = Math.max(dataHalf, minHalf)
+  if (extentPrices.length > 0 && dataHalf > tick) {
+    const floor = dataHalf * 1.06
+    const ceiling = dataHalf * 1.75
+    half = Math.max(floor, Math.min(half, ceiling))
+  }
   lo = center - half
   hi = center + half
   const span = Math.max(tick, hi - lo)

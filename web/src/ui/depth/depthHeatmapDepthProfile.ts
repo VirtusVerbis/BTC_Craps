@@ -37,8 +37,11 @@ export const latestHeatmapColumn = (columns: readonly HeatmapGridColumn[]): Heat
   return null
 }
 
-export const bandPriceBoundsForMid = (refMid: number): { bandTop: number; bandBottom: number } => {
-  const k = HEATMAP_PRICE_BAND_BPS / 10_000
+export const bandPriceBoundsForMid = (
+  refMid: number,
+  bandBps: number = HEATMAP_PRICE_BAND_BPS,
+): { bandTop: number; bandBottom: number } => {
+  const k = bandBps / 10_000
   return { bandTop: refMid * (1 + k), bandBottom: refMid * (1 - k) }
 }
 
@@ -55,9 +58,10 @@ export const nearestOffRangeLargePools = (
   axis: HeatmapPriceAxis,
   refMid: number,
   minUsd: number = HEATMAP_OFFRANGE_MIN_USD,
+  bandBps: number = HEATMAP_PRICE_BAND_BPS,
 ): OffRangeSummary => {
   if (!column || !(refMid > 0)) return { above: null, below: null }
-  const { bandTop, bandBottom } = bandPriceBoundsForMid(refMid)
+  const { bandTop, bandBottom } = bandPriceBoundsForMid(refMid, bandBps)
   let above: OffRangeEdge | null = null
   let below: OffRangeEdge | null = null
   for (const b of column.buckets) {
@@ -181,6 +185,7 @@ export const drawHeatmapDepthProfile = (
   maxVal: number,
   refMid: number,
   precomputedByPrice?: Map<number, number>,
+  bandBps: number = HEATMAP_PRICE_BAND_BPS,
 ): void => {
   const overflowFrac = HEATMAP_PROFILE_OVERFLOW_FRAC
   const overflowH = h * overflowFrac
@@ -201,7 +206,7 @@ export const drawHeatmapDepthProfile = (
 
   if (!(refMid > 0) || maxVal <= 0) return
 
-  const { bandTop, bandBottom } = bandPriceBoundsForMid(refMid)
+  const { bandTop, bandBottom } = bandPriceBoundsForMid(refMid, bandBps)
   const byPrice = precomputedByPrice ?? aggregateMaxUsdByPrice(columns)
   const { above, inView, below } = splitProfileRows(byPrice, axis)
   const maxBarW = Math.max(4, w - 2)

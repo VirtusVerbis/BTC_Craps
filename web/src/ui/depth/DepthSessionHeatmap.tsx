@@ -4,11 +4,14 @@ import { fetchHeatmapTimelineCandles, heatmapCandleBarMs } from '../../data/heat
 import { heatmapPriceAxis, type HeatmapPriceAxis } from '../../data/microstructure/depthHeatmapPriceAxis'
 import { HEATMAP_PRICE_TICK_USD } from '../../data/microstructure/depthHeatmapPriceBins'
 import {
+  applyHeatmapViewportToColumns,
   buildMergedSessionHeatmap,
   heatmapGridMax,
   heatmapWindowTimeRange,
+  overlayLiveBooksOnLatestHeatmapColumn,
   type HeatmapGridColumn,
 } from '../../data/microstructure/depthSessionHeatmapGrid'
+import { heatmapViewportForChartHeight } from '../../data/microstructure/depthHeatmapViewport'
 import {
   advanceTimelineScale,
   heatmapCanvasMetricsFit,
@@ -159,6 +162,8 @@ export const DepthSessionHeatmap = ({ micro }: DepthSessionHeatmapProps) => {
   const timelineNow = snapTimelineNow(micro.sampledAt)
   const liveMid = micro.venues.binancePerp.mid
 
+  const heatmapViewport = useMemo(() => heatmapViewportForChartHeight(chartSize.h), [chartSize.h])
+
   useEffect(() => {
     try {
       sessionStorage.setItem(STORAGE_WINDOW, String(windowMin))
@@ -217,7 +222,7 @@ export const DepthSessionHeatmap = ({ micro }: DepthSessionHeatmapProps) => {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    const columns = buildMergedSessionHeatmap(
+    const mergedColumns = buildMergedSessionHeatmap(
       samplesByVenue.out,
       samplesByVenue.statuses,
       DEPTH_VENUE_ORDER,
@@ -225,6 +230,8 @@ export const DepthSessionHeatmap = ({ micro }: DepthSessionHeatmapProps) => {
       timelineNow,
       displayPlan.groupSize,
     )
+    const withLive = overlayLiveBooksOnLatestHeatmapColumn(mergedColumns, micro, DEPTH_VENUE_ORDER, heatmapViewport.bandBps)
+    const columns = applyHeatmapViewportToColumns(withLive, heatmapViewport.bandBps)
 
     const windowRange = heatmapWindowTimeRange(bucketCount, timelineNow, displayPlan.groupSize)
     const timeRange = { start: windowRange.start, end: windowRange.end }
@@ -243,7 +250,7 @@ export const DepthSessionHeatmap = ({ micro }: DepthSessionHeatmapProps) => {
     }
 
     // Y scale from mids + OHLC only — distant resting depth must not compress candle bodies.
-    const axis = heatmapPriceAxis(candleExtent, refMids)
+    const axis = heatmapPriceAxis(candleExtent, refMids, undefined, { minHalfBps: heatmapViewport.minHalfBps })
     setPriceAxis(axis)
 
     const windowMax = heatmapGridMax(columns)
@@ -266,7 +273,7 @@ export const DepthSessionHeatmap = ({ micro }: DepthSessionHeatmapProps) => {
           : 0
     const byPrice = aggregateMaxUsdByPrice(columns)
     const latestCol = latestHeatmapColumn(columns)
-    const offRange = nearestOffRangeLargePools(latestCol, axis, refMid)
+    const offRange = nearestOffRangeLargePools(latestCol, axis, refMid, undefined, heatmapViewport.bandBps)
     drawHeatmap(ctx, columns, w, h, maxVal, axis, liveMid, candles, timeRange, candleBarMs, offRange)
     setAxisMaxUsd(maxVal)
     setOffRangePools(offRange)
@@ -280,10 +287,21 @@ export const DepthSessionHeatmap = ({ micro }: DepthSessionHeatmapProps) => {
         profileCanvas.height = h
         profileCanvas.style.width = `${pw}px`
         profileCanvas.style.height = '100%'
-        drawHeatmapDepthProfile(pctx, pw, h, columns, axis, maxVal, refMid, byPrice)
+        drawHeatmapDepthProfile(pctx, pw, h, columns, axis, maxVal, refMid, byPrice, heatmapViewport.bandBps)
       }
     }
-  }, [micro, bucketCount, displayPlan, timelineNow, windowMin, chartSize, samplesByVenue, liveMid, candles])
+  }, [
+    micro,
+    bucketCount,
+    displayPlan,
+    timelineNow,
+    windowMin,
+    chartSize,
+    samplesByVenue,
+    liveMid,
+    candles,
+    heatmapViewport,
+  ])
 
   const axisMaxLabel = formatWallUsd(axisMaxUsd)
   const axisTop = formatAxisPrice(priceAxis.priceMax)

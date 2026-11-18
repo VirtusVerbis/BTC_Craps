@@ -13,7 +13,7 @@ import {
   DEPTH_SAMPLE_CAP,
   DEPTH_SAMPLE_MS,
 } from './depthDisplayConstants'
-import { binBookToPriceBuckets } from './depthHeatmapPriceBins'
+import { binBookToPriceBuckets, HEATMAP_PRICE_BAND_BPS_MAX } from './depthHeatmapPriceBins'
 import { WALL_BAND_BPS, WallTracker, bandNotional } from './wallTracker'
 
 const HL_TRADE_TID_CAP = 4_000
@@ -324,7 +324,7 @@ export class MicrostructureService {
       mid,
       bid: bandNotional(mid, bids, WALL_BAND_BPS),
       ask: bandNotional(mid, asks, WALL_BAND_BPS),
-      priceBuckets: binBookToPriceBuckets(mid, bids, asks),
+      priceBuckets: binBookToPriceBuckets(mid, bids, asks, undefined, HEATMAP_PRICE_BAND_BPS_MAX),
     })
   }
 
