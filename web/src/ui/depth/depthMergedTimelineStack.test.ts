@@ -7,8 +7,9 @@ import {
   stackIsContiguous,
 } from './depthMergedTimelineStack'
 import type { TimelineStackSegment } from './depthMergedTimelineStack'
+import type { VenueId } from '../../data/microstructure/types'
 
-const seg = (value: number, h: number, venue = 'binancePerp'): TimelineStackSegment => ({
+const seg = (value: number, h: number, venue: VenueId = 'binancePerp'): TimelineStackSegment => ({
   value,
   h,
   venue,
