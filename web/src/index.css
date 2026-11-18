@@ -2566,7 +2566,11 @@ html.shooter-gesture-lock body {
   min-height: 0;
 }
 
-.depth-charts-stack--equal-grow .depth-consolidated-walls--charts-grow .depth-book-chart-wrap,
+.depth-charts-stack--equal-grow .depth-consolidated-walls--charts-grow .depth-book-chart-wrap {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
 .depth-charts-stack--equal-grow .depth-consolidated-walls--charts-grow .depth-session-heatmap {
   flex: 1 1 0;
   min-height: 0;
@@ -2642,11 +2646,15 @@ html.shooter-gesture-lock body {
     padding-right: 0.28rem;
   }
 
-  /* Scroll the full panel on narrow viewports; don’t flex-clip sections out of order. */
-  .depth-panel-scroll--fill {
+  /* Scroll when snapshot is open; keep flex fill when snapshot is collapsed (grow charts). */
+  .depth-panel-scroll--fill:not(.depth-panel-scroll--overview-collapsed) {
     overflow-x: hidden;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+  }
+
+  .depth-panel-scroll--fill.depth-panel-scroll--overview-collapsed {
+    overflow: hidden;
   }
 
   .depth-panel-scroll--fill:not(.depth-panel-scroll--overview-collapsed) > .depth-charts-stack {
@@ -2654,7 +2662,36 @@ html.shooter-gesture-lock body {
     min-height: auto;
   }
 
-  .depth-session-heatmap .depth-timeline-chart-row {
+  /* Market open + walls/tape collapsed: fill remaining panel height so charts can grow. */
+  .depth-panel-scroll--fill:not(.depth-panel-scroll--overview-collapsed):has(
+      .depth-consolidated-walls--charts-grow
+    )
+    > .depth-charts-stack {
+    flex: 1 1 0;
+    min-height: 0;
+  }
+
+  .depth-charts-stack:has(.depth-consolidated-walls--charts-grow) > .depth-consolidated-walls {
+    flex: 1 1 0;
+    min-height: 0;
+  }
+
+  .depth-charts-stack:has(.depth-consolidated-walls--charts-grow)
+    .depth-consolidated-walls--charts-grow
+    .depth-book-chart-wrap,
+  .depth-charts-stack:has(.depth-consolidated-walls--charts-grow)
+    .depth-consolidated-walls--charts-grow
+    .depth-session-heatmap {
+    flex: 1 1 0;
+    min-height: 0;
+  }
+
+  .depth-panel-scroll--fill.depth-panel-scroll--overview-collapsed > .depth-charts-stack {
+    flex: 1 1 0;
+    min-height: 0;
+  }
+
+  .depth-session-heatmap:not(.depth-session-heatmap--grow) .depth-timeline-chart-row {
     min-height: min(25rem, 52vh);
   }
 }
@@ -2828,28 +2865,52 @@ html.shooter-gesture-lock body {
 }
 
 .depth-consolidated-walls--charts-grow .depth-book-chart-wrap {
-  flex: 1;
+  flex: 1 1 0;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.depth-book-chart-wrap--grow {
+  min-height: 0;
+  margin-bottom: 0.35rem;
+}
+
+.depth-book-chart-row--grow {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  height: 0;
   display: flex;
   flex-direction: column;
 }
 
 .depth-book-chart-wrap--grow .depth-book-chart-scroll-grow {
-  flex: 1;
-  min-height: 0;
+  position: absolute;
+  inset: 0;
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
+  display: block;
 }
 
 .depth-book-chart-wrap--grow .depth-book-chart-canvas {
-  flex: 0 0 auto;
   width: 100%;
-  max-height: 100%;
+  display: block;
+  margin-top: 0;
 }
 
 .depth-consolidated-walls--charts-grow .depth-session-heatmap {
-  flex: 1;
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.depth-consolidated-walls--charts-grow .depth-session-heatmap .depth-timeline-chart-row {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.depth-session-heatmap--grow .depth-timeline-chart-row {
+  flex: 1 1 0;
+  min-height: 0;
 }
 
 .depth-session-heatmap {
@@ -3018,6 +3079,7 @@ html.shooter-gesture-lock body {
 .depth-book-chart-canvas {
   width: 100%;
   min-height: 4rem;
+  margin-top: 0;
 }
 
 .depth-wall-subhead {

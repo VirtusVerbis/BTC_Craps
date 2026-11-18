@@ -65,6 +65,7 @@ const bucketCountForWindow = (windowMin: TimelineWindowMin): number => {
 }
 
 const HEATMAP_CHART_MIN_H = 400
+const HEATMAP_CHART_MIN_H_GROW = 120
 const HEATMAP_PROFILE_RAIL_W = 32
 
 const formatAxisPrice = (price: number): string =>
@@ -136,9 +137,10 @@ const drawHeatmap = (
 
 interface DepthSessionHeatmapProps {
   micro: MicrostructureState
+  fillAvailableHeight?: boolean
 }
 
-export const DepthSessionHeatmap = ({ micro }: DepthSessionHeatmapProps) => {
+export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: DepthSessionHeatmapProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const profileCanvasRef = useRef<HTMLCanvasElement>(null)
   const chartRowRef = useRef<HTMLDivElement>(null)
@@ -195,16 +197,29 @@ export const DepthSessionHeatmap = ({ micro }: DepthSessionHeatmapProps) => {
     const row = chartRowRef.current
     const scroll = scrollRef.current
     if (!row || !scroll) return
+    const minH = fillAvailableHeight ? HEATMAP_CHART_MIN_H_GROW : HEATMAP_CHART_MIN_H
     const measure = () => {
-      const h = Math.max(HEATMAP_CHART_MIN_H, Math.floor(row.clientHeight))
+      const rowH = Math.floor(row.getBoundingClientRect().height)
+      const h = Math.max(minH, rowH > 0 ? rowH : Math.floor(row.clientHeight))
       const w = Math.max(320, Math.floor(scroll.clientWidth))
       setChartSize({ w, h })
     }
-    measure()
-    const ro = new ResizeObserver(measure)
+    const scheduleMeasure = () => {
+      measure()
+      requestAnimationFrame(measure)
+    }
+    scheduleMeasure()
+    const ro = new ResizeObserver(scheduleMeasure)
     ro.observe(row)
+    ro.observe(scroll)
+    if (fillAvailableHeight) {
+      const section = row.closest('.depth-session-heatmap')
+      if (section) ro.observe(section)
+      const consolidated = row.closest('.depth-consolidated-walls')
+      if (consolidated) ro.observe(consolidated)
+    }
     return () => ro.disconnect()
-  }, [])
+  }, [fillAvailableHeight])
 
   const samplesByVenue = useMemo(() => {
     const out = {} as Record<(typeof DEPTH_VENUE_ORDER)[number], (typeof micro.venues)[keyof typeof micro.venues]['depthSamples']>
@@ -260,7 +275,10 @@ export const DepthSessionHeatmap = ({ micro }: DepthSessionHeatmapProps) => {
 
     const metrics = heatmapCanvasMetricsFit(layoutCols, chartSize.w)
     const w = metrics.width
-    const h = chartSize.h
+    const row = chartRowRef.current
+    const minH = fillAvailableHeight ? HEATMAP_CHART_MIN_H_GROW : HEATMAP_CHART_MIN_H
+    const rowH = row ? Math.floor(row.getBoundingClientRect().height) : 0
+    const h = Math.max(minH, fillAvailableHeight && rowH > 0 ? rowH : chartSize.h)
     canvas.width = w
     canvas.height = h
     canvas.style.width = '100%'
@@ -301,6 +319,7 @@ export const DepthSessionHeatmap = ({ micro }: DepthSessionHeatmapProps) => {
     liveMid,
     candles,
     heatmapViewport,
+    fillAvailableHeight,
   ])
 
   const axisMaxLabel = formatWallUsd(axisMaxUsd)
@@ -327,7 +346,9 @@ export const DepthSessionHeatmap = ({ micro }: DepthSessionHeatmapProps) => {
       : `Depth heatmap by BTC price; color scale to ${axisMaxLabel} resting USD`
 
   return (
-    <section className="depth-session-heatmap">
+    <section
+      className={fillAvailableHeight ? 'depth-session-heatmap depth-session-heatmap--grow' : 'depth-session-heatmap'}
+    >
       <div className="depth-timeline-toolbar">
         <DepthInfoIcon glossaryKey="depthSessionHeatmap" label="Depth heatmap (price × time)" />
         <div className="depth-heatmap-legend" aria-hidden>

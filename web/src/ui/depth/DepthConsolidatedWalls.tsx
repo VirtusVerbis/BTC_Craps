@@ -14,6 +14,7 @@ import {
   readLiveWallsOpen,
   readTapeOpen,
 } from './depthWallSectionToggles'
+import { useDepthPanelNarrow } from './useDepthPanelNarrow'
 
 const wallReasonLabel: Record<string, string> = {
   active: 'Active',
@@ -50,7 +51,10 @@ export const DepthConsolidatedWalls = ({ micro, forceChartsGrow = false }: Depth
   const [liveWallsOpen, setLiveWallsOpen] = useState(readLiveWallsOpen)
   const [tapeOpen, setTapeOpen] = useState(readTapeOpen)
 
-  const chartsGrow = forceChartsGrow || !liveWallsOpen || !tapeOpen
+  const narrowPanel = useDepthPanelNarrow()
+  const wallsTapeCollapsed = !liveWallsOpen || !tapeOpen
+  /** Snapshot collapsed (desktop grow), or mobile with walls/tape collapsed (scroll panel still has a flex slot). */
+  const chartsFlexGrow = wallsTapeCollapsed && (forceChartsGrow || narrowPanel)
 
   useEffect(() => {
     persistLiveWallsOpen(liveWallsOpen)
@@ -132,10 +136,12 @@ export const DepthConsolidatedWalls = ({ micro, forceChartsGrow = false }: Depth
   return (
     <section
       className={
-        chartsGrow ? 'depth-consolidated-walls depth-consolidated-walls--charts-grow' : 'depth-consolidated-walls'
+        chartsFlexGrow
+          ? 'depth-consolidated-walls depth-consolidated-walls--charts-grow'
+          : 'depth-consolidated-walls'
       }
     >
-      <DepthBookChart micro={micro} topWalls={chartWalls} fillAvailableHeight={chartsGrow} />
+      <DepthBookChart micro={micro} topWalls={chartWalls} fillAvailableHeight={chartsFlexGrow} />
 
       <h3 className="depth-wall-subhead">
         <button
@@ -203,7 +209,7 @@ export const DepthConsolidatedWalls = ({ micro, forceChartsGrow = false }: Depth
         )
       ) : null}
 
-      <DepthSessionHeatmap micro={micro} />
+      <DepthSessionHeatmap micro={micro} fillAvailableHeight={chartsFlexGrow} />
     </section>
   )
 }

@@ -330,8 +330,22 @@ const drawWallMarkers = (
 const BOOK_CHART_STACK_ROW_H = 76
 /** One height for stack & overlap so toggling mode does not resize the chart block. */
 const BOOK_CHART_MIN_DISPLAY_H = BOOK_CHART_STACK_ROW_H * DEPTH_VENUE_ORDER.length + 8
-
 const defaultBookChartHeight = (_mode: BookChartMode): number => BOOK_CHART_MIN_DISPLAY_H
+
+const bookChartToolbarChromePx = (wrap: HTMLElement): number =>
+  wrap.querySelector<HTMLElement>('.depth-timeline-toolbar')?.offsetHeight ?? 0
+
+/** Drawable height inside the book flex slot (wrap − toolbar). Row may under-report when scroll is position:absolute. */
+const bookChartSlotHeightPx = (chartRow: HTMLElement | null, wrap: HTMLElement | null): number => {
+  const fromWrap = wrap
+    ? Math.max(0, wrap.clientHeight - bookChartToolbarChromePx(wrap))
+    : 0
+  const fromRow = chartRow ? Math.floor(chartRow.getBoundingClientRect().height) : 0
+  const fromRowClient = chartRow?.clientHeight ?? 0
+  const slot = Math.max(fromWrap, fromRow, fromRowClient)
+  if (slot <= 0) return BOOK_CHART_MIN_DISPLAY_H
+  return Math.max(BOOK_CHART_MIN_DISPLAY_H, slot)
+}
 
 interface DepthBookChartProps {
   micro: MicrostructureState
@@ -342,6 +356,7 @@ interface DepthBookChartProps {
 export const DepthBookChart = ({ micro, topWalls, fillAvailableHeight = false }: DepthBookChartProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
+  const chartRowRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const [mode, setMode] = useState<BookChartMode>(readBookMode)
   const [xScale, setXScale] = useState<BookChartXScale>(readXScale)
@@ -401,21 +416,33 @@ export const DepthBookChart = ({ micro, topWalls, fillAvailableHeight = false }:
     const measure = () => {
       const w = Math.max(320, Math.floor(scrollEl.clientWidth))
       let h = defaultBookChartHeight(mode)
-      if (fillAvailableHeight && wrapEl) {
-        const toolbar = wrapEl.querySelector<HTMLElement>('.depth-timeline-toolbar')
-        const chrome = toolbar?.offsetHeight ?? 0
-        const available = wrapEl.clientHeight - chrome
-        if (available > 0) {
-          h = Math.max(BOOK_CHART_MIN_DISPLAY_H, Math.floor(available))
-        }
+      if (fillAvailableHeight) {
+        h = bookChartSlotHeightPx(chartRowRef.current, wrapEl)
       }
       setViewSize((prev) => (prev.w === w && prev.h === h ? prev : { w, h }))
     }
 
-    measure()
-    const ro = new ResizeObserver(measure)
+    const scheduleMeasure = () => {
+      measure()
+      requestAnimationFrame(measure)
+    }
+
+    scheduleMeasure()
+    const ro = new ResizeObserver(scheduleMeasure)
     ro.observe(scrollEl)
-    if (fillAvailableHeight && wrapEl) ro.observe(wrapEl)
+    if (fillAvailableHeight) {
+      const row = chartRowRef.current
+      if (row) ro.observe(row)
+      if (wrapEl) {
+        ro.observe(wrapEl)
+        const parent = wrapEl.parentElement
+        if (parent) ro.observe(parent)
+        const panel = wrapEl.closest('.depth-panel-scroll')
+        if (panel) ro.observe(panel)
+        const chartsStack = wrapEl.closest('.depth-charts-stack')
+        if (chartsStack) ro.observe(chartsStack)
+      }
+    }
     return () => ro.disconnect()
   }, [fillAvailableHeight, mode])
 
@@ -426,16 +453,19 @@ export const DepthBookChart = ({ micro, topWalls, fillAvailableHeight = false }:
     if (!ctx) return
 
     const w = viewSize.w
-    const h = viewSize.h
+    const slotH = fillAvailableHeight
+      ? bookChartSlotHeightPx(chartRowRef.current, wrapRef.current)
+      : viewSize.h
+    const h = slotH
     const stackRowH =
-      mode === 'stack' && h > defaultBookChartHeight('stack')
+      mode === 'stack'
         ? Math.max(BOOK_CHART_STACK_ROW_H, Math.floor((h - 4) / DEPTH_VENUE_ORDER.length))
         : BOOK_CHART_STACK_ROW_H
     canvas.width = w
     canvas.height = h
     canvas.style.width = '100%'
     canvas.style.height = `${h}px`
-    canvas.style.maxHeight = fillAvailableHeight ? '100%' : ''
+    canvas.style.maxHeight = ''
     ctx.clearRect(0, 0, w, h)
 
     const padX = 4
@@ -609,14 +639,19 @@ export const DepthBookChart = ({ micro, topWalls, fillAvailableHeight = false }:
         </div>
       </div>
       <div
-        ref={scrollRef}
-        className={
-          fillAvailableHeight ? 'depth-timeline-scroll depth-book-chart-scroll-grow' : 'depth-timeline-scroll'
-        }
-        role="img"
-        aria-label="Cumulative depth chart"
+        ref={chartRowRef}
+        className={fillAvailableHeight ? 'depth-book-chart-row depth-book-chart-row--grow' : 'depth-book-chart-row'}
       >
-        <canvas ref={canvasRef} className="depth-timeline-canvas depth-book-chart-canvas" width={900} height={viewSize.h} />
+        <div
+          ref={scrollRef}
+          className={
+            fillAvailableHeight ? 'depth-timeline-scroll depth-book-chart-scroll-grow' : 'depth-timeline-scroll'
+          }
+          role="img"
+          aria-label="Cumulative depth chart"
+        >
+          <canvas ref={canvasRef} className="depth-timeline-canvas depth-book-chart-canvas" width={900} height={viewSize.h} />
+        </div>
       </div>
     </div>
   )
