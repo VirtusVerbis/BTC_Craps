@@ -16,7 +16,6 @@ import {
   type TimelineGridCell,
   type TimelineScaleState,
 } from '../../data/microstructure/depthTimelineGrid'
-import { DEPTH_BUCKET_MS } from '../../data/microstructure/depthDisplayConstants'
 import type { MicrostructureState, VenueId } from '../../data/microstructure/types'
 import { formatWallUsd } from './depthWallRowMetrics'
 import { DepthInfoIcon } from './DepthInfoIcon'
