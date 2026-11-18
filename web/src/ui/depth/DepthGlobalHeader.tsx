@@ -1,9 +1,23 @@
 import type { OpenInterestSnapshot } from '../../data/openInterest'
-import type { MicrostructureState, VenueId } from '../../data/microstructure/types'
+import type { FeedStatus, MicrostructureState, VenueId } from '../../data/microstructure/types'
 import { formatLiqBtc, formatLiqUsd } from '../format'
+import { FeedGlyph } from '../FeedGlyph'
 import { DepthInfoIcon } from './DepthInfoIcon'
-import { DepthVenueFeedMids } from './DepthVenueFeedMids'
+import type { DepthGlossaryKey } from './depthGlossary'
 import { DEPTH_VENUE_ORDER, depthVenueColorBid, depthVenueShort } from './depthVenueTheme'
+
+const venueGlossary: Record<VenueId, DepthGlossaryKey> = {
+  binancePerp: 'venueBinancePerp',
+  binanceSpot: 'venueBinanceSpot',
+  coinbase: 'venueCoinbase',
+  hyperliquid: 'venueHyperliquid',
+}
+
+const feedStatusLabel: Record<FeedStatus, string> = {
+  connected: 'Connected',
+  connecting: 'Connecting',
+  disconnected: 'Disconnected',
+}
 
 const venueLabelColor = (venue: VenueId): string =>
   depthVenueColorBid[venue].replace(/,\s*[\d.]+\)$/, ', 0.95)')
@@ -15,6 +29,9 @@ const formatTakerNet = (buy: number, sell: number): string => {
   const sign = net >= 0 ? '+' : ''
   return `${sign}${net.toFixed(1)}`
 }
+
+const formatVenueMid = (mid: number): string =>
+  mid > 0 ? `$${mid.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : '—'
 
 const formatOi = (value: number): string => Math.round(value).toLocaleString('en-US')
 const formatPct = (value: number): string => `${Math.round(value)}%`
@@ -43,29 +60,14 @@ export const DepthGlobalHeader = ({ micro, openInterest }: DepthGlobalHeaderProp
 
   return (
     <header className="depth-global">
-      <div className="depth-global-grid">
-        <p className="depth-row">
-          <DepthInfoIcon glossaryKey="basis" label="Basis (BN − CB)" />
-          <span>{basis}</span>
-        </p>
-        <p className="depth-row">
-          <DepthInfoIcon glossaryKey="openInterest" label="O/I" />
-          <span>{oi}</span>
-        </p>
-        <p className="depth-row">
-          <DepthInfoIcon glossaryKey="longShortRatio" label="Long / Short" />
-          <span>{longShort}</span>
-        </p>
-        <p className="depth-row">
-          <DepthInfoIcon glossaryKey="liquidationsBar" label="Last liq bar" />
-          <span>{liq}</span>
-        </p>
-        <section className="depth-taker-section depth-global-col-left">
+      <div className="depth-global-layout">
+        <section className="depth-taker-section">
           <DepthInfoIcon glossaryKey="takerFlow15m" label="Taker 15m (all venues)" />
           <table className="depth-taker-table">
             <thead>
               <tr>
                 <th scope="col">Venue</th>
+                <th scope="col">Mid</th>
                 <th scope="col">Buy</th>
                 <th scope="col">Sell</th>
                 <th scope="col">Net</th>
@@ -78,8 +80,17 @@ export const DepthGlobalHeader = ({ micro, openInterest }: DepthGlobalHeaderProp
                 return (
                   <tr key={venue}>
                     <th scope="row" className="depth-taker-venue" style={{ color: venueLabelColor(venue) }}>
-                      {depthVenueShort[venue]}
+                      <span className="depth-taker-venue-inner">
+                        <DepthInfoIcon glossaryKey={venueGlossary[venue]} label={depthVenueShort[venue]} />
+                        <FeedGlyph
+                          status={snap.status}
+                          title={feedStatusLabel[snap.status]}
+                          ariaLabel={`${depthVenueShort[venue]}: ${feedStatusLabel[snap.status]}`}
+                          className="feed-glyph--depth"
+                        />
+                      </span>
                     </th>
+                    <td className="depth-taker-mid">{formatVenueMid(snap.mid)}</td>
                     <td>{formatTakerBtc(buyBtc)}</td>
                     <td>{formatTakerBtc(sellBtc)}</td>
                     <td>{formatTakerNet(buyBtc, sellBtc)}</td>
@@ -89,10 +100,24 @@ export const DepthGlobalHeader = ({ micro, openInterest }: DepthGlobalHeaderProp
             </tbody>
           </table>
         </section>
-        <section className="depth-live-feeds-section depth-global-col-right">
-          <DepthInfoIcon glossaryKey="feedStatus" label="Live feeds" />
-          <DepthVenueFeedMids venues={venues} />
-        </section>
+        <aside className="depth-global-stats" aria-label="Market summary">
+          <p className="depth-row">
+            <DepthInfoIcon glossaryKey="basis" label="Basis (BN − CB)" />
+            <span>{basis}</span>
+          </p>
+          <p className="depth-row">
+            <DepthInfoIcon glossaryKey="openInterest" label="O/I" />
+            <span>{oi}</span>
+          </p>
+          <p className="depth-row">
+            <DepthInfoIcon glossaryKey="longShortRatio" label="Long / Short" />
+            <span>{longShort}</span>
+          </p>
+          <p className="depth-row">
+            <DepthInfoIcon glossaryKey="liquidationsBar" label="Last liq bar" />
+            <span>{liq}</span>
+          </p>
+        </aside>
       </div>
     </header>
   )

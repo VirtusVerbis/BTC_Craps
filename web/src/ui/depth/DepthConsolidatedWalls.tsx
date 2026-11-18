@@ -40,16 +40,17 @@ const sortEventsByPeakBtcDesc = (rows: readonly WallEvent[]): WallEvent[] =>
 
 interface DepthConsolidatedWallsProps {
   micro: MicrostructureState
+  forceChartsGrow?: boolean
 }
 
-export const DepthConsolidatedWalls = ({ micro }: DepthConsolidatedWallsProps) => {
+export const DepthConsolidatedWalls = ({ micro, forceChartsGrow = false }: DepthConsolidatedWallsProps) => {
   const now = micro.sampledAt
   const prevLivePeaksRef = useRef<Map<string, number>>(new Map())
   const [livePulseKeys, setLivePulseKeys] = useState<Set<string>>(() => new Set())
   const [liveWallsOpen, setLiveWallsOpen] = useState(readLiveWallsOpen)
   const [tapeOpen, setTapeOpen] = useState(readTapeOpen)
 
-  const chartsGrow = !liveWallsOpen || !tapeOpen
+  const chartsGrow = forceChartsGrow || !liveWallsOpen || !tapeOpen
 
   useEffect(() => {
     persistLiveWallsOpen(liveWallsOpen)

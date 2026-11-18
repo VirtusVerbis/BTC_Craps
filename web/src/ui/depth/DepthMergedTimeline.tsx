@@ -127,17 +127,22 @@ const drawColumn = (
   }
 }
 
+const TIMELINE_CHART_MIN_H = DEPTH_TIMELINE_CHART_H
+
 interface DepthMergedTimelineProps {
   micro: MicrostructureState
+  fillAvailableHeight?: boolean
 }
 
-export const DepthMergedTimeline = ({ micro }: DepthMergedTimelineProps) => {
+export const DepthMergedTimeline = ({ micro, fillAvailableHeight = false }: DepthMergedTimelineProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const chartRowRef = useRef<HTMLDivElement>(null)
   const scaleStateRef = useRef<TimelineScaleState>({ tick: 0, max: 1 })
   const [layerMode, setLayerMode] = useState<DepthTimelineLayerMode>(readMode)
   const [windowMin, setWindowMin] = useState<TimelineWindowMin>(readWindowMin())
   const [viewWidth, setViewWidth] = useState(900)
+  const [chartHeight, setChartHeight] = useState(DEPTH_TIMELINE_CHART_H)
   const [axisMaxUsd, setAxisMaxUsd] = useState(1)
 
   const bucketCount = bucketCountForWindow(windowMin)
@@ -175,6 +180,23 @@ export const DepthMergedTimeline = ({ micro }: DepthMergedTimelineProps) => {
   }, [])
 
   useEffect(() => {
+    if (!fillAvailableHeight) {
+      setChartHeight(DEPTH_TIMELINE_CHART_H)
+      return
+    }
+    const row = chartRowRef.current
+    if (!row) return
+    const measure = () => {
+      const h = Math.max(TIMELINE_CHART_MIN_H, Math.floor(row.clientHeight))
+      setChartHeight(h)
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(row)
+    return () => ro.disconnect()
+  }, [fillAvailableHeight])
+
+  useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')
@@ -210,9 +232,11 @@ export const DepthMergedTimeline = ({ micro }: DepthMergedTimelineProps) => {
     const maxVal = scaled.max
     const metrics = timelineCanvasMetrics(layoutCols, viewWidth, DEPTH_TIMELINE_MIN_COL_PX)
     const w = metrics.width
+    const h = chartHeight
     canvas.width = w
+    canvas.height = h
     canvas.style.width = metrics.scrollable ? `${w}px` : '100%'
-    const h = canvas.height
+    canvas.style.height = fillAvailableHeight ? '100%' : `${h}px`
     ctx.clearRect(0, 0, w, h)
 
     const displayCols = layoutCols
@@ -240,12 +264,12 @@ export const DepthMergedTimeline = ({ micro }: DepthMergedTimelineProps) => {
     if (metrics.scrollable && scrollEl && scrollEl.scrollWidth > scrollEl.clientWidth) {
       scrollEl.scrollLeft = scrollEl.scrollWidth - scrollEl.clientWidth
     }
-  }, [micro, bucketCount, displayPlan, timelineNow, layerMode, windowMin, viewWidth])
+  }, [micro, bucketCount, displayPlan, timelineNow, layerMode, windowMin, viewWidth, chartHeight, fillAvailableHeight])
 
   const axisMaxLabel = formatWallUsd(axisMaxUsd)
 
   return (
-    <section className="depth-merged-timeline">
+    <section className={fillAvailableHeight ? 'depth-merged-timeline depth-merged-timeline--grow' : 'depth-merged-timeline'}>
       <div className="depth-timeline-toolbar">
         <DepthInfoIcon glossaryKey="mergedTimeline" label="Depth timeline" />
         <div className="depth-timeline-legend">
@@ -294,10 +318,14 @@ export const DepthMergedTimeline = ({ micro }: DepthMergedTimelineProps) => {
           </button>
         </div>
       </div>
-      <div className="depth-timeline-chart-row">
+      <div ref={chartRowRef} className="depth-timeline-chart-row">
         <div
           ref={scrollRef}
-          className="depth-timeline-scroll depth-timeline-scroll--chart"
+          className={
+            fillAvailableHeight
+              ? 'depth-timeline-scroll depth-timeline-scroll--chart depth-timeline-scroll--chart-grow'
+              : 'depth-timeline-scroll depth-timeline-scroll--chart'
+          }
           tabIndex={0}
           role="region"
           aria-label={`Depth timeline chart; scale ${axisMaxLabel} near-mid notional per venue band`}
@@ -306,12 +334,12 @@ export const DepthMergedTimeline = ({ micro }: DepthMergedTimelineProps) => {
             ref={canvasRef}
             className="depth-timeline-canvas depth-timeline-canvas-hero"
             width={900}
-            height={DEPTH_TIMELINE_CHART_H}
+            height={chartHeight}
           />
         </div>
         <div
           className="depth-timeline-axis"
-          style={{ height: DEPTH_TIMELINE_CHART_H }}
+          style={{ height: chartHeight }}
           aria-hidden
           title="Near-mid resting notional USD (50 bps); full band height"
         >
