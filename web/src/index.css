@@ -2625,11 +2625,49 @@ html.shooter-gesture-lock body {
 
 @media (max-width: 520px) {
   .depth-global {
-    --depth-global-font: clamp(1.14rem, 2.8vw, 1.32rem);
+    --depth-global-font: clamp(1.02rem, 2.6vw, 1.2rem);
   }
 
+  /* Same as desktop: taker table left, summary stats right (avoid stacking the “chart” above items). */
   .depth-global-layout {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    gap: 0.35rem 0.45rem;
+  }
+
+  .depth-global-stats {
     grid-template-columns: 1fr;
+    gap: 0.15rem 0;
+  }
+
+  .depth-taker-table th,
+  .depth-taker-table td {
+    padding-right: 0.28rem;
+  }
+
+  /* Scroll the full panel on narrow viewports; don’t flex-clip sections out of order. */
+  .depth-panel-scroll--fill {
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .depth-panel-scroll--fill > .depth-charts-stack {
+    flex: 0 0 auto;
+    min-height: auto;
+  }
+
+  .depth-charts-stack--equal-grow > .depth-consolidated-walls {
+    flex: 0 0 auto;
+    min-height: auto;
+  }
+
+  .depth-consolidated-walls--charts-grow .depth-session-heatmap {
+    flex: 0 0 auto;
+    min-height: auto;
+  }
+
+  .depth-session-heatmap .depth-timeline-chart-row {
+    min-height: min(25rem, 52vh);
   }
 }
 
