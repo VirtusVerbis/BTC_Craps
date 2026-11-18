@@ -326,12 +326,6 @@ export const DepthMergedTimeline = ({ micro }: DepthMergedTimelineProps) => {
           </span>
         </div>
       </div>
-      <p className="depth-muted depth-timeline-caption">
-        Bids above · asks below · Y: USD notional within 50 bps of mid (full band height) · columns ≈{' '}
-        {displayPlan.groupSize * (DEPTH_BUCKET_MS / 1000)}s · widens to fit until {DEPTH_TIMELINE_MIN_COL_PX}px cols ·
-        stack sums venues per
-        column
-      </p>
     </section>
   )
 }

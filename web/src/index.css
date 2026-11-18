@@ -2713,11 +2713,6 @@ html.shooter-gesture-lock body {
   margin: 0 0.15rem;
 }
 
-.depth-timeline-caption {
-  margin: 0.35rem 0 0;
-  font-size: var(--depth-font-sm);
-}
-
 .depth-consolidated-walls {
   display: flex;
   flex-direction: column;
@@ -2768,8 +2763,7 @@ html.shooter-gesture-lock body {
   overflow: hidden;
 }
 
-.depth-session-heatmap .depth-timeline-toolbar,
-.depth-session-heatmap .depth-timeline-caption {
+.depth-session-heatmap .depth-timeline-toolbar {
   flex-shrink: 0;
 }
 

@@ -402,12 +402,6 @@ export const DepthSessionHeatmap = ({ micro }: DepthSessionHeatmapProps) => {
           </span>
         </div>
       </div>
-      <p className="depth-muted depth-timeline-caption">
-        Y: BTC USD ({priceAxis.tick.toLocaleString()} grid) · chart labels (top/bottom right): nearest pool outside Y (size/color
-        vs scale max) ·
-        right rail: session max resting USD per price · X: time · merged depth + Binance spot 1m candles · color: resting USD ·
-        scale max {axisMaxLabel}
-      </p>
     </section>
   )
 }

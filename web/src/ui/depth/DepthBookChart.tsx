@@ -557,13 +557,6 @@ export const DepthBookChart = ({ micro, topWalls, fillAvailableHeight = false }:
     }
   }, [micro, mode, xScale, topWalls, viewSize, fillAvailableHeight, maxCum, venueCurves, venueExtentsById])
 
-  const captionBps =
-    xScale === 'stretch'
-      ? mode === 'stack'
-        ? 'stretch per row (true bps at row edges)'
-        : 'stretch per venue (horizontal scale not comparable across colors)'
-      : `±${DEPTH_BOOK_CHART_MAX_BPS} bps fixed`
-
   return (
     <div className={fillAvailableHeight ? 'depth-book-chart-wrap depth-book-chart-wrap--grow' : 'depth-book-chart-wrap'}>
       <div className="depth-timeline-toolbar">
@@ -612,9 +605,6 @@ export const DepthBookChart = ({ micro, topWalls, fillAvailableHeight = false }:
       >
         <canvas ref={canvasRef} className="depth-timeline-canvas depth-book-chart-canvas" width={900} height={viewSize.h} />
       </div>
-      <p className="depth-muted depth-timeline-caption">
-        Refreshes ~2.5s · X = bps from mid ({captionBps}) · Y = cumulative BTC · X scale
-      </p>
     </div>
   )
 }
