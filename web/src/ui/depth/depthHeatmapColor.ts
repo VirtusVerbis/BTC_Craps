@@ -1,5 +1,5 @@
 /** Display t=0 uses this fraction along the stop ramp (skips near-bg navy). */
-export const HEATMAP_COLOR_RAMP_FLOOR = 0.25
+export const HEATMAP_COLOR_RAMP_FLOOR = 0.15
 
 /** Sequential ramp: dark → teal → amber → red (resting size intensity). */
 const STOPS: readonly [number, number, number][] = [
