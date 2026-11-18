@@ -2,7 +2,19 @@ import { describe, expect, it } from 'vitest'
 import type { HeatmapPriceAxis } from '../../data/microstructure/depthHeatmapPriceAxis'
 import { rowIndexForPrice } from '../../data/microstructure/depthHeatmapPriceAxis'
 import type { HeatmapGridColumn } from '../../data/microstructure/depthSessionHeatmapGrid'
-import { carriedUsdPerColumnForRow } from './depthHeatmapDragPaint'
+import {
+  carriedUsdPerColumnForRow,
+  heatmapRowSegmentPixelSpan,
+  HEATMAP_ROW_SEGMENT_HEIGHT_FRAC,
+} from './depthHeatmapDragPaint'
+
+describe('heatmapRowSegmentPixelSpan', () => {
+  it('uses full row band when segment fraction is 1', () => {
+    const row = heatmapRowSegmentPixelSpan(0, 10, 100)
+    expect(HEATMAP_ROW_SEGMENT_HEIGHT_FRAC).toBe(1)
+    expect(row).toEqual({ y: 0, height: 10 })
+  })
+})
 
 describe('carriedUsdPerColumnForRow', () => {
   const axis: HeatmapPriceAxis = { priceMin: 99_900, priceMax: 100_100, tick: 25, rows: 8 }

@@ -3,11 +3,17 @@ import type { HeatmapPriceAxis } from '../../data/microstructure/depthHeatmapPri
 
 const CANDLE_GREEN = '#00c853'
 const CANDLE_RED = '#d50000'
-const CANDLE_BORDER = 'rgba(0, 0, 0, 0.92)'
-const WICK_WIDTH = 1.25
-const WICK_BORDER_EXTRA = 1.1
-const BODY_BORDER_WIDTH = 1
-const MIN_BODY = 1.5
+const CANDLE_BORDER = 'rgba(0, 0, 0, 0.55)'
+const WICK_WIDTH = 1
+const BODY_BORDER_WIDTH = 0.75
+const MIN_BODY = 1
+/** Dim heatmap under each candle so bodies/wicks read clearly. */
+const CANDLE_BACKDROP = 'rgba(10, 14, 23, 0.82)'
+const CANDLE_BACKDROP_PAD_X = 3.125
+/** Padding beyond body top/bottom inside the housing. */
+const CANDLE_BACKDROP_PAD_Y = 1.5625
+/** Extra inset past high/low so wick tips sit inside the semi-opaque panel (incl. stroke half-width). */
+const CANDLE_BACKDROP_WICK_TIP_PAD = 2.75
 
 export type HeatmapTimeRange = { start: number; end: number }
 
@@ -23,8 +29,8 @@ const priceToY = (price: number, h: number, axis: HeatmapPriceAxis): number => {
 }
 
 const CANDLE_BODY_SLOT_FILL = 0.9
-/** vs tight slot fill (`spacing * 0.9 - 0.5`): 0.7 prior, ×0.7 again = ~30% narrower bodies. */
-export const HEATMAP_CANDLE_WIDTH_SCALE = 0.49
+/** Narrow bodies vs bar spacing (Coinglass-like width on ~60 bars across the window). */
+export const HEATMAP_CANDLE_WIDTH_SCALE = 0.42
 
 /** Body width from actual bar center spacing so 15m / 30m / 60m stay aligned with series density. */
 export const heatmapCandleBodyWidthPx = (barSpacingPx: number): number => {
@@ -49,6 +55,8 @@ export const drawHeatmapCandleOverlay = (
   const span = Math.max(1, timeRange.end - timeRange.start)
   const barSpacingPx = (intervalMs / span) * w
   const candleW = heatmapCandleBodyWidthPx(barSpacingPx)
+  const rowH = h / axis.rows
+  const minBodyPx = Math.max(1, Math.min(MIN_BODY, rowH))
 
   const pad = intervalMs
   const inWindow = candles.filter(
@@ -69,14 +77,23 @@ export const drawHeatmapCandleOverlay = (
     if (lowY > h + 4 || highY < -4) continue
 
     const color = c.close >= c.open ? CANDLE_GREEN : CANDLE_RED
+
+    const wickTop = Math.min(highY, lowY)
+    const wickBottom = Math.max(highY, lowY)
+    const wickExtentPad = CANDLE_BACKDROP_WICK_TIP_PAD + WICK_WIDTH / 2
+    const backdropW = Math.max(candleW + CANDLE_BACKDROP_PAD_X * 2, WICK_WIDTH + 4)
+    const bodyH = Math.max(Math.max(openY, closeY) - Math.min(openY, closeY), minBodyPx)
+    const backdropH = Math.max(
+      wickBottom - wickTop + wickExtentPad * 2,
+      bodyH + CANDLE_BACKDROP_PAD_Y * 2,
+    )
+    const backdropX = xCenter - backdropW / 2
+    const backdropY = wickTop - wickExtentPad
+    ctx.fillStyle = CANDLE_BACKDROP
+    ctx.fillRect(backdropX, backdropY, backdropW, backdropH)
+
     const xWick = xCenter + 0.5
     ctx.lineCap = 'butt'
-    ctx.strokeStyle = CANDLE_BORDER
-    ctx.lineWidth = WICK_WIDTH + WICK_BORDER_EXTRA
-    ctx.beginPath()
-    ctx.moveTo(xWick, highY)
-    ctx.lineTo(xWick, lowY)
-    ctx.stroke()
     ctx.strokeStyle = color
     ctx.lineWidth = WICK_WIDTH
     ctx.beginPath()
@@ -86,7 +103,7 @@ export const drawHeatmapCandleOverlay = (
 
     const bodyTop = Math.min(openY, closeY)
     const bodyBottom = Math.max(openY, closeY)
-    const bodyHeight = Math.max(MIN_BODY, bodyBottom - bodyTop)
+    const bodyHeight = Math.max(bodyBottom - bodyTop, minBodyPx)
     const bodyX = xCenter - candleW / 2
     ctx.fillStyle = color
     ctx.fillRect(bodyX, bodyTop, candleW, bodyHeight)

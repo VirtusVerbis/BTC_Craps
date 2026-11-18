@@ -1,14 +1,15 @@
 import type { BookLevel } from './types'
 
-/** USD price lattice step for the session heatmap (Coinglass-style Y). */
-export const HEATMAP_PRICE_TICK_USD = 25
+/** USD price lattice step for the session heatmap (Coinglass-style Y; finer ⇒ thinner full bands). */
+export const HEATMAP_PRICE_TICK_USD = 6
 /** Include resting levels within this bps of each venue mid when building buckets. */
 export const HEATMAP_PRICE_BAND_BPS = 180
 /** Extra price slack above/below data (depth + candles). */
 export const HEATMAP_PRICE_AXIS_PAD_PCT = 0.012
 /** Minimum half-span around center when range is tight (~±35 bps at $100k). */
 export const HEATMAP_PRICE_AXIS_MIN_HALF_BPS = 35
-export const HEATMAP_PRICE_MAX_ROWS = 140
+/** Cap before Y tick coarsens; higher ⇒ thinner rows at fixed chart height (Coinglass-style density). */
+export const HEATMAP_PRICE_MAX_ROWS = 640
 /** Nearest off-view pool labels / edge tint on the session heatmap (merged venues, latest book). */
 export const HEATMAP_OFFRANGE_MIN_USD = 1_000_000
 

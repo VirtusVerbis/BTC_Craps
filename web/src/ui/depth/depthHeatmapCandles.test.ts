@@ -6,7 +6,7 @@ describe('heatmapCandleBodyWidthPx', () => {
     const spacing = 900 / 60
     const legacy = spacing * 0.9 - 0.5
     const body = heatmapCandleBodyWidthPx(spacing)
-    expect(body).toBeCloseTo(legacy * 0.49, 5)
+    expect(body).toBeCloseTo(legacy * 0.42, 5)
     expect(body).toBeLessThanOrEqual(spacing - 0.75)
   })
 })

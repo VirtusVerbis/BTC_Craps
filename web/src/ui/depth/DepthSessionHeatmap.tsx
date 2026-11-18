@@ -61,7 +61,7 @@ const bucketCountForWindow = (windowMin: TimelineWindowMin): number => {
   return DEPTH_WINDOW_60_MIN_BUCKETS
 }
 
-const HEATMAP_CHART_MIN_H = 200
+const HEATMAP_CHART_MIN_H = 400
 const HEATMAP_PROFILE_RAIL_W = 32
 
 const formatAxisPrice = (price: number): string =>
@@ -142,7 +142,7 @@ export const DepthSessionHeatmap = ({ micro }: DepthSessionHeatmapProps) => {
   const scrollRef = useRef<HTMLDivElement>(null)
   const scaleStateRef = useRef<TimelineScaleState>({ tick: 0, max: 1 })
   const [windowMin, setWindowMin] = useState<TimelineWindowMin>(readWindowMin())
-  const [chartSize, setChartSize] = useState({ w: 900, h: 220 })
+  const [chartSize, setChartSize] = useState({ w: 900, h: 400 })
   const [axisMaxUsd, setAxisMaxUsd] = useState(1)
   const [candles, setCandles] = useState<Candle[]>([])
   const [offRangePools, setOffRangePools] = useState<OffRangeSummary>({ above: null, below: null })

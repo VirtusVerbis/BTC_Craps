@@ -52,6 +52,20 @@ const heatmapRowPixelSpan = (row: number, rowCount: number, h: number): { y: num
   return { y: y0, height: Math.max(1, y1 - y0) }
 }
 
+/** 1 = paint full row band (no gutters); use finer Y tick for thinner stripes. */
+export const HEATMAP_ROW_SEGMENT_HEIGHT_FRAC = 1
+
+export const heatmapRowSegmentPixelSpan = (
+  row: number,
+  rowCount: number,
+  h: number,
+): { y: number; height: number } => {
+  const { y, height: rowH } = heatmapRowPixelSpan(row, rowCount, h)
+  const segH = Math.max(1, Math.round(rowH * HEATMAP_ROW_SEGMENT_HEIGHT_FRAC))
+  const ySeg = y + Math.floor((rowH - segH) / 2)
+  return { y: ySeg, height: segH }
+}
+
 export const drawDraggedHeatmapDepth = (
   ctx: CanvasRenderingContext2D,
   columns: readonly HeatmapGridColumn[],
@@ -66,14 +80,14 @@ export const drawDraggedHeatmapDepth = (
 
   for (let row = 0; row < axis.rows; row++) {
     const carried = carriedUsdPerColumnForRow(columns, row, axis)
-    const { y, height: rowH } = heatmapRowPixelSpan(row, axis.rows, h)
+    const { y, height: segH } = heatmapRowSegmentPixelSpan(row, axis.rows, h)
     for (let i = 0; i < colCount; i++) {
       const carriedUsd = carried[i]!
       if (carriedUsd <= 0) continue
       const { x, width: cellW } = heatmapColumnPixelSpan(i, colCount, w)
       if (x >= w) continue
       ctx.fillStyle = heatmapColor01(carriedUsd / maxVal)
-      ctx.fillRect(x, y, cellW, rowH)
+      ctx.fillRect(x, y, cellW, segH)
     }
   }
 }

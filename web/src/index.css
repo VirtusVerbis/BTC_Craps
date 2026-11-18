@@ -2775,7 +2775,7 @@ html.shooter-gesture-lock body {
 
 .depth-session-heatmap .depth-timeline-chart-row {
   flex: 1;
-  min-height: 12.5rem;
+  min-height: 25rem;
   max-width: 100%;
   min-width: 0;
   align-items: stretch;
