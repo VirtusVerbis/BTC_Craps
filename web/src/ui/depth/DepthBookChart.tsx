@@ -328,10 +328,10 @@ const drawWallMarkers = (
 }
 
 const BOOK_CHART_STACK_ROW_H = 76
-const BOOK_CHART_OVERLAP_H = 200
+/** One height for stack & overlap so toggling mode does not resize the chart block. */
+const BOOK_CHART_MIN_DISPLAY_H = BOOK_CHART_STACK_ROW_H * DEPTH_VENUE_ORDER.length + 8
 
-const defaultBookChartHeight = (mode: BookChartMode): number =>
-  mode === 'stack' ? BOOK_CHART_STACK_ROW_H * DEPTH_VENUE_ORDER.length + 8 : BOOK_CHART_OVERLAP_H
+const defaultBookChartHeight = (_mode: BookChartMode): number => BOOK_CHART_MIN_DISPLAY_H
 
 interface DepthBookChartProps {
   micro: MicrostructureState
@@ -344,7 +344,7 @@ export const DepthBookChart = ({ micro, topWalls, fillAvailableHeight = false }:
   const scrollRef = useRef<HTMLDivElement>(null)
   const [mode, setMode] = useState<BookChartMode>(readBookMode)
   const [xScale, setXScale] = useState<BookChartXScale>(readXScale)
-  const [viewSize, setViewSize] = useState({ w: 900, h: BOOK_CHART_OVERLAP_H })
+  const [viewSize, setViewSize] = useState({ w: 900, h: BOOK_CHART_MIN_DISPLAY_H })
 
   const bookChartMaxBps =
     xScale === 'stretch' ? DEPTH_BOOK_CHART_STRETCH_MAX_BPS : DEPTH_BOOK_CHART_MAX_BPS
@@ -397,18 +397,17 @@ export const DepthBookChart = ({ micro, topWalls, fillAvailableHeight = false }:
     if (!el) return
     const measure = () => {
       const w = Math.max(320, Math.floor(el.clientWidth))
-      const baseH = defaultBookChartHeight(mode)
       const h =
         fillAvailableHeight && el.clientHeight > 0
-          ? Math.max(baseH, Math.floor(el.clientHeight))
-          : baseH
+          ? Math.max(BOOK_CHART_MIN_DISPLAY_H, Math.floor(el.clientHeight))
+          : defaultBookChartHeight(mode)
       setViewSize({ w, h })
     }
     measure()
     const ro = new ResizeObserver(measure)
     ro.observe(el)
     return () => ro.disconnect()
-  }, [fillAvailableHeight, mode])
+  }, [fillAvailableHeight])
 
   useEffect(() => {
     const canvas = canvasRef.current
