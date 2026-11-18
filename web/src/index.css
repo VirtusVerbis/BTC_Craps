@@ -2779,6 +2779,30 @@ html.shooter-gesture-lock body {
   max-width: 100%;
   min-width: 0;
   align-items: stretch;
+  display: flex;
+  flex-direction: row;
+  gap: 0;
+}
+
+.depth-heatmap-profile-rail {
+  flex: 0 0 2rem;
+  width: 2rem;
+  min-height: 0;
+  align-self: stretch;
+  display: block;
+  border-radius: 0 4px 4px 0;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(246, 240, 218, 0.1);
+  border-left: none;
+  image-rendering: pixelated;
+}
+
+.depth-session-heatmap .depth-heatmap-price-axis {
+  position: relative;
+  left: auto;
+  top: auto;
+  flex: 0 0 4.25rem;
+  width: 4.25rem;
 }
 
 .depth-heatmap-scroll-fit {
@@ -2789,12 +2813,59 @@ html.shooter-gesture-lock body {
   min-width: 0;
   display: flex;
   flex-direction: column;
+  position: relative;
+}
+
+.depth-heatmap-chart-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+}
+
+.depth-heatmap-offrange-chip {
+  position: absolute;
+  right: 0.35rem;
+  z-index: 3;
+  width: max-content;
+  max-width: calc(100% - 0.7rem);
+  display: block;
+  padding: 0.12rem 0.38rem;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.52);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  text-align: right;
+  white-space: nowrap;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.depth-heatmap-offrange-chip--top {
+  top: 0.35rem;
+}
+
+.depth-heatmap-offrange-chip--bottom {
+  bottom: 0.35rem;
 }
 
 .depth-session-heatmap .depth-heatmap-price-axis {
   flex-shrink: 0;
   min-height: 0;
   align-self: stretch;
+}
+
+.depth-heatmap-price-axis .depth-timeline-axis-tick {
+  left: auto;
+  right: 0.2rem;
 }
 
 .depth-heatmap-legend {
@@ -2818,10 +2889,9 @@ html.shooter-gesture-lock body {
   border-radius: 2px;
   background: linear-gradient(
     90deg,
-    rgb(10, 14, 23) 0%,
-    rgb(30, 58, 95) 22%,
-    rgb(45, 212, 191) 48%,
-    rgb(251, 191, 36) 72%,
+    rgb(30, 58, 95) 0%,
+    rgb(45, 212, 191) 33.33%,
+    rgb(251, 191, 36) 66.67%,
     rgb(239, 68, 68) 100%
   );
   border: 1px solid rgba(246, 240, 218, 0.2);

@@ -25,6 +25,17 @@ import { formatWallUsd } from './depthWallRowMetrics'
 import { DEPTH_VENUE_ORDER } from './depthVenueTheme'
 import { drawHeatmapCandleOverlay } from './depthHeatmapCandles'
 import { drawDraggedHeatmapDepth } from './depthHeatmapDragPaint'
+import { offRangeChipStyle } from './depthHeatmapOffRangeChip'
+import {
+  aggregateMaxUsdByPrice,
+  drawHeatmapDepthProfile,
+  drawHeatmapOffRangeEdgeBleed,
+  latestHeatmapColumn,
+  nearestOffRangeLargePools,
+  qualifiesOffRangePool,
+  type OffRangeEdge,
+  type OffRangeSummary,
+} from './depthHeatmapDepthProfile'
 
 const HEATMAP_CANDLE_POLL_MS = 45_000
 
@@ -51,9 +62,26 @@ const bucketCountForWindow = (windowMin: TimelineWindowMin): number => {
 }
 
 const HEATMAP_CHART_MIN_H = 200
+const HEATMAP_PROFILE_RAIL_W = 32
 
 const formatAxisPrice = (price: number): string =>
   `$${Math.round(price).toLocaleString('en-US', { maximumFractionDigits: 0 })}`
+
+const bpsFromMid = (mid: number, price: number): number => {
+  if (!(mid > 0)) return 0
+  return Math.round((Math.abs(price - mid) / mid) * 10_000)
+}
+
+const formatOffRangeChip = (direction: 'above' | 'below', edge: OffRangeEdge, mid: number): string => {
+  const arrow = direction === 'above' ? '↑' : '↓'
+  const bps = bpsFromMid(mid, edge.price)
+  return `${arrow} +${bps} bps · ${formatWallUsd(edge.usd)} @ ${formatAxisPrice(edge.price)}`
+}
+
+const offRangeChipAria = (direction: 'above' | 'below', edge: OffRangeEdge, mid: number): string => {
+  const side = direction === 'above' ? 'Above chart' : 'Below chart'
+  return `${side}: nearest pool ≥ $1M, ${bpsFromMid(mid, edge.price)} bps from perp mid, ${formatWallUsd(edge.usd)} at ${formatAxisPrice(edge.price)}`
+}
 
 const drawHeatmap = (
   ctx: CanvasRenderingContext2D,
@@ -66,6 +94,7 @@ const drawHeatmap = (
   candles: readonly Candle[],
   timeRange: { start: number; end: number },
   candleIntervalMs: number,
+  offRange: OffRangeSummary,
 ) => {
   const rowH = h / axis.rows
   ctx.fillStyle = '#0a0e17'
@@ -83,6 +112,7 @@ const drawHeatmap = (
   }
 
   drawDraggedHeatmapDepth(ctx, columns, w, h, maxVal, axis, timeRange)
+  drawHeatmapOffRangeEdgeBleed(ctx, w, h, offRange, maxVal)
 
   if (liveMid > axis.priceMin && liveMid < axis.priceMax) {
     const midRow = (axis.priceMax - liveMid) / axis.tick
@@ -107,6 +137,7 @@ interface DepthSessionHeatmapProps {
 
 export const DepthSessionHeatmap = ({ micro }: DepthSessionHeatmapProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const profileCanvasRef = useRef<HTMLCanvasElement>(null)
   const chartRowRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const scaleStateRef = useRef<TimelineScaleState>({ tick: 0, max: 1 })
@@ -114,6 +145,7 @@ export const DepthSessionHeatmap = ({ micro }: DepthSessionHeatmapProps) => {
   const [chartSize, setChartSize] = useState({ w: 900, h: 220 })
   const [axisMaxUsd, setAxisMaxUsd] = useState(1)
   const [candles, setCandles] = useState<Candle[]>([])
+  const [offRangePools, setOffRangePools] = useState<OffRangeSummary>({ above: null, below: null })
   const [priceAxis, setPriceAxis] = useState<HeatmapPriceAxis>(() => ({
     priceMin: 99_000,
     priceMax: 101_000,
@@ -226,8 +258,31 @@ export const DepthSessionHeatmap = ({ micro }: DepthSessionHeatmapProps) => {
     canvas.height = h
     canvas.style.width = '100%'
     canvas.style.height = '100%'
-    drawHeatmap(ctx, columns, w, h, maxVal, axis, liveMid, candles, timeRange, candleBarMs)
+    const refMid =
+      liveMid > 0
+        ? liveMid
+        : columns.length > 0
+          ? columns[columns.length - 1]!.refMid
+          : 0
+    const byPrice = aggregateMaxUsdByPrice(columns)
+    const latestCol = latestHeatmapColumn(columns)
+    const offRange = nearestOffRangeLargePools(latestCol, axis, refMid)
+    drawHeatmap(ctx, columns, w, h, maxVal, axis, liveMid, candles, timeRange, candleBarMs, offRange)
     setAxisMaxUsd(maxVal)
+    setOffRangePools(offRange)
+
+    const profileCanvas = profileCanvasRef.current
+    if (profileCanvas) {
+      const pctx = profileCanvas.getContext('2d')
+      if (pctx) {
+        const pw = HEATMAP_PROFILE_RAIL_W
+        profileCanvas.width = pw
+        profileCanvas.height = h
+        profileCanvas.style.width = `${pw}px`
+        profileCanvas.style.height = '100%'
+        drawHeatmapDepthProfile(pctx, pw, h, columns, axis, maxVal, refMid, byPrice)
+      }
+    }
   }, [micro, bucketCount, displayPlan, timelineNow, windowMin, chartSize, samplesByVenue, liveMid, candles])
 
   const axisMaxLabel = formatWallUsd(axisMaxUsd)
@@ -235,6 +290,23 @@ export const DepthSessionHeatmap = ({ micro }: DepthSessionHeatmapProps) => {
   const axisMid =
     liveMid > 0 ? formatAxisPrice(liveMid) : formatAxisPrice((priceAxis.priceMax + priceAxis.priceMin) / 2)
   const axisBottom = formatAxisPrice(priceAxis.priceMin)
+  const chipMid =
+    liveMid > 0 ? liveMid : Math.max(0, (priceAxis.priceMax + priceAxis.priceMin) / 2)
+  const showOffRangeAbove =
+    offRangePools.above != null && qualifiesOffRangePool(offRangePools.above.usd) && chipMid > 0
+  const showOffRangeBelow =
+    offRangePools.below != null && qualifiesOffRangePool(offRangePools.below.usd) && chipMid > 0
+  const offRangeAriaParts: string[] = []
+  if (offRangePools.above && qualifiesOffRangePool(offRangePools.above.usd) && chipMid > 0) {
+    offRangeAriaParts.push(offRangeChipAria('above', offRangePools.above, chipMid))
+  }
+  if (offRangePools.below && qualifiesOffRangePool(offRangePools.below.usd) && chipMid > 0) {
+    offRangeAriaParts.push(offRangeChipAria('below', offRangePools.below, chipMid))
+  }
+  const heatmapAria =
+    offRangeAriaParts.length > 0
+      ? `Depth heatmap by BTC price; color scale to ${axisMaxLabel} resting USD. ${offRangeAriaParts.join('. ')}`
+      : `Depth heatmap by BTC price; color scale to ${axisMaxLabel} resting USD`
 
   return (
     <section className="depth-session-heatmap">
@@ -275,15 +347,44 @@ export const DepthSessionHeatmap = ({ micro }: DepthSessionHeatmapProps) => {
           className="depth-timeline-scroll depth-timeline-scroll--chart depth-heatmap-scroll-fit"
           tabIndex={0}
           role="img"
-          aria-label={`Depth heatmap by BTC price; color scale to ${axisMaxLabel} resting USD`}
+          aria-label={heatmapAria}
         >
-          <canvas
-            ref={canvasRef}
-            className="depth-timeline-canvas depth-timeline-canvas-hero depth-heatmap-canvas"
-            width={900}
-            height={chartSize.h}
-          />
+          <div className="depth-heatmap-chart-wrap">
+            <canvas
+              ref={canvasRef}
+              className="depth-timeline-canvas depth-timeline-canvas-hero depth-heatmap-canvas"
+              width={900}
+              height={chartSize.h}
+            />
+            {showOffRangeAbove && offRangePools.above ? (
+              <span
+                className="depth-heatmap-offrange-chip depth-heatmap-offrange-chip--top"
+                style={offRangeChipStyle(offRangePools.above.usd, axisMaxUsd)}
+                title="Nearest merged resting pool above chart Y (latest book; color vs scale max)"
+              >
+                {formatOffRangeChip('above', offRangePools.above, chipMid)}
+              </span>
+            ) : null}
+            {showOffRangeBelow && offRangePools.below ? (
+              <span
+                className="depth-heatmap-offrange-chip depth-heatmap-offrange-chip--bottom"
+                style={offRangeChipStyle(offRangePools.below.usd, axisMaxUsd)}
+                title="Nearest merged resting pool below chart Y (latest book; color vs scale max)"
+              >
+                {formatOffRangeChip('below', offRangePools.below, chipMid)}
+              </span>
+            ) : null}
+          </div>
         </div>
+        <canvas
+          ref={profileCanvasRef}
+          className="depth-heatmap-profile-rail"
+          width={HEATMAP_PROFILE_RAIL_W}
+          height={chartSize.h}
+          role="img"
+          aria-label="Session max resting USD by price; top and bottom strips show liquidity outside the main price view"
+          title="Depth profile: in-view band matches chart Y; ↑↓ strips = resting size above/below view (within ~180 bps band)"
+        />
         <div
           className="depth-timeline-axis depth-heatmap-price-axis"
           style={{ height: chartSize.h }}
@@ -302,8 +403,10 @@ export const DepthSessionHeatmap = ({ micro }: DepthSessionHeatmapProps) => {
         </div>
       </div>
       <p className="depth-muted depth-timeline-caption">
-        Y: BTC USD ({priceAxis.tick.toLocaleString()} grid) · X: time · merged depth + Binance spot 1m candles · color:
-        resting USD · scale max {axisMaxLabel}
+        Y: BTC USD ({priceAxis.tick.toLocaleString()} grid) · chart labels (top/bottom right): nearest pool outside Y (size/color
+        vs scale max) ·
+        right rail: session max resting USD per price · X: time · merged depth + Binance spot 1m candles · color: resting USD ·
+        scale max {axisMaxLabel}
       </p>
     </section>
   )

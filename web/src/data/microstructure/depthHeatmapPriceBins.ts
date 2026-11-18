@@ -9,6 +9,8 @@ export const HEATMAP_PRICE_AXIS_PAD_PCT = 0.012
 /** Minimum half-span around center when range is tight (~±35 bps at $100k). */
 export const HEATMAP_PRICE_AXIS_MIN_HALF_BPS = 35
 export const HEATMAP_PRICE_MAX_ROWS = 140
+/** Nearest off-view pool labels / edge tint on the session heatmap (merged venues, latest book). */
+export const HEATMAP_OFFRANGE_MIN_USD = 1_000_000
 
 export type PriceBucket = { p: number; usd: number }
 

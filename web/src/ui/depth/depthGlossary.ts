@@ -138,7 +138,7 @@ export const depthGlossary: Record<DepthGlossaryKey, GlossaryEntry> = {
   depthSessionHeatmap: {
     title: 'Depth heatmap (price × time)',
     body:
-      'Session-only Coinglass-style view: time across the bottom, BTC USD price up the side ($25 ticks by default). Resting liquidity within ~180 bps of each venue mid is binned at absolute prices and merged across venues; Binance BTCUSDT 1m candles are drawn on top. Brighter depth color = more resting USD; faint dashed line = Binance perp mid. Color scale max ratchets up during the session.',
+      'Session-only Coinglass-style view: time across the bottom, BTC USD price on the side ($25 ticks by default). Resting liquidity within ~180 bps of each venue mid is binned at absolute prices and merged across venues; Binance BTCUSDT 1m candles are drawn on top. Top/bottom chips and edge tint mark the nearest merged pool ≥ $1M outside the visible Y (latest book, distance in bps from Binance perp mid). The profile rail shows session-max resting USD at each price. Brighter color = more resting USD; faint dashed line = Binance perp mid. Color scale max ratchets up during the session.',
   },
   wallTapeSection: {
     title: 'Wall tape',

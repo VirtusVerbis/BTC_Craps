@@ -3,7 +3,10 @@ import type { HeatmapPriceAxis } from '../../data/microstructure/depthHeatmapPri
 
 const CANDLE_GREEN = '#00c853'
 const CANDLE_RED = '#d50000'
+const CANDLE_BORDER = 'rgba(0, 0, 0, 0.92)'
 const WICK_WIDTH = 1.25
+const WICK_BORDER_EXTRA = 1.1
+const BODY_BORDER_WIDTH = 1
 const MIN_BODY = 1.5
 
 export type HeatmapTimeRange = { start: number; end: number }
@@ -66,21 +69,30 @@ export const drawHeatmapCandleOverlay = (
     if (lowY > h + 4 || highY < -4) continue
 
     const color = c.close >= c.open ? CANDLE_GREEN : CANDLE_RED
+    const xWick = xCenter + 0.5
+    ctx.lineCap = 'butt'
+    ctx.strokeStyle = CANDLE_BORDER
+    ctx.lineWidth = WICK_WIDTH + WICK_BORDER_EXTRA
+    ctx.beginPath()
+    ctx.moveTo(xWick, highY)
+    ctx.lineTo(xWick, lowY)
+    ctx.stroke()
     ctx.strokeStyle = color
     ctx.lineWidth = WICK_WIDTH
     ctx.beginPath()
-    ctx.moveTo(xCenter + 0.5, highY)
-    ctx.lineTo(xCenter + 0.5, lowY)
+    ctx.moveTo(xWick, highY)
+    ctx.lineTo(xWick, lowY)
     ctx.stroke()
 
     const bodyTop = Math.min(openY, closeY)
     const bodyBottom = Math.max(openY, closeY)
     const bodyHeight = Math.max(MIN_BODY, bodyBottom - bodyTop)
+    const bodyX = xCenter - candleW / 2
     ctx.fillStyle = color
-    ctx.fillRect(xCenter - candleW / 2, bodyTop, candleW, bodyHeight)
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)'
-    ctx.lineWidth = 0.75
-    ctx.strokeRect(xCenter - candleW / 2, bodyTop, candleW, bodyHeight)
+    ctx.fillRect(bodyX, bodyTop, candleW, bodyHeight)
+    ctx.strokeStyle = CANDLE_BORDER
+    ctx.lineWidth = BODY_BORDER_WIDTH
+    ctx.strokeRect(bodyX + 0.5, bodyTop + 0.5, candleW - 1, bodyHeight - 1)
   }
   ctx.restore()
 }
