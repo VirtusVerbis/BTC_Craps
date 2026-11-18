@@ -2628,15 +2628,13 @@ html.shooter-gesture-lock body {
     --depth-global-font: clamp(1.02rem, 2.6vw, 1.2rem);
   }
 
-  /* Same as desktop: taker table left, summary stats right (avoid stacking the “chart” above items). */
+  /* Match desktop: table | 2×2 stats; only tighten gaps. */
   .depth-global-layout {
-    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-    gap: 0.35rem 0.45rem;
+    gap: 0.5rem 0.55rem;
   }
 
   .depth-global-stats {
-    grid-template-columns: 1fr;
-    gap: 0.15rem 0;
+    gap: 0.12rem 0.4rem;
   }
 
   .depth-taker-table th,
@@ -2651,17 +2649,7 @@ html.shooter-gesture-lock body {
     -webkit-overflow-scrolling: touch;
   }
 
-  .depth-panel-scroll--fill > .depth-charts-stack {
-    flex: 0 0 auto;
-    min-height: auto;
-  }
-
-  .depth-charts-stack--equal-grow > .depth-consolidated-walls {
-    flex: 0 0 auto;
-    min-height: auto;
-  }
-
-  .depth-consolidated-walls--charts-grow .depth-session-heatmap {
+  .depth-panel-scroll--fill:not(.depth-panel-scroll--overview-collapsed) > .depth-charts-stack {
     flex: 0 0 auto;
     min-height: auto;
   }
@@ -2855,9 +2843,9 @@ html.shooter-gesture-lock body {
 }
 
 .depth-book-chart-wrap--grow .depth-book-chart-canvas {
-  flex: 1;
-  min-height: 0;
-  height: 100%;
+  flex: 0 0 auto;
+  width: 100%;
+  max-height: 100%;
 }
 
 .depth-consolidated-walls--charts-grow .depth-session-heatmap {

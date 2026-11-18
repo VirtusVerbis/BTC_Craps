@@ -341,6 +341,7 @@ interface DepthBookChartProps {
 
 export const DepthBookChart = ({ micro, topWalls, fillAvailableHeight = false }: DepthBookChartProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const wrapRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const [mode, setMode] = useState<BookChartMode>(readBookMode)
   const [xScale, setXScale] = useState<BookChartXScale>(readXScale)
@@ -393,21 +394,30 @@ export const DepthBookChart = ({ micro, topWalls, fillAvailableHeight = false }:
   }, [xScale])
 
   useEffect(() => {
-    const el = scrollRef.current
-    if (!el) return
+    const scrollEl = scrollRef.current
+    const wrapEl = wrapRef.current
+    if (!scrollEl) return
+
     const measure = () => {
-      const w = Math.max(320, Math.floor(el.clientWidth))
-      const h =
-        fillAvailableHeight && el.clientHeight > 0
-          ? Math.max(BOOK_CHART_MIN_DISPLAY_H, Math.floor(el.clientHeight))
-          : defaultBookChartHeight(mode)
-      setViewSize({ w, h })
+      const w = Math.max(320, Math.floor(scrollEl.clientWidth))
+      let h = defaultBookChartHeight(mode)
+      if (fillAvailableHeight && wrapEl) {
+        const toolbar = wrapEl.querySelector<HTMLElement>('.depth-timeline-toolbar')
+        const chrome = toolbar?.offsetHeight ?? 0
+        const available = wrapEl.clientHeight - chrome
+        if (available > 0) {
+          h = Math.max(BOOK_CHART_MIN_DISPLAY_H, Math.floor(available))
+        }
+      }
+      setViewSize((prev) => (prev.w === w && prev.h === h ? prev : { w, h }))
     }
+
     measure()
     const ro = new ResizeObserver(measure)
-    ro.observe(el)
+    ro.observe(scrollEl)
+    if (fillAvailableHeight && wrapEl) ro.observe(wrapEl)
     return () => ro.disconnect()
-  }, [fillAvailableHeight])
+  }, [fillAvailableHeight, mode])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -424,7 +434,8 @@ export const DepthBookChart = ({ micro, topWalls, fillAvailableHeight = false }:
     canvas.width = w
     canvas.height = h
     canvas.style.width = '100%'
-    canvas.style.height = fillAvailableHeight ? '100%' : `${h}px`
+    canvas.style.height = `${h}px`
+    canvas.style.maxHeight = fillAvailableHeight ? '100%' : ''
     ctx.clearRect(0, 0, w, h)
 
     const padX = 4
@@ -557,7 +568,10 @@ export const DepthBookChart = ({ micro, topWalls, fillAvailableHeight = false }:
   }, [micro, mode, xScale, topWalls, viewSize, fillAvailableHeight, maxCum, venueCurves, venueExtentsById])
 
   return (
-    <div className={fillAvailableHeight ? 'depth-book-chart-wrap depth-book-chart-wrap--grow' : 'depth-book-chart-wrap'}>
+    <div
+      ref={wrapRef}
+      className={fillAvailableHeight ? 'depth-book-chart-wrap depth-book-chart-wrap--grow' : 'depth-book-chart-wrap'}
+    >
       <div className="depth-timeline-toolbar">
         <DepthInfoIcon glossaryKey="wallDepthChart" label="Live book depth" />
         <div className="depth-timeline-legend">
