@@ -35,3 +35,26 @@ export const depthVenueMissingColor: Record<VenueId, string> = {
   coinbase: 'rgba(100, 181, 246, 0.35)',
   hyperliquid: 'rgba(186, 104, 200, 0.35)',
 }
+
+/** Opaque merged-timeline bars (stack/overlap); panel chrome stays translucent in CSS. */
+export const depthVenueColorBidTimeline: Record<VenueId, string> = {
+  binancePerp: 'rgb(255, 183, 77)',
+  binanceSpot: 'rgb(255, 235, 59)',
+  coinbase: 'rgb(100, 181, 246)',
+  hyperliquid: 'rgb(186, 104, 200)',
+}
+
+/** Ask timeline hues lightened vs bid (replaces former lower-alpha ask). */
+export const depthVenueColorAskTimeline: Record<VenueId, string> = {
+  binancePerp: 'rgb(255, 212, 148)',
+  binanceSpot: 'rgb(255, 246, 176)',
+  coinbase: 'rgb(153, 206, 250)',
+  hyperliquid: 'rgb(212, 153, 218)',
+}
+
+export const depthVenueMissingColorTimeline: Record<VenueId, string> = {
+  binancePerp: 'rgb(140, 100, 42)',
+  binanceSpot: 'rgb(140, 128, 32)',
+  coinbase: 'rgb(55, 100, 136)',
+  hyperliquid: 'rgb(102, 57, 110)',
+}

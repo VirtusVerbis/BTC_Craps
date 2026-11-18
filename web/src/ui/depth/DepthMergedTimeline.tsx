@@ -20,10 +20,16 @@ import type { MicrostructureState, VenueId } from '../../data/microstructure/typ
 import { formatWallUsd } from './depthWallRowMetrics'
 import { DepthInfoIcon } from './DepthInfoIcon'
 import {
+  buildTimelineStackSegments,
+  layoutTimelineStack,
+  scaleStackSegmentsToSpan,
+} from './depthMergedTimelineStack'
+import {
   DEPTH_VENUE_ORDER,
-  depthVenueColorAsk,
+  depthVenueColorAskTimeline,
   depthVenueColorBid,
-  depthVenueMissingColor,
+  depthVenueColorBidTimeline,
+  depthVenueMissingColorTimeline,
   depthVenueShort,
 } from './depthVenueTheme'
 
@@ -76,6 +82,7 @@ const drawColumn = (
   midY: number,
   halfH: number,
   maxVal: number,
+  chartH: number,
   mode: DepthTimelineLayerMode,
   side: 'bid' | 'ask',
 ) => {
@@ -87,7 +94,7 @@ const drawColumn = (
 
   for (const { venue, gap } of values) {
     if (!gap) continue
-    const color = depthVenueMissingColor[venue]
+    const color = depthVenueMissingColorTimeline[venue]
     const tickH = 2
     const tickY = side === 'bid' ? midY - tickH : midY
     ctx.fillStyle = color
@@ -95,34 +102,33 @@ const drawColumn = (
   }
 
   const plotted = values.filter((v) => !v.gap)
-  const sorted = [...plotted].sort((a, b) => a.value - b.value)
+  const byNotionalDesc = (a: { value: number }, b: { value: number }) => b.value - a.value
+  const colInnerW = Math.max(1, colW - 0.5)
 
   if (mode === 'overlap') {
-    for (const { venue, value } of sorted) {
+    for (const { venue, value } of [...plotted].sort(byNotionalDesc)) {
       const h = (value / maxVal) * halfH
       if (h < 0.5) continue
-      ctx.fillStyle = side === 'bid' ? depthVenueColorBid[venue] : depthVenueColorAsk[venue]
+      ctx.fillStyle = side === 'bid' ? depthVenueColorBidTimeline[venue] : depthVenueColorAskTimeline[venue]
       if (side === 'bid') {
-        ctx.fillRect(x, midY - h, Math.max(1, colW - 0.5), h)
+        ctx.fillRect(x, midY - h, colInnerW, h)
       } else {
-        ctx.fillRect(x, midY, Math.max(1, colW - 0.5), h)
+        ctx.fillRect(x, midY, colInnerW, h)
       }
     }
     return
   }
 
-  let stackBase = side === 'bid' ? midY : midY
-  for (const { venue, value } of sorted) {
-    const h = (value / maxVal) * halfH
-    if (h < 0.25) continue
-    ctx.fillStyle = side === 'bid' ? depthVenueColorBid[venue] : depthVenueColorAsk[venue]
-    if (side === 'bid') {
-      stackBase -= h
-      ctx.fillRect(x, stackBase, Math.max(1, colW - 0.5), h)
-    } else {
-      ctx.fillRect(x, stackBase, Math.max(1, colW - 0.5), h)
-      stackBase += h
-    }
+  const bandSpan = side === 'bid' ? midY : chartH - midY
+  const segments = scaleStackSegmentsToSpan(buildTimelineStackSegments(plotted, halfH), bandSpan)
+  const fill =
+    side === 'bid'
+      ? (venue: VenueId) => depthVenueColorBidTimeline[venue]
+      : (venue: VenueId) => depthVenueColorAskTimeline[venue]
+
+  for (const { venue, h, y } of layoutTimelineStack(segments, midY, side)) {
+    ctx.fillStyle = fill(venue)
+    ctx.fillRect(x, y, colInnerW, h)
   }
 }
 
@@ -245,8 +251,8 @@ export const DepthMergedTimeline = ({ micro, fillAvailableHeight = false }: Dept
 
     for (let col = 0; col < displayCols; col++) {
       const x = col * colW
-      drawColumn(ctx, DEPTH_VENUE_ORDER, cellsByVenue, col, x, colW, midY, halfH, maxVal, layerMode, 'bid')
-      drawColumn(ctx, DEPTH_VENUE_ORDER, cellsByVenue, col, x, colW, midY, halfH, maxVal, layerMode, 'ask')
+      drawColumn(ctx, DEPTH_VENUE_ORDER, cellsByVenue, col, x, colW, midY, halfH, maxVal, h, layerMode, 'bid')
+      drawColumn(ctx, DEPTH_VENUE_ORDER, cellsByVenue, col, x, colW, midY, halfH, maxVal, h, layerMode, 'ask')
     }
 
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.92)'

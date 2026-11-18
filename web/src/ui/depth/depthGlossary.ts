@@ -88,7 +88,7 @@ export const depthGlossary: Record<DepthGlossaryKey, GlossaryEntry> = {
   },
   timelineLayerMode: {
     title: 'Overlap vs stack',
-    body: 'Overlap draws each venue’s bar in the same column (larger size on top; bid/ask use the same alpha as stack). Stack builds one column from the midline with segments that add up.',
+    body: 'Overlap draws each venue’s bar from the midline in the same column (opaque colors); largest is painted first and smallest last so thinner venues stay visible on top. Stack builds one column from the midline with opaque segments that add up—sorted by size with the largest farthest from mid (top bids, bottom asks); each column scales slice heights to that column’s leader, then fits the stack in the canvas half.',
   },
   timelineWindow: {
     title: 'Timeline window',
