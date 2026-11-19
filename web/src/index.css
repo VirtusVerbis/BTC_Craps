@@ -2605,9 +2605,10 @@ html.shooter-gesture-lock body {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-content: start;
-  gap: 0.1rem clamp(1rem, 4vw, 2.5rem);
+  gap: 1.15rem clamp(1rem, 4vw, 2.5rem);
   min-width: 0;
   width: 100%;
+  font-size: 1.38em;
 }
 
 .depth-global-stats > .depth-row {
@@ -2638,7 +2639,7 @@ html.shooter-gesture-lock body {
   }
 
   .depth-global-stats {
-    gap: 0.12rem 0.4rem;
+    gap: 1.05rem 0.4rem;
   }
 
   .depth-taker-table th,
