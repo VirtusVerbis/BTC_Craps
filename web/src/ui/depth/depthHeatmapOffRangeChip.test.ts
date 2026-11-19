@@ -18,5 +18,7 @@ describe('offRangeChipStyle', () => {
     expect(offRangeChipIntensity(10_000_000, 10_000_000)).toBe(1)
     expect(parseFloat(String(high.fontSize))).toBeCloseTo(HEATMAP_OFFRANGE_CHIP_FONT_MAX_REM, 2)
     expect(high.color).toMatch(/^rgb\(/)
+    expect(String(low.background)).toMatch(/rgba\(255,\s*255,\s*255/)
+    expect(String(high.background)).toMatch(/rgba\(10,\s*14,\s*23/)
   })
 })

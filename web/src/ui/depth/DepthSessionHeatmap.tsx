@@ -68,6 +68,14 @@ const HEATMAP_CHART_MIN_H = 400
 const HEATMAP_CHART_MIN_H_GROW = 120
 const HEATMAP_PROFILE_RAIL_W = 32
 
+const heatmapSlotHeightPx = (row: HTMLElement | null, minH: number): number => {
+  if (!row) return minH
+  const rowH = Math.floor(row.getBoundingClientRect().height)
+  const clientH = row.clientHeight
+  const slot = Math.max(rowH, clientH)
+  return slot > 0 ? Math.max(minH, slot) : minH
+}
+
 const formatAxisPrice = (price: number): string =>
   `$${Math.round(price).toLocaleString('en-US', { maximumFractionDigits: 0 })}`
 
@@ -199,8 +207,7 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     if (!row || !scroll) return
     const minH = fillAvailableHeight ? HEATMAP_CHART_MIN_H_GROW : HEATMAP_CHART_MIN_H
     const measure = () => {
-      const rowH = Math.floor(row.getBoundingClientRect().height)
-      const h = Math.max(minH, rowH > 0 ? rowH : Math.floor(row.clientHeight))
+      const h = heatmapSlotHeightPx(row, minH)
       const w = Math.max(320, Math.floor(scroll.clientWidth))
       setChartSize({ w, h })
     }
@@ -275,10 +282,7 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
 
     const metrics = heatmapCanvasMetricsFit(layoutCols, chartSize.w)
     const w = metrics.width
-    const row = chartRowRef.current
-    const minH = fillAvailableHeight ? HEATMAP_CHART_MIN_H_GROW : HEATMAP_CHART_MIN_H
-    const rowH = row ? Math.floor(row.getBoundingClientRect().height) : 0
-    const h = Math.max(minH, fillAvailableHeight && rowH > 0 ? rowH : chartSize.h)
+    const h = chartSize.h
     canvas.width = w
     canvas.height = h
     canvas.style.width = '100%'
@@ -424,12 +428,7 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
           aria-label="Session max resting USD by price; top and bottom strips show liquidity outside the main price view"
           title="Depth profile: in-view band matches chart Y; ↑↓ strips = resting size above/below view (within ~180 bps band)"
         />
-        <div
-          className="depth-timeline-axis depth-heatmap-price-axis"
-          style={{ height: chartSize.h }}
-          aria-hidden
-          title="BTC USD price"
-        >
+        <div className="depth-timeline-axis depth-heatmap-price-axis" aria-hidden title="BTC USD price">
           <span className="depth-timeline-axis-tick" style={{ top: '2%' }}>
             {axisTop}
           </span>

@@ -58,3 +58,7 @@ export const depthVenueMissingColorTimeline: Record<VenueId, string> = {
   coinbase: 'rgb(55, 100, 136)',
   hyperliquid: 'rgb(102, 57, 110)',
 }
+
+/** UI text/hues aligned with depth legend chips and live book (bid vs ask). */
+export const depthVenueUiColor = (venue: VenueId, side: 'bid' | 'ask'): string =>
+  side === 'bid' ? depthVenueColorBidTimeline[venue] : depthVenueColorAskTimeline[venue]

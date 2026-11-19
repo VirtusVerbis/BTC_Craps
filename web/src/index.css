@@ -2991,7 +2991,6 @@ html.shooter-gesture-lock body {
   display: block;
   padding: 0.12rem 0.38rem;
   border-radius: 3px;
-  background: rgba(255, 255, 255, 0.92);
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
   font-weight: 700;
@@ -3015,6 +3014,7 @@ html.shooter-gesture-lock body {
   flex-shrink: 0;
   min-height: 0;
   align-self: stretch;
+  height: auto;
 }
 
 .depth-heatmap-price-axis .depth-timeline-axis-tick {
@@ -3057,7 +3057,8 @@ html.shooter-gesture-lock body {
 }
 
 .depth-heatmap-price-axis .depth-timeline-axis-tick {
-  font-size: 0.62rem;
+  font-size: 0.96875rem;
+  font-weight: 700;
   max-width: 4.5rem;
   text-align: right;
   line-height: 1.15;

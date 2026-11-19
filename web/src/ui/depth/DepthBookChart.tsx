@@ -9,6 +9,7 @@ import {
 } from '../../data/microstructure/depthBookCurve'
 import type { MicrostructureState, VenueId, WallRecord } from '../../data/microstructure/types'
 import { DepthInfoIcon } from './DepthInfoIcon'
+import { formatWallUsdCompact } from './depthWallRowMetrics'
 import { DEPTH_VENUE_ORDER, depthVenueColorAsk, depthVenueColorBid, depthVenueShort } from './depthVenueTheme'
 
 const STORAGE_BOOK_MODE = 'depthBookChartMode'
@@ -93,8 +94,8 @@ const drawFixedAxisLabels = (
   ctx.fillText(`+${maxBps}`, x + w - 26, labelY)
 }
 
-const CURVE_LABEL_FONT = '11px sans-serif'
-const CURVE_LABEL_LINE_H = 13
+const CURVE_LABEL_FONT = '18px sans-serif'
+const CURVE_LABEL_LINE_H = 20
 
 const venueLabelColor = (venue: VenueId, side: 'bid' | 'ask'): string => {
   const raw = side === 'bid' ? depthVenueColorBid[venue] : depthVenueColorAsk[venue]
@@ -293,7 +294,7 @@ const drawWallMarkers = (
   const midX = x + w / 2
   const halfW = w / 2 - 4
   const baseY = y + h - 4
-  ctx.font = '10px sans-serif'
+  ctx.font = '16px sans-serif'
   for (const wall of walls) {
     const mid = venues[wall.venue].mid
     if (!(mid > 0)) continue
@@ -315,7 +316,7 @@ const drawWallMarkers = (
     ctx.lineTo(px, baseY)
     ctx.stroke()
     ctx.setLineDash([])
-    const text = `${depthVenueShort[wall.venue]} ${wall.side === 'bid' ? 'B' : 'A'}`
+    const text = `${depthVenueShort[wall.venue]} ${wall.side === 'bid' ? 'B' : 'A'} ${formatWallUsdCompact(wall.peakUsd)}`
     ctx.fillStyle = venueLabelColor(wall.venue, wall.side)
     const textW = ctx.measureText(text).width
     const labelY = topY - 2

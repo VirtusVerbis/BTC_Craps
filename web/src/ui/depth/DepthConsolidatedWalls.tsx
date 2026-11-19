@@ -4,7 +4,7 @@ import { DepthBookChart } from './DepthBookChart'
 import { DepthSessionHeatmap } from './DepthSessionHeatmap'
 import { DepthInfoIcon } from './DepthInfoIcon'
 import { buildDisplayWallsFromMicro } from './depthLiveBookWalls'
-import { depthVenueShort } from './depthVenueTheme'
+import { depthVenueShort, depthVenueUiColor } from './depthVenueTheme'
 import { DEPTH_WALL_TAPE_MAX_ROWS } from './depthUiConstants'
 import { renderWallSize } from './depthWallRowMetrics'
 import { wallEventKey, wallStage1Highlight, wallStage2Flash } from './depthWallHighlight'
@@ -107,7 +107,10 @@ export const DepthConsolidatedWalls = ({ micro, forceChartsGrow = false }: Depth
       .join(' ')
     return (
       <li key={key} className={classes || undefined}>
-        <span className="depth-wall-source">{depthVenueShort[w.venue]}</span> {renderWallSize(w.price, w.peakBtc, w.peakUsd)} ·{' '}
+        <span className="depth-wall-source" style={{ color: depthVenueUiColor(w.venue, w.side) }}>
+          {depthVenueShort[w.venue]}
+        </span>{' '}
+        {renderWallSize(w.price, w.peakBtc, w.peakUsd)} ·{' '}
         {wallReasonLabel[w.reason] ?? w.reason}
       </li>
     )
@@ -123,7 +126,10 @@ export const DepthConsolidatedWalls = ({ micro, forceChartsGrow = false }: Depth
     const btc = eventPeakBtc(e)
     return (
       <li key={key} className={classes || undefined}>
-        <span className="depth-wall-source">{depthVenueShort[e.venue]}</span> {renderWallSize(e.price, btc, e.peakUsd)} ·{' '}
+        <span className="depth-wall-source" style={{ color: depthVenueUiColor(e.venue, e.side) }}>
+          {depthVenueShort[e.venue]}
+        </span>{' '}
+        {renderWallSize(e.price, btc, e.peakUsd)} ·{' '}
         {wallReasonLabel[e.reason] ?? e.reason}{' '}
         <span className="depth-wall-age">{formatAge(e.at, now)}</span>
       </li>

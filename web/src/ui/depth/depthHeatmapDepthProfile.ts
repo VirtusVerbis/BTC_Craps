@@ -235,7 +235,7 @@ export const drawHeatmapDepthProfile = (
   const hasBelow = below.some((r) => r.p >= bandBottom)
   if (hasAbove || hasBelow) {
     ctx.fillStyle = 'rgba(246, 240, 218, 0.45)'
-    ctx.font = `${Math.max(8, Math.round(w * 0.55))}px system-ui, sans-serif`
+    ctx.font = `${Math.max(13, Math.round(w * 0.859375))}px system-ui, sans-serif`
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     if (hasAbove) ctx.fillText('↑', w / 2, overflowH * 0.35)
