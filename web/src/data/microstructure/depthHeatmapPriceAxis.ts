@@ -93,3 +93,14 @@ export const maxUsdInBuckets = (buckets: readonly PriceBucket[]): number => {
 
 export const priceAtRowCenter = (row: number, axis: HeatmapPriceAxis): number =>
   snapPriceTick(axis.priceMax - (row + 0.5) * axis.tick, axis.tick)
+
+/** Vertical % for HTML ticks: 0 = top (priceMax), 100 = bottom (priceMin); matches canvas row Y. */
+export const heatmapPriceToTopPercent = (price: number, axis: HeatmapPriceAxis): number => {
+  const span = axis.priceMax - axis.priceMin
+  if (!(span > 0)) return 50
+  const t = (axis.priceMax - price) / span
+  return Math.min(100, Math.max(0, t * 100))
+}
+
+export const heatmapAxisMidRangePrice = (axis: HeatmapPriceAxis): number =>
+  (axis.priceMax + axis.priceMin) / 2

@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { type Candle } from '../../data/candles'
 import { fetchHeatmapTimelineCandles, heatmapCandleBarMs } from '../../data/heatmapCandleSeries'
-import { heatmapPriceAxis, type HeatmapPriceAxis } from '../../data/microstructure/depthHeatmapPriceAxis'
+import {
+  heatmapAxisMidRangePrice,
+  heatmapPriceAxis,
+  heatmapPriceToTopPercent,
+  type HeatmapPriceAxis,
+} from '../../data/microstructure/depthHeatmapPriceAxis'
 import { HEATMAP_PRICE_TICK_USD } from '../../data/microstructure/depthHeatmapPriceBins'
 import {
   applyHeatmapViewportToColumns,
@@ -64,16 +69,18 @@ const bucketCountForWindow = (windowMin: TimelineWindowMin): number => {
   return DEPTH_WINDOW_60_MIN_BUCKETS
 }
 
-const HEATMAP_CHART_MIN_H = 400
-const HEATMAP_CHART_MIN_H_GROW = 120
+const HEATMAP_CHART_FALLBACK_H = 400
+const HEATMAP_CHART_MIN_H = 120
 const HEATMAP_PROFILE_RAIL_W = 32
 
-const heatmapSlotHeightPx = (row: HTMLElement | null, minH: number): number => {
-  if (!row) return minH
+/** Canvas height follows the chart row slot; do not inflate above the row (panel uses overflow hidden). */
+const heatmapSlotHeightPx = (row: HTMLElement | null, fallbackMin: number): number => {
+  if (!row) return fallbackMin
   const rowH = Math.floor(row.getBoundingClientRect().height)
   const clientH = row.clientHeight
   const slot = Math.max(rowH, clientH)
-  return slot > 0 ? Math.max(minH, slot) : minH
+  if (slot <= 0) return fallbackMin
+  return Math.max(HEATMAP_CHART_MIN_H, slot)
 }
 
 const formatAxisPrice = (price: number): string =>
@@ -205,9 +212,9 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     const row = chartRowRef.current
     const scroll = scrollRef.current
     if (!row || !scroll) return
-    const minH = fillAvailableHeight ? HEATMAP_CHART_MIN_H_GROW : HEATMAP_CHART_MIN_H
+    const inFillPanel = Boolean(row.closest('.depth-panel-scroll--fill'))
     const measure = () => {
-      const h = heatmapSlotHeightPx(row, minH)
+      const h = heatmapSlotHeightPx(row, HEATMAP_CHART_FALLBACK_H)
       const w = Math.max(320, Math.floor(scroll.clientWidth))
       setChartSize({ w, h })
     }
@@ -219,11 +226,13 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     const ro = new ResizeObserver(scheduleMeasure)
     ro.observe(row)
     ro.observe(scroll)
-    if (fillAvailableHeight) {
+    if (fillAvailableHeight || inFillPanel) {
       const section = row.closest('.depth-session-heatmap')
       if (section) ro.observe(section)
       const consolidated = row.closest('.depth-consolidated-walls')
       if (consolidated) ro.observe(consolidated)
+      const chartsStack = row.closest('.depth-charts-stack')
+      if (chartsStack) ro.observe(chartsStack)
     }
     return () => ro.disconnect()
   }, [fillAvailableHeight])
@@ -327,10 +336,18 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
   ])
 
   const axisMaxLabel = formatWallUsd(axisMaxUsd)
+  const midRangePrice = heatmapAxisMidRangePrice(priceAxis)
   const axisTop = formatAxisPrice(priceAxis.priceMax)
-  const axisMid =
-    liveMid > 0 ? formatAxisPrice(liveMid) : formatAxisPrice((priceAxis.priceMax + priceAxis.priceMin) / 2)
+  const axisMid = formatAxisPrice(midRangePrice)
   const axisBottom = formatAxisPrice(priceAxis.priceMin)
+  const axisLabelTopPct = useMemo(
+    () => ({
+      top: heatmapPriceToTopPercent(priceAxis.priceMax, priceAxis),
+      mid: heatmapPriceToTopPercent(midRangePrice, priceAxis),
+      bottom: heatmapPriceToTopPercent(priceAxis.priceMin, priceAxis),
+    }),
+    [priceAxis, midRangePrice],
+  )
   const chipMid =
     liveMid > 0 ? liveMid : Math.max(0, (priceAxis.priceMax + priceAxis.priceMin) / 2)
   const showOffRangeAbove =
@@ -429,13 +446,19 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
           title="Depth profile: in-view band matches chart Y; ↑↓ strips = resting size above/below view (within ~180 bps band)"
         />
         <div className="depth-timeline-axis depth-heatmap-price-axis" aria-hidden title="BTC USD price">
-          <span className="depth-timeline-axis-tick" style={{ top: '2%' }}>
+          <span
+            className="depth-timeline-axis-tick depth-heatmap-axis-tick--range-top"
+            style={{ top: `${axisLabelTopPct.top}%` }}
+          >
             {axisTop}
           </span>
-          <span className="depth-timeline-axis-tick depth-timeline-axis-mid" style={{ top: '50%' }}>
+          <span className="depth-timeline-axis-tick depth-timeline-axis-mid" style={{ top: `${axisLabelTopPct.mid}%` }}>
             {axisMid}
           </span>
-          <span className="depth-timeline-axis-tick" style={{ top: '90%' }}>
+          <span
+            className="depth-timeline-axis-tick depth-heatmap-axis-tick--range-bottom"
+            style={{ top: `${axisLabelTopPct.bottom}%` }}
+          >
             {axisBottom}
           </span>
         </div>

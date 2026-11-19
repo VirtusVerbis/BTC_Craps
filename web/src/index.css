@@ -2515,6 +2515,8 @@ html.shooter-gesture-lock body {
 
 .depth-panel-scroll--fill {
   overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: hidden;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -2647,23 +2649,13 @@ html.shooter-gesture-lock body {
     padding-right: 0.28rem;
   }
 
-  /* Scroll when snapshot is open; keep flex fill when snapshot is collapsed (grow charts). */
-  .depth-panel-scroll--fill:not(.depth-panel-scroll--overview-collapsed) {
-    overflow-x: hidden;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
+  /* Match desktop: panel does not scroll; charts stack fills remaining height. */
+  .depth-panel-scroll--fill > .depth-charts-stack {
+    flex: 1 1 0;
+    min-height: 0;
   }
 
-  .depth-panel-scroll--fill.depth-panel-scroll--overview-collapsed {
-    overflow: hidden;
-  }
-
-  .depth-panel-scroll--fill:not(.depth-panel-scroll--overview-collapsed) > .depth-charts-stack {
-    flex: 0 0 auto;
-    min-height: auto;
-  }
-
-  /* Market open + walls/tape collapsed: fill remaining panel height so charts can grow. */
+  /* Walls/tape collapsed + grow: consolidated/book/heatmap flex split (same as desktop equal-grow). */
   .depth-panel-scroll--fill:not(.depth-panel-scroll--overview-collapsed):has(
       .depth-consolidated-walls--charts-grow
     )
@@ -2687,14 +2679,6 @@ html.shooter-gesture-lock body {
     min-height: 0;
   }
 
-  .depth-panel-scroll--fill.depth-panel-scroll--overview-collapsed > .depth-charts-stack {
-    flex: 1 1 0;
-    min-height: 0;
-  }
-
-  .depth-session-heatmap:not(.depth-session-heatmap--grow) .depth-timeline-chart-row {
-    min-height: min(25rem, 52vh);
-  }
 }
 
 .depth-row {
@@ -2939,6 +2923,11 @@ html.shooter-gesture-lock body {
   gap: 0;
 }
 
+.depth-panel-scroll--fill .depth-session-heatmap .depth-timeline-chart-row {
+  min-height: 0;
+  flex: 1 1 0;
+}
+
 .depth-heatmap-profile-rail {
   flex: 0 0 2rem;
   width: 2rem;
@@ -3021,6 +3010,14 @@ html.shooter-gesture-lock body {
 .depth-heatmap-price-axis .depth-timeline-axis-tick {
   left: auto;
   right: 0.2rem;
+}
+
+.depth-heatmap-price-axis .depth-heatmap-axis-tick--range-top {
+  transform: translateY(0);
+}
+
+.depth-heatmap-price-axis .depth-heatmap-axis-tick--range-bottom {
+  transform: translateY(-100%);
 }
 
 .depth-heatmap-legend {
