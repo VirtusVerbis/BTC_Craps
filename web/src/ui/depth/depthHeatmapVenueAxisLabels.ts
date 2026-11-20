@@ -74,7 +74,7 @@ export const venueAxisLabelMinGapPct = (chartHeightPx: number, linePx = 14): num
 const RESERVED_TICK_BANDS_PCT = [0, 50, 100] as const
 const TICK_CLEARANCE_PCT = 3.5
 
-const nudgeFromStaticTicks = (topPct: number, minGap: number): number => {
+const nudgeFromStaticTicks = (topPct: number, _minGap: number): number => {
   let y = topPct
   for (const tick of RESERVED_TICK_BANDS_PCT) {
     if (Math.abs(y - tick) < TICK_CLEARANCE_PCT) {

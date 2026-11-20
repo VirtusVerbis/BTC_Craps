@@ -74,7 +74,7 @@ describe('heatmapVenueMidCache', () => {
   })
 
   it('readVenueMidHistoryCache hits after write via load', async () => {
-    await loadHeatmapVenueMidHistoryWithCache(60, Date.now())
+    await loadHeatmapVenueMidHistoryWithCache(60, undefined, Date.now())
     const hit = readVenueMidHistoryCache(60)
     expect(hit?.coinbase?.length).toBe(2)
   })
