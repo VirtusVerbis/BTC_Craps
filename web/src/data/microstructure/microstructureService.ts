@@ -7,7 +7,11 @@ import { OrderBook } from './orderBook'
 import { RingBuffer } from './ringBuffer'
 import { TakerRollup15m } from './takerRollup'
 import type { BookLevel, FeedStatus, MicrostructureState, VenueId, VenueSnapshot } from './types'
+import { bybitLinearSubscribePayloads, parseBybitOrderBookMessage, parseBybitTradeMessage } from './bybitLinearFeed'
 import { HL_TRADES_SUBSCRIBE, parseHyperliquidTradesMessage } from './hyperliquidTrades'
+import { krakenSpotSubscribePayloads, parseKrakenOrderBookMessage, parseKrakenTradeMessage } from './krakenSpotFeed'
+import { okxSwapSubscribePayloads, parseOkxOrderBookMessage, parseOkxTradeMessage } from './okxSwapFeed'
+import { DEPTH_VENUE_ORDER } from './venueOrder'
 import {
   DEPTH_EMIT_MS,
   DEPTH_SAMPLE_CAP,
@@ -60,12 +64,18 @@ export class MicrostructureService {
   private readonly spotBook = new OrderBook()
   private readonly coinbaseBook = new OrderBook()
   private readonly hlBook = new OrderBook()
+  private readonly bybitBook = new OrderBook()
+  private readonly okxBook = new OrderBook()
+  private readonly krakenBook = new OrderBook()
 
   private readonly trackers: Record<VenueId, WallTracker> = {
     binancePerp: new WallTracker('binancePerp'),
     binanceSpot: new WallTracker('binanceSpot'),
     coinbase: new WallTracker('coinbase'),
     hyperliquid: new WallTracker('hyperliquid'),
+    bybitPerp: new WallTracker('bybitPerp'),
+    okxPerp: new WallTracker('okxPerp'),
+    krakenSpot: new WallTracker('krakenSpot'),
   }
 
   private readonly depthSamples: Record<
@@ -82,6 +92,9 @@ export class MicrostructureService {
     binanceSpot: new RingBuffer(DEPTH_SAMPLE_CAP),
     coinbase: new RingBuffer(DEPTH_SAMPLE_CAP),
     hyperliquid: new RingBuffer(DEPTH_SAMPLE_CAP),
+    bybitPerp: new RingBuffer(DEPTH_SAMPLE_CAP),
+    okxPerp: new RingBuffer(DEPTH_SAMPLE_CAP),
+    krakenSpot: new RingBuffer(DEPTH_SAMPLE_CAP),
   }
 
   private readonly takers: Record<VenueId, TakerRollup15m> = {
@@ -89,6 +102,9 @@ export class MicrostructureService {
     binanceSpot: new TakerRollup15m(),
     coinbase: new TakerRollup15m(),
     hyperliquid: new TakerRollup15m(),
+    bybitPerp: new TakerRollup15m(),
+    okxPerp: new TakerRollup15m(),
+    krakenSpot: new TakerRollup15m(),
   }
 
   private status: Record<VenueId, FeedStatus> = {
@@ -96,6 +112,9 @@ export class MicrostructureService {
     binanceSpot: 'disconnected',
     coinbase: 'disconnected',
     hyperliquid: 'disconnected',
+    bybitPerp: 'disconnected',
+    okxPerp: 'disconnected',
+    krakenSpot: 'disconnected',
   }
 
   private hlOiBtc: number | null = null
@@ -109,6 +128,9 @@ export class MicrostructureService {
     binanceSpot: { bids: [], asks: [] },
     coinbase: { bids: [], asks: [] },
     hyperliquid: { bids: [], asks: [] },
+    bybitPerp: { bids: [], asks: [] },
+    okxPerp: { bids: [], asks: [] },
+    krakenSpot: { bids: [], asks: [] },
   }
 
   private basisBinance = 0
@@ -121,6 +143,9 @@ export class MicrostructureService {
   private coinbaseWsBookAt = 0
   private readonly hlSeenTids = new Set<number>()
   private readonly hlSeenTidOrder: number[] = []
+  private readonly okxSeenTradeIds = new Set<string>()
+  private readonly okxSeenTradeIdOrder: string[] = []
+  private static readonly OKX_TRADE_ID_CAP = 4_000
   private listeners = new Set<(state: MicrostructureState) => void>()
   private state: MicrostructureState = this.buildState()
   private readonly onVisibility = (): void => {
@@ -128,6 +153,9 @@ export class MicrostructureService {
       this.perpClient.connect()
       this.spotDepthClient.connect()
       this.hlTradesClient.connect()
+      this.bybitClient.connect()
+      this.okxClient.connect()
+      this.krakenClient.connect()
     }
   }
 
@@ -160,6 +188,45 @@ export class MicrostructureService {
     onStatus: (s) => {
       if (s === 'connected') this.status.hyperliquid = 'connected'
       else if (s === 'disconnected' && this.hlBook.mid() <= 0) this.status.hyperliquid = 'disconnected'
+      this.emit()
+    },
+  })
+
+  private readonly bybitClient = new SafeWebSocketClient({
+    url: env.bybitLinearWsUrl,
+    maxPayloadBytes: BINANCE_DEPTH_WS_MAX_PAYLOAD_BYTES,
+    onJsonMessage: (payload) => this.onBybitMessage(payload),
+    onOpen: (socket) => {
+      for (const msg of bybitLinearSubscribePayloads()) socket.send(msg)
+    },
+    onStatus: (s) => {
+      this.status.bybitPerp = s === 'connected' ? 'connected' : this.bybitBook.mid() > 0 ? 'connected' : s
+      this.emit()
+    },
+  })
+
+  private readonly okxClient = new SafeWebSocketClient({
+    url: env.okxPublicWsUrl,
+    maxPayloadBytes: BINANCE_DEPTH_WS_MAX_PAYLOAD_BYTES,
+    onJsonMessage: (payload) => this.onOkxMessage(payload),
+    onOpen: (socket) => {
+      for (const msg of okxSwapSubscribePayloads()) socket.send(msg)
+    },
+    onStatus: (s) => {
+      this.status.okxPerp = s === 'connected' ? 'connected' : this.okxBook.mid() > 0 ? 'connected' : s
+      this.emit()
+    },
+  })
+
+  private readonly krakenClient = new SafeWebSocketClient({
+    url: env.krakenWsUrl,
+    maxPayloadBytes: BINANCE_DEPTH_WS_MAX_PAYLOAD_BYTES,
+    onJsonMessage: (payload) => this.onKrakenMessage(payload),
+    onOpen: (socket) => {
+      for (const msg of krakenSpotSubscribePayloads()) socket.send(msg)
+    },
+    onStatus: (s) => {
+      this.status.krakenSpot = s === 'connected' ? 'connected' : this.krakenBook.mid() > 0 ? 'connected' : s
       this.emit()
     },
   })
@@ -216,6 +283,9 @@ export class MicrostructureService {
     this.perpClient.connect()
     this.spotDepthClient.connect()
     this.hlTradesClient.connect()
+    this.bybitClient.connect()
+    this.okxClient.connect()
+    this.krakenClient.connect()
     void this.pollHyperliquid()
 
     if (this.sampleTimer === null) {
@@ -251,6 +321,93 @@ export class MicrostructureService {
     this.perpClient.disconnect()
     this.spotDepthClient.disconnect()
     this.hlTradesClient.disconnect()
+    this.bybitClient.disconnect()
+    this.okxClient.disconnect()
+    this.krakenClient.disconnect()
+  }
+
+  private applyExternalBook(
+    venue: VenueId,
+    book: OrderBook,
+    kind: 'snapshot' | 'delta',
+    bids: BookLevel[],
+    asks: BookLevel[],
+  ): void {
+    if (kind === 'snapshot') book.applySnapshot(bids, asks)
+    else book.applyDelta(bids, asks)
+    this.status[venue] = 'connected'
+    this.emit()
+  }
+
+  private onBybitMessage(payload: unknown): void {
+    const book = parseBybitOrderBookMessage(payload)
+    if (book) {
+      this.applyExternalBook('bybitPerp', this.bybitBook, book.kind, book.bids, book.asks)
+      return
+    }
+    const trades = parseBybitTradeMessage(payload)
+    if (trades.length === 0) return
+    for (const t of trades) this.takers.bybitPerp.add(t.isSell, t.qtyBtc)
+    this.emit()
+  }
+
+  private onOkxMessage(payload: unknown): void {
+    const book = parseOkxOrderBookMessage(payload)
+    if (book) {
+      this.applyExternalBook('okxPerp', this.okxBook, book.kind, book.bids, book.asks)
+      return
+    }
+    const trades = parseOkxTradeMessage(payload)
+    if (trades.length === 0) return
+    let added = false
+    for (const t of trades) {
+      if (!this.rememberOkxTradeId(t.tradeId)) continue
+      this.takers.okxPerp.add(t.isSell, t.qtyBtc)
+      added = true
+    }
+    if (added) this.emit()
+  }
+
+  private onKrakenMessage(payload: unknown): void {
+    const book = parseKrakenOrderBookMessage(payload)
+    if (book) {
+      this.applyExternalBook('krakenSpot', this.krakenBook, book.kind, book.bids, book.asks)
+      return
+    }
+    const trades = parseKrakenTradeMessage(payload)
+    if (trades.length === 0) return
+    for (const t of trades) this.takers.krakenSpot.add(t.isSell, t.qtyBtc)
+    this.emit()
+  }
+
+  private orderBookFor(venue: VenueId): OrderBook {
+    switch (venue) {
+      case 'binancePerp':
+        return this.perpBook
+      case 'binanceSpot':
+        return this.spotBook
+      case 'coinbase':
+        return this.coinbaseBook
+      case 'hyperliquid':
+        return this.hlBook
+      case 'bybitPerp':
+        return this.bybitBook
+      case 'okxPerp':
+        return this.okxBook
+      case 'krakenSpot':
+        return this.krakenBook
+    }
+  }
+
+  private rememberOkxTradeId(tradeId: string): boolean {
+    if (!tradeId || this.okxSeenTradeIds.has(tradeId)) return false
+    this.okxSeenTradeIds.add(tradeId)
+    this.okxSeenTradeIdOrder.push(tradeId)
+    if (this.okxSeenTradeIdOrder.length > MicrostructureService.OKX_TRADE_ID_CAP) {
+      const drop = this.okxSeenTradeIdOrder.shift()
+      if (drop !== undefined) this.okxSeenTradeIds.delete(drop)
+    }
+    return true
   }
 
   private rememberHlTradeTid(tid: number): boolean {
@@ -306,10 +463,11 @@ export class MicrostructureService {
 
   private sampleVenues(): void {
     const now = Date.now()
-    this.sampleVenue('binancePerp', this.perpBook, now)
-    this.sampleVenue('binanceSpot', this.spotBook, now)
-    this.sampleVenue('coinbase', this.coinbaseBook, now)
-    if (this.hlBook.mid() > 0) this.sampleVenue('hyperliquid', this.hlBook, now)
+    for (const venue of DEPTH_VENUE_ORDER) {
+      const book = this.orderBookFor(venue)
+      if (venue === 'hyperliquid' && book.mid() <= 0) continue
+      if (book.mid() > 0) this.sampleVenue(venue, book, now)
+    }
     this.emit()
   }
 
@@ -430,16 +588,8 @@ export class MicrostructureService {
 
   private buildState(): MicrostructureState {
     const venues = {} as Record<VenueId, VenueSnapshot>
-    const ids: VenueId[] = ['binancePerp', 'binanceSpot', 'coinbase', 'hyperliquid']
-    for (const venue of ids) {
-      const book =
-        venue === 'binancePerp'
-          ? this.perpBook
-          : venue === 'binanceSpot'
-            ? this.spotBook
-            : venue === 'coinbase'
-              ? this.coinbaseBook
-              : this.hlBook
+    for (const venue of DEPTH_VENUE_ORDER) {
+      const book = this.orderBookFor(venue)
       venues[venue] = {
         ...emptyVenue(venue),
         status: this.status[venue],

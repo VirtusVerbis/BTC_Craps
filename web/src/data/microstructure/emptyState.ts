@@ -20,5 +20,8 @@ export const emptyMicrostructureState = (): MicrostructureState => ({
     binanceSpot: emptyVenue('binanceSpot'),
     coinbase: emptyVenue('coinbase'),
     hyperliquid: emptyVenue('hyperliquid'),
+    bybitPerp: emptyVenue('bybitPerp'),
+    okxPerp: emptyVenue('okxPerp'),
+    krakenSpot: emptyVenue('krakenSpot'),
   },
 })

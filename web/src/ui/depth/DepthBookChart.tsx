@@ -11,7 +11,9 @@ import type { MicrostructureState, VenueId, WallRecord } from '../../data/micros
 import { DepthInfoIcon } from './DepthInfoIcon'
 import { formatVenueMid, venueMidChartLabelColor } from './depthVenueMidFormat'
 import { formatWallUsdCompact } from './depthWallRowMetrics'
+import { DEPTH_BOOK_STACK_ROW_MIN_PX } from './depthUiConstants'
 import { DEPTH_VENUE_ORDER, depthVenueColorAsk, depthVenueColorBid, depthVenueShort } from './depthVenueTheme'
+import { useDepthPingPongScroll } from './useDepthPingPongScroll'
 
 const STORAGE_BOOK_MODE = 'depthBookChartMode'
 const STORAGE_BOOK_X_SCALE = 'depthBookChartXScale'
@@ -98,6 +100,17 @@ const drawFixedAxisLabels = (
 const CURVE_LABEL_FONT = '18px sans-serif'
 const CURVE_LABEL_LINE_H = 20
 const MID_PRICE_FIRST_BASELINE = 18
+/** Canvas fillText baseline + descenders (overlap curve labels). */
+const CURVE_LABEL_DESCENT_PX = 16
+/** Padding below curve floor: ±bps row (fixed) or a thin margin (stretch). */
+const overlapChartBottomPad = (xScale: BookChartXScale): number => (xScale === 'fixed' ? 12 : 4)
+/** Keep overlap fillText baselines inside the panel, above the bottom pad / axis. */
+const overlapChartLabelMaxBaselineY = (
+  chartTopY: number,
+  chartPanelHeight: number,
+  fontPx: number,
+  bottomPad: number,
+): number => chartTopY + chartPanelHeight - bottomPad - Math.ceil(fontPx * 0.55) - 2
 
 const venueLabelColor = (venue: VenueId, side: 'bid' | 'ask'): string => {
   const raw = side === 'bid' ? depthVenueColorBid[venue] : depthVenueColorAsk[venue]
@@ -166,9 +179,15 @@ const resolveLabelCollisions = (labels: CurveLabelSpec[], minY: number, maxY: nu
     const overflow = labels[labels.length - 1].y - maxY
     for (const label of labels) label.y -= overflow
   }
-  if (labels[0].y < minY) {
+    if (labels[0].y < minY) {
     const under = minY - labels[0].y
     for (const label of labels) label.y += under
+  }
+}
+
+const clampCurveLabelsY = (labels: CurveLabelSpec[], minY: number, maxY: number): void => {
+  for (const label of labels) {
+    label.y = Math.min(Math.max(label.y, minY), maxY)
   }
 }
 
@@ -195,6 +214,7 @@ const drawCurve = (
   side: 'bid' | 'ask',
   venue?: VenueId,
   labelCollector?: CurveLabelSpec[],
+  labelBaselineMaxY?: number,
 ) => {
   if (points.length < 2) return
   const pointX = (bps: number) => xFromBps(midX, halfW, bps, xScale, fixedMaxBps, sideExtents)
@@ -224,7 +244,9 @@ const drawCurve = (
   }
   ctx.stroke()
   if (last.cumulativeBtc > 0 && venue) {
-    const labelY = baseY - (last.cumulativeBtc / maxCum) * chartH - 2
+    const anchorY = baseY - (last.cumulativeBtc / maxCum) * chartH - 2
+    const labelY =
+      labelBaselineMaxY != null ? Math.min(anchorY, labelBaselineMaxY) : anchorY
     const text = `${depthVenueShort[venue]} ${last.cumulativeBtc.toFixed(1)} BTC`
     const color = venueLabelColor(venue, side)
     ctx.font = CURVE_LABEL_FONT
@@ -333,10 +355,12 @@ const drawWallMarkers = (
   chartInnerH: number,
   curvesByVenue: Readonly<Partial<Record<VenueId, VenueCurve>>>,
   venueExtents?: Readonly<Partial<Record<VenueId, CurveSideExtents>>>,
+  labelBaselineMaxY?: number,
+  chartBaseY?: number,
 ) => {
   const midX = x + w / 2
   const halfW = w / 2 - 4
-  const baseY = y + h - 4
+  const baseY = chartBaseY ?? y + h - 4
   ctx.font = '16px sans-serif'
   for (const wall of walls) {
     const mid = venues[wall.venue].mid
@@ -362,7 +386,10 @@ const drawWallMarkers = (
     const text = formatWallUsdCompact(wall.price)
     ctx.fillStyle = venueLabelColor(wall.venue, wall.side)
     const textW = ctx.measureText(text).width
-    const labelY = topY - 2
+    let labelY = topY - 2
+    if (labelBaselineMaxY != null) {
+      labelY = Math.min(labelY, labelBaselineMaxY)
+    }
     const labelX =
       wall.side === 'bid'
         ? Math.min(px + 3, midX - textW - 4)
@@ -372,9 +399,36 @@ const drawWallMarkers = (
 }
 
 const BOOK_CHART_STACK_ROW_H = 76
-/** One height for stack & overlap so toggling mode does not resize the chart block. */
-const BOOK_CHART_MIN_DISPLAY_H = BOOK_CHART_STACK_ROW_H * DEPTH_VENUE_ORDER.length + 8
-const defaultBookChartHeight = (_mode: BookChartMode): number => BOOK_CHART_MIN_DISPLAY_H
+/** Fixed viewport height (historical 4-venue stack); stack mode scrolls taller canvas inside. */
+const BOOK_CHART_VIEWPORT_H = BOOK_CHART_STACK_ROW_H * 4 + 8
+const STACK_TOP_PAD = 4
+const stackChartBottomPad = (xScale: BookChartXScale): number => (xScale === 'fixed' ? 4 : 2)
+
+/** Pixel height of the stack canvas and per-venue row band (grow fills viewport exactly). */
+const stackChartMetrics = (
+  fillAvailableHeight: boolean,
+  viewportH: number,
+  xScale: BookChartXScale,
+): { canvasH: number; stackRowH: number } => {
+  const n = DEPTH_VENUE_ORDER.length
+  const bottomPad = stackChartBottomPad(xScale)
+  if (fillAvailableHeight) {
+    const stackRowH = Math.max(
+      DEPTH_BOOK_STACK_ROW_MIN_PX,
+      (viewportH - STACK_TOP_PAD - bottomPad + 4) / n,
+    )
+    return { canvasH: viewportH, stackRowH }
+  }
+  const stackRowH = DEPTH_BOOK_STACK_ROW_MIN_PX
+  const canvasH = STACK_TOP_PAD + n * stackRowH + bottomPad - 4
+  return { canvasH, stackRowH }
+}
+
+const stackCanvasHeight = (xScale: BookChartXScale = 'stretch'): number =>
+  stackChartMetrics(false, 0, xScale).canvasH
+
+const defaultBookChartHeight = (mode: BookChartMode): number =>
+  mode === 'stack' ? stackCanvasHeight() : BOOK_CHART_VIEWPORT_H
 
 const bookChartToolbarChromePx = (wrap: HTMLElement): number =>
   wrap.querySelector<HTMLElement>('.depth-timeline-toolbar')?.offsetHeight ?? 0
@@ -387,8 +441,8 @@ const bookChartSlotHeightPx = (chartRow: HTMLElement | null, wrap: HTMLElement |
   const fromRow = chartRow ? Math.floor(chartRow.getBoundingClientRect().height) : 0
   const fromRowClient = chartRow?.clientHeight ?? 0
   const slot = Math.max(fromWrap, fromRow, fromRowClient)
-  if (slot <= 0) return BOOK_CHART_MIN_DISPLAY_H
-  return Math.max(BOOK_CHART_MIN_DISPLAY_H, slot)
+  if (slot <= 0) return BOOK_CHART_VIEWPORT_H
+  return Math.max(BOOK_CHART_VIEWPORT_H, slot)
 }
 
 interface DepthBookChartProps {
@@ -404,7 +458,8 @@ export const DepthBookChart = ({ micro, topWalls, fillAvailableHeight = false }:
   const scrollRef = useRef<HTMLDivElement>(null)
   const [mode, setMode] = useState<BookChartMode>(readBookMode)
   const [xScale, setXScale] = useState<BookChartXScale>(readXScale)
-  const [viewSize, setViewSize] = useState({ w: 900, h: BOOK_CHART_MIN_DISPLAY_H })
+  const [viewSize, setViewSize] = useState({ w: 900, h: BOOK_CHART_VIEWPORT_H })
+  useDepthPingPongScroll(scrollRef, mode === 'stack')
 
   const bookChartMaxBps =
     xScale === 'stretch' ? DEPTH_BOOK_CHART_STRETCH_MAX_BPS : DEPTH_BOOK_CHART_MAX_BPS
@@ -497,14 +552,13 @@ export const DepthBookChart = ({ micro, topWalls, fillAvailableHeight = false }:
     if (!ctx) return
 
     const w = viewSize.w
-    const slotH = fillAvailableHeight
+    const viewportH = fillAvailableHeight
       ? bookChartSlotHeightPx(chartRowRef.current, wrapRef.current)
       : viewSize.h
-    const h = slotH
-    const stackRowH =
-      mode === 'stack'
-        ? Math.max(BOOK_CHART_STACK_ROW_H, Math.floor((h - 4) / DEPTH_VENUE_ORDER.length))
-        : BOOK_CHART_STACK_ROW_H
+    const stackMetrics =
+      mode === 'stack' ? stackChartMetrics(fillAvailableHeight, viewportH, xScale) : null
+    const h = stackMetrics ? stackMetrics.canvasH : viewportH
+    const stackRowH = stackMetrics ? stackMetrics.stackRowH : BOOK_CHART_STACK_ROW_H
     canvas.width = w
     canvas.height = h
     canvas.style.width = '100%'
@@ -517,7 +571,7 @@ export const DepthBookChart = ({ micro, topWalls, fillAvailableHeight = false }:
 
     if (mode === 'stack') {
       venueCurves.forEach(({ venue, curve, sideExtents }, i) => {
-        const y = i * stackRowH + 4
+        const y = STACK_TOP_PAD + i * stackRowH
         const rowH = stackRowH - 4
         const venueMaxCum = maxCumulativeBtc([curve])
         const extents = xScale === 'stretch' ? sideExtents : { bidExtentBps: 0, askExtentBps: 0 }
@@ -557,9 +611,10 @@ export const DepthBookChart = ({ micro, topWalls, fillAvailableHeight = false }:
       const y = 8
       const chartH = h - 16
       const midX = padX + chartW / 2
-      const baseY = y + chartH - 4
+      const overlapBottomPad = overlapChartBottomPad(xScale)
+      const baseY = y + chartH - overlapBottomPad
       const halfW = chartW / 2 - 4
-      const chartHInner = chartH - 20
+      const chartHInner = chartH - 20 - overlapBottomPad
       const fixedExtents = { bidExtentBps: 0, askExtentBps: 0 }
 
       ctx.fillStyle = 'rgba(0, 0, 0, 0.25)'
@@ -576,7 +631,12 @@ export const DepthBookChart = ({ micro, topWalls, fillAvailableHeight = false }:
       const bidLabels: CurveLabelSpec[] = []
       const askLabels: CurveLabelSpec[] = []
       const labelMinY = overlapMidPriceStackMinCurveLabelY(y)
-      const labelMaxY = baseY - 4
+      const overlapLabelFloorY = overlapChartLabelMaxBaselineY(y, chartH, 18, overlapBottomPad)
+      const wallLabelFloorY = overlapChartLabelMaxBaselineY(y, chartH, 16, overlapBottomPad)
+      const labelMaxY = Math.min(
+        overlapLabelFloorY,
+        baseY - CURVE_LABEL_DESCENT_PX - (xScale === 'fixed' ? 10 : 0),
+      )
 
       for (const { venue, curve, sideExtents } of venueCurves) {
         const bidFill = depthVenueColorBid[venue].replace(/[\d.]+\)$/, '0.22)')
@@ -597,6 +657,7 @@ export const DepthBookChart = ({ micro, topWalls, fillAvailableHeight = false }:
           'bid',
           venue,
           bidLabels,
+          overlapLabelFloorY,
         )
         drawCurve(
           ctx,
@@ -613,11 +674,14 @@ export const DepthBookChart = ({ micro, topWalls, fillAvailableHeight = false }:
           'ask',
           venue,
           askLabels,
+          overlapLabelFloorY,
         )
       }
 
       resolveLabelCollisions(bidLabels, labelMinY, labelMaxY)
       resolveLabelCollisions(askLabels, labelMinY, labelMaxY)
+      clampCurveLabelsY(bidLabels, labelMinY, labelMaxY)
+      clampCurveLabelsY(askLabels, labelMinY, labelMaxY)
       paintCurveLabels(ctx, bidLabels)
       paintCurveLabels(ctx, askLabels)
       const curvesByVenue: Partial<Record<VenueId, VenueCurve>> = {}
@@ -636,9 +700,11 @@ export const DepthBookChart = ({ micro, topWalls, fillAvailableHeight = false }:
         chartHInner,
         curvesByVenue,
         xScale === 'stretch' ? venueExtentsById : undefined,
+        wallLabelFloorY,
+        baseY,
       )
       if (xScale === 'fixed') {
-        drawFixedAxisLabels(ctx, padX, chartW, DEPTH_BOOK_CHART_MAX_BPS, h - 6)
+        drawFixedAxisLabels(ctx, padX, chartW, DEPTH_BOOK_CHART_MAX_BPS, y + chartH - 2)
       }
     }
   }, [micro, mode, xScale, topWalls, viewSize, fillAvailableHeight, maxCum, venueCurves, venueExtentsById])
@@ -646,7 +712,16 @@ export const DepthBookChart = ({ micro, topWalls, fillAvailableHeight = false }:
   return (
     <div
       ref={wrapRef}
-      className={fillAvailableHeight ? 'depth-book-chart-wrap depth-book-chart-wrap--grow' : 'depth-book-chart-wrap'}
+      className={
+        [
+          'depth-book-chart-wrap',
+          fillAvailableHeight ? 'depth-book-chart-wrap--grow' : '',
+          mode === 'stack' && fillAvailableHeight ? 'depth-book-chart-wrap--stack-grow' : '',
+          mode === 'stack' && !fillAvailableHeight ? 'depth-book-chart-wrap--stack-compact' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')
+      }
     >
       <div className="depth-timeline-toolbar">
         <DepthInfoIcon glossaryKey="wallDepthChart" label="Live book depth" />
@@ -686,17 +761,39 @@ export const DepthBookChart = ({ micro, topWalls, fillAvailableHeight = false }:
       </div>
       <div
         ref={chartRowRef}
-        className={fillAvailableHeight ? 'depth-book-chart-row depth-book-chart-row--grow' : 'depth-book-chart-row'}
+        className={
+          [
+            'depth-book-chart-row',
+            fillAvailableHeight ? 'depth-book-chart-row--grow' : '',
+            mode === 'stack' && !fillAvailableHeight ? 'depth-book-chart-row--stack-fit' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')
+        }
       >
         <div
           ref={scrollRef}
           className={
-            fillAvailableHeight ? 'depth-timeline-scroll depth-book-chart-scroll-grow' : 'depth-timeline-scroll'
+            [
+              'depth-timeline-scroll',
+              fillAvailableHeight ? 'depth-book-chart-scroll-grow' : '',
+              mode === 'stack' ? 'depth-book-chart-scroll--stack-y' : '',
+              mode === 'stack' && !fillAvailableHeight ? 'depth-book-chart-scroll--stack-compact' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')
           }
           role="img"
           aria-label="Cumulative depth chart"
         >
-          <canvas ref={canvasRef} className="depth-timeline-canvas depth-book-chart-canvas" width={900} height={viewSize.h} />
+          <canvas
+            ref={canvasRef}
+            className="depth-timeline-canvas depth-book-chart-canvas"
+            width={900}
+            height={
+              mode === 'stack' ? stackChartMetrics(fillAvailableHeight, viewSize.h, xScale).canvasH : viewSize.h
+            }
+          />
         </div>
       </div>
     </div>

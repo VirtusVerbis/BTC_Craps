@@ -161,7 +161,7 @@ Last price and the buy/sell tape come from [Binance](https://www.binance.com) an
 
 ## Depth panel
 
-The **Depth** tab (bottom left) opens a full-screen readout of order-book walls, 15-minute taker flow, and cross-venue context. Sampling runs in the browser from public feeds only: Binance spot and USDⓈ-M futures WebSockets, Coinbase level-2 (shared with the price feed), Hyperliquid BTC trades WebSocket plus public `info` requests (book, OI, funding). Open interest and liquidations in the Depth header still come from the Coinalyze worker snapshot at `/oi`. No trading keys or extra worker storage are used for Depth. Production CSP allows `fstream.binance.com`, `fapi.binance.com`, and `api.hyperliquid.xyz` (HTTP and `wss`) for these connections.
+The **Depth** tab (bottom left) opens a full-screen readout of order-book walls, 15-minute taker flow, and cross-venue context. Sampling runs in the browser from public feeds only: Binance spot and USDⓈ-M futures WebSockets, Coinbase level-2 (shared with the price feed), Hyperliquid BTC trades WebSocket plus public `info` requests (book, OI, funding), Bybit v5 linear BTCUSDT order book and trades, OKX v5 public BTC-USDT-SWAP book and trades, and Kraken v2 BTC/USD spot book and trades. Open interest and liquidations in the Depth header still come from the Coinalyze worker snapshot at `/oi`. No trading keys or extra worker storage are used for Depth. Production CSP allows `fstream.binance.com`, `fapi.binance.com`, `api.hyperliquid.xyz`, `stream.bybit.com`, `ws.okx.com`, and `ws.kraken.com` for these connections.
 
 ## Run it locally
 

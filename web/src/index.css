@@ -2872,7 +2872,7 @@ html.shooter-gesture-lock body {
 
 .depth-book-chart-wrap--grow {
   min-height: 0;
-  margin-bottom: 0.35rem;
+  margin-bottom: 0;
 }
 
 .depth-book-chart-row--grow {
@@ -3086,7 +3086,11 @@ html.shooter-gesture-lock body {
 }
 
 .depth-book-chart-wrap {
-  margin: 0.5rem 0 1rem;
+  margin: 0.5rem 0 0.15rem;
+}
+
+.depth-consolidated-walls .depth-book-chart-wrap + .depth-wall-subhead {
+  margin-top: 0.1rem;
 }
 
 .depth-book-chart-canvas {
@@ -3188,7 +3192,7 @@ html.shooter-gesture-lock body {
 }
 
 .depth-wall-list-scroll {
-  max-height: calc(var(--depth-wall-row-height) * var(--depth-wall-visible-rows, 10));
+  max-height: calc(var(--depth-wall-row-height) * var(--depth-wall-visible-rows, 5));
   overflow-y: auto;
   overflow-x: hidden;
   margin-right: -0.25rem;
@@ -3389,4 +3393,49 @@ html.shooter-gesture-lock body {
 
 .depth-taker-table tbody tr:nth-child(even) {
   background: rgba(255, 255, 255, 0.03);
+}
+
+.depth-taker-table-scroll {
+  max-height: calc(var(--depth-wall-row-height) * var(--depth-wall-visible-rows, 5) + 2.2rem);
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.depth-taker-table-scroll .depth-taker-table thead th {
+  position: sticky;
+  top: 0;
+  background: rgba(18, 28, 42, 0.96);
+  z-index: 1;
+}
+
+.depth-book-chart-scroll--stack-y {
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.depth-book-chart-scroll--stack-compact {
+  height: auto;
+  flex: 0 0 auto;
+}
+
+.depth-book-chart-row--stack-fit {
+  flex: 0 0 auto;
+  height: auto;
+  min-height: 0;
+}
+
+.depth-book-chart-wrap--stack-compact {
+  flex: 0 0 auto;
+}
+
+.depth-book-chart-wrap--stack-compact .depth-book-chart-canvas,
+.depth-book-chart-wrap--stack-grow .depth-book-chart-canvas {
+  min-height: 0;
+  display: block;
+}
+
+.depth-book-chart-scroll--stack-y.depth-book-chart-scroll-grow {
+  max-height: 100%;
 }

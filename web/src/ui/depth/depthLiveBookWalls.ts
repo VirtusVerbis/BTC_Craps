@@ -58,5 +58,11 @@ export const buildDisplayWallsFromMicro = (
     if (bid) liveBids.push(displayWallRecord(venue, 'bid', bid, at))
     if (ask) liveAsks.push(displayWallRecord(venue, 'ask', ask, at))
   }
-  return { chartWalls: [...liveBids, ...liveAsks], liveBids, liveAsks }
+  const sortByPeakUsd = (rows: WallRecord[]): WallRecord[] =>
+    [...rows].sort((a, b) => b.peakUsd - a.peakUsd)
+  return {
+    chartWalls: [...liveBids, ...liveAsks],
+    liveBids: sortByPeakUsd(liveBids),
+    liveAsks: sortByPeakUsd(liveAsks),
+  }
 }

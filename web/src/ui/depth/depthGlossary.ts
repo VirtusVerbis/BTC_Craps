@@ -16,6 +16,9 @@ export type DepthGlossaryKey =
   | 'venueBinanceSpot'
   | 'venueCoinbase'
   | 'venueHyperliquid'
+  | 'venueBybit'
+  | 'venueOkx'
+  | 'venueKraken'
   | 'mergedTimeline'
   | 'timelineLayerMode'
   | 'timelineWindow'
@@ -96,7 +99,7 @@ export const depthGlossary: Record<DepthGlossaryKey, GlossaryEntry> = {
   },
   wallDepthChart: {
     title: 'Live book depth',
-    body: 'Cumulative resting liquidity near mid from Binance perp/spot, Coinbase, and Hyperliquid. Refreshes about every 2.5 seconds with depth sampling.',
+    body: 'Cumulative resting liquidity near mid from Binance perp/spot, Coinbase, Hyperliquid, Bybit, OKX, and Kraken spot. Refreshes about every 2.5 seconds with depth sampling.',
     items: [
       {
         label: 'Curves',
@@ -185,5 +188,17 @@ export const depthGlossary: Record<DepthGlossaryKey, GlossaryEntry> = {
   venueHyperliquid: {
     title: 'Hyperliquid',
     body: 'BTC perpetual on Hyperliquid: open interest, funding, and L2 book snapshots.',
+  },
+  venueBybit: {
+    title: 'Bybit linear perp',
+    body: 'BTCUSDT linear perpetual order book and public trades on Bybit v5.',
+  },
+  venueOkx: {
+    title: 'OKX swap',
+    body: 'BTC-USDT-SWAP order book and trades on OKX v5 public WebSocket.',
+  },
+  venueKraken: {
+    title: 'Kraken spot',
+    body: 'BTC/USD spot level-2 book and trades from Kraken v2 WebSocket.',
   },
 }

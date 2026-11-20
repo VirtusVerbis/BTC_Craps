@@ -55,4 +55,18 @@ export const env = {
   binanceFapiOrigin:
     (import.meta.env.VITE_BINANCE_FAPI_ORIGIN as string | undefined) ??
     'https://fapi.binance.com',
+  get bybitLinearWsUrl() {
+    return (
+      (import.meta.env.VITE_BYBIT_LINEAR_WS_URL as string | undefined) ??
+      'wss://stream.bybit.com/v5/public/linear'
+    )
+  },
+  get okxPublicWsUrl() {
+    return (
+      (import.meta.env.VITE_OKX_PUBLIC_WS_URL as string | undefined) ?? 'wss://ws.okx.com:443/ws/v5/public'
+    )
+  },
+  get krakenWsUrl() {
+    return (import.meta.env.VITE_KRAKEN_WS_URL as string | undefined) ?? 'wss://ws.kraken.com/v2'
+  },
 }

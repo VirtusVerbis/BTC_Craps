@@ -9,6 +9,9 @@ const venueGlossary: Record<VenueSnapshot['venue'], DepthGlossaryKey> = {
   binanceSpot: 'venueBinanceSpot',
   coinbase: 'venueCoinbase',
   hyperliquid: 'venueHyperliquid',
+  bybitPerp: 'venueBybit',
+  okxPerp: 'venueOkx',
+  krakenSpot: 'venueKraken',
 }
 
 const venueTitle: Record<VenueSnapshot['venue'], string> = {
@@ -16,6 +19,9 @@ const venueTitle: Record<VenueSnapshot['venue'], string> = {
   binanceSpot: 'Binance spot',
   coinbase: 'Coinbase',
   hyperliquid: 'Hyperliquid',
+  bybitPerp: 'Bybit perp',
+  okxPerp: 'OKX perp',
+  krakenSpot: 'Kraken spot',
 }
 
 const wallReasonLabel: Record<string, string> = {

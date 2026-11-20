@@ -1,4 +1,11 @@
-export type VenueId = 'binancePerp' | 'binanceSpot' | 'coinbase' | 'hyperliquid'
+export type VenueId =
+  | 'binancePerp'
+  | 'binanceSpot'
+  | 'coinbase'
+  | 'hyperliquid'
+  | 'bybitPerp'
+  | 'okxPerp'
+  | 'krakenSpot'
 
 export type WallEndReason = 'active' | 'pulled' | 'atTouch' | 'consumed' | 'flipped'
 

@@ -5,10 +5,11 @@ import { DepthSessionHeatmap } from './DepthSessionHeatmap'
 import { DepthInfoIcon } from './DepthInfoIcon'
 import { buildDisplayWallsFromMicro } from './depthLiveBookWalls'
 import { depthVenueShort, depthVenueUiColor } from './depthVenueTheme'
-import { DEPTH_WALL_TAPE_MAX_ROWS } from './depthUiConstants'
+import { DEPTH_SCROLL_VISIBLE_ROWS, DEPTH_WALL_TAPE_RENDER_MAX } from './depthUiConstants'
 import { renderWallSize } from './depthWallRowMetrics'
 import { wallEventKey, wallStage1Highlight, wallStage2Flash } from './depthWallHighlight'
 import { useDepthPanelNarrow } from './useDepthPanelNarrow'
+import { useDepthPingPongScroll } from './useDepthPingPongScroll'
 
 const wallReasonLabel: Record<string, string> = {
   active: 'Active',
@@ -53,6 +54,16 @@ export const DepthConsolidatedWalls = ({
   const now = micro.sampledAt
   const prevLivePeaksRef = useRef<Map<string, number>>(new Map())
   const [livePulseKeys, setLivePulseKeys] = useState<Set<string>>(() => new Set())
+  const liveBidsScrollRef = useRef<HTMLUListElement>(null)
+  const liveAsksScrollRef = useRef<HTMLUListElement>(null)
+  const tapeBidsScrollRef = useRef<HTMLUListElement>(null)
+  const tapeAsksScrollRef = useRef<HTMLUListElement>(null)
+  useDepthPingPongScroll(tapeBidsScrollRef, tapeOpen)
+  useDepthPingPongScroll(tapeAsksScrollRef, tapeOpen)
+
+  const listScrollStyle = {
+    ['--depth-wall-visible-rows' as string]: String(DEPTH_SCROLL_VISIBLE_ROWS),
+  }
 
   const narrowPanel = useDepthPanelNarrow()
   const wallsTapeCollapsed = !liveWallsOpen || !tapeOpen
@@ -66,7 +77,7 @@ export const DepthConsolidatedWalls = ({
     for (const venue of Object.values(micro.venues)) {
       rows.push(...venue.recentEvents.filter((e) => e.side === 'bid'))
     }
-    return sortEventsByPeakBtcDesc(rows).slice(0, DEPTH_WALL_TAPE_MAX_ROWS)
+    return sortEventsByPeakBtcDesc(rows).slice(0, DEPTH_WALL_TAPE_RENDER_MAX)
   }, [micro.venues])
 
   const tapeAsks = useMemo(() => {
@@ -74,7 +85,7 @@ export const DepthConsolidatedWalls = ({
     for (const venue of Object.values(micro.venues)) {
       rows.push(...venue.recentEvents.filter((e) => e.side === 'ask'))
     }
-    return sortEventsByPeakBtcDesc(rows).slice(0, DEPTH_WALL_TAPE_MAX_ROWS)
+    return sortEventsByPeakBtcDesc(rows).slice(0, DEPTH_WALL_TAPE_RENDER_MAX)
   }, [micro.venues])
 
   useEffect(() => {
@@ -163,13 +174,21 @@ export const DepthConsolidatedWalls = ({
           <div className="depth-wall-split">
             <div className="depth-wall-split-col">
               <p className="depth-wall-split-label">BID</p>
-              <ul className="depth-wall-list depth-wall-list--split">
+              <ul
+                ref={liveBidsScrollRef}
+                className="depth-wall-list depth-wall-list--split depth-wall-list-scroll"
+                style={listScrollStyle}
+              >
                 {liveBids.length === 0 ? <li className="depth-muted">—</li> : liveBids.map(renderLiveRow)}
               </ul>
             </div>
             <div className="depth-wall-split-col">
               <p className="depth-wall-split-label">ASK</p>
-              <ul className="depth-wall-list depth-wall-list--split">
+              <ul
+                ref={liveAsksScrollRef}
+                className="depth-wall-list depth-wall-list--split depth-wall-list-scroll"
+                style={listScrollStyle}
+              >
                 {liveAsks.length === 0 ? <li className="depth-muted">—</li> : liveAsks.map(renderLiveRow)}
               </ul>
             </div>
@@ -196,13 +215,21 @@ export const DepthConsolidatedWalls = ({
           <div className="depth-wall-split">
             <div className="depth-wall-split-col">
               <p className="depth-wall-split-label">BID</p>
-              <ul className="depth-wall-list depth-wall-list--split">
+              <ul
+                ref={tapeBidsScrollRef}
+                className="depth-wall-list depth-wall-list--split depth-wall-list-scroll"
+                style={listScrollStyle}
+              >
                 {tapeBids.length === 0 ? <li className="depth-muted">—</li> : tapeBids.map(renderTapeRow)}
               </ul>
             </div>
             <div className="depth-wall-split-col">
               <p className="depth-wall-split-label">ASK</p>
-              <ul className="depth-wall-list depth-wall-list--split">
+              <ul
+                ref={tapeAsksScrollRef}
+                className="depth-wall-list depth-wall-list--split depth-wall-list-scroll"
+                style={listScrollStyle}
+              >
                 {tapeAsks.length === 0 ? <li className="depth-muted">—</li> : tapeAsks.map(renderTapeRow)}
               </ul>
             </div>
