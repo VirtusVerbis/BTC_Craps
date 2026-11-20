@@ -129,19 +129,73 @@ export const buildVenueMidPolylinesFromHistory = (
   _rangeStart: number,
   rangeEnd: number,
   venues: readonly VenueId[] = HEATMAP_VENUE_MID_LINE_VENUES,
+  appendLiveTip = true,
 ): HeatmapVenueMidPolylines => {
   const out = {} as HeatmapVenueMidPolylines
   for (const venue of venues) {
     const snap = micro.venues[venue]
     const liveMid = snap?.status === 'connected' && snap.mid > 0 ? snap.mid : 0
     let points = midPointsFromCandleHistory(history[venue] ?? [], barMs)
-    points = appendLiveMidTip(points, liveMid, rangeEnd)
+    if (appendLiveTip) points = appendLiveMidTip(points, liveMid, rangeEnd)
     out[venue] = points.length >= 2 ? [points] : []
   }
   return out
 }
 
-/** Prefer REST history; fall back to in-session depth samples per venue. */
+const flattenMidSegments = (segments: readonly HeatmapMidSegment[]): HeatmapMidPoint[] => {
+  const out: HeatmapMidPoint[] = []
+  for (const seg of segments) {
+    for (const p of seg) out.push(p)
+  }
+  return out
+}
+
+/**
+ * Cached / REST mids before the first live sample column; from there use the
+ * streamed column mids (same path as when no history exists).
+ */
+export const stitchHistoryMidPolylinesToSamples = (
+  historyPoints: readonly HeatmapMidPoint[],
+  sampleSegments: readonly HeatmapMidSegment[],
+  liveMid: number,
+  rangeEnd: number,
+): HeatmapMidSegment[] => {
+  const samplePoints = flattenMidSegments(sampleSegments)
+  if (samplePoints.length === 0) {
+    const tipped = appendLiveMidTip([...historyPoints], liveMid, rangeEnd)
+    return tipped.length >= 2 ? [tipped] : []
+  }
+
+  const stitchT = Math.min(...samplePoints.map((p) => p.t))
+  const prefix = historyPoints.filter((p) => p.t < stitchT)
+  const out: HeatmapMidSegment[] = []
+  let prefixPending = [...prefix]
+
+  for (const seg of sampleSegments) {
+    const tail = seg.filter((p) => p.t >= stitchT - 1)
+    if (tail.length === 0) continue
+    if (prefixPending.length > 0) {
+      out.push([...prefixPending, ...tail])
+      prefixPending = []
+    } else {
+      out.push([...tail])
+    }
+  }
+
+  if (prefixPending.length >= 2) out.unshift([...prefixPending])
+
+  return out.filter((s) => s.length >= 2)
+}
+
+const venueHasStreamedDepthSamples = (
+  samples: readonly DepthSample[] | undefined,
+  rangeStart: number,
+): boolean => {
+  if (!samples || samples.length === 0) return false
+  return samples.some((s) => s.mid > 0 && s.at >= rangeStart)
+}
+
+/** Cached klines for backfill; streamed depth samples from the first live column onward. */
 export const resolveVenueMidPolylines = (
   history: VenueMidHistory | null,
   barMs: number,
@@ -152,20 +206,22 @@ export const resolveVenueMidPolylines = (
   rangeEnd: number,
   venues: readonly VenueId[] = HEATMAP_VENUE_MID_LINE_VENUES,
 ): HeatmapVenueMidPolylines => {
-  const fromHistory =
-    history != null
-      ? buildVenueMidPolylinesFromHistory(history, barMs, micro, rangeStart, rangeEnd, venues)
-      : null
   const fromSamples = buildVenueMidPolylines(columns, samplesByVenue, micro, rangeStart, venues)
   const out = {} as HeatmapVenueMidPolylines
   for (const venue of venues) {
-    const hist = fromHistory?.[venue] ?? []
-    const sample = fromSamples[venue] ?? []
-    const histSeg = hist.length > 0 && (hist[0]?.length ?? 0) >= 2 ? hist[0]! : null
-    if (histSeg) {
-      out[venue] = [histSeg]
-    } else {
-      out[venue] = sample
+    const streamed = venueHasStreamedDepthSamples(samplesByVenue[venue], rangeStart)
+    const sampleSegs = streamed ? (fromSamples[venue] ?? []) : []
+    const snap = micro.venues[venue]
+    const liveMid = snap?.status === 'connected' && snap.mid > 0 ? snap.mid : 0
+    const historyPoints =
+      history != null ? midPointsFromCandleHistory(history[venue] ?? [], barMs) : []
+    out[venue] = stitchHistoryMidPolylinesToSamples(historyPoints, sampleSegs, liveMid, rangeEnd)
+    if (out[venue].length === 0 && sampleSegs.length > 0) {
+      out[venue] = sampleSegs.filter((s) => s.length >= 2)
+    }
+    if (out[venue].length === 0 && !streamed) {
+      const tail = buildVenueMidPolylines(columns, samplesByVenue, micro, rangeStart, [venue])[venue] ?? []
+      out[venue] = tail.filter((s) => s.length >= 2)
     }
   }
   return out

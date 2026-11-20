@@ -78,7 +78,7 @@ describe('buildVenueMidPolylines', () => {
     expect(lines.coinbase[1]).toHaveLength(1)
   })
 
-  it('resolve prefers REST history over longer in-session samples', () => {
+  it('resolve stitches cached klines to streamed column mids', () => {
     const barMs = 60_000
     const rangeStart = 0
     const rangeEnd = 600_000
@@ -87,14 +87,14 @@ describe('buildVenueMidPolylines', () => {
       columns.push(col(i * 60_000, (i + 1) * 60_000, false))
     }
     const samplesByVenue = {
-      coinbase: Array.from({ length: 10 }, (_, i) => sample(i * 60_000 + 30_000, 99_000 + i)),
+      coinbase: Array.from({ length: 4 }, (_, i) => sample(360_000 + i * 60_000 + 30_000, 101_000 + i)),
     } as Record<VenueId, DepthSample[]>
     const micro = {
       venues: {
         coinbase: {
           venue: 'coinbase',
           status: 'connected',
-          mid: 100_000,
+          mid: 105_000,
           depthSamples: [],
           bookBids: [],
           bookAsks: [],
@@ -104,14 +104,13 @@ describe('buildVenueMidPolylines', () => {
         },
       },
     } as unknown as MicrostructureState
-    const historyBase = 1_700_000_000_000
     const history = {
-      coinbase: Array.from({ length: 60 }, (_, i) => ({
-        openTime: historyBase + i * 60_000,
+      coinbase: Array.from({ length: 6 }, (_, i) => ({
+        openTime: (i + 1) * 60_000,
         open: 100,
         high: 100,
         low: 100,
-        close: 100 + i * 0.01,
+        close: 100 + i,
       })),
     }
     const lines = resolveVenueMidPolylines(
@@ -124,7 +123,53 @@ describe('buildVenueMidPolylines', () => {
       rangeEnd,
       ['coinbase'],
     )
-    expect(lines.coinbase[0]!.length).toBeGreaterThan(10)
-    expect(lines.coinbase[0]![0]!.mid).toBeCloseTo(100, 5)
+    const seg = lines.coinbase[0]!
+    expect(seg.length).toBeGreaterThanOrEqual(5)
+    expect(seg[0]!.t).toBe(90_000)
+    expect(seg[0]!.mid).toBe(100)
+    const last = seg[seg.length - 1]!
+    expect(last.mid).toBe(105_000)
+    expect(last.t).toBe(570_000)
+    expect(seg.some((p) => p.t >= 390_000 && p.mid >= 101_000)).toBe(true)
+  })
+
+  it('resolve uses history with live tip when no stream samples yet', () => {
+    const barMs = 60_000
+    const rangeEnd = 300_000
+    const columns = [col(0, 60_000, false), col(60_000, 120_000, false)]
+    const micro = {
+      venues: {
+        coinbase: {
+          venue: 'coinbase',
+          status: 'connected',
+          mid: 99_500,
+          depthSamples: [],
+          bookBids: [],
+          bookAsks: [],
+          activeWalls: [],
+          recentEvents: [],
+          taker15m: { buyBtc: 0, sellBtc: 0 },
+        },
+      },
+    } as unknown as MicrostructureState
+    const history = {
+      coinbase: [
+        { openTime: 0, open: 99, high: 99, low: 99, close: 99 },
+        { openTime: 60_000, open: 99.2, high: 99.2, low: 99.2, close: 99.2 },
+      ],
+    }
+    const lines = resolveVenueMidPolylines(
+      history,
+      barMs,
+      columns,
+      { coinbase: [] } as Record<VenueId, DepthSample[]>,
+      micro,
+      0,
+      rangeEnd,
+      ['coinbase'],
+    )
+    expect(lines.coinbase[0]).toHaveLength(2)
+    expect(lines.coinbase[0]![1]!.t).toBe(rangeEnd)
+    expect(lines.coinbase[0]![1]!.mid).toBe(99_500)
   })
 })
