@@ -3034,6 +3034,12 @@ html.shooter-gesture-lock body {
   transform: translateY(-100%);
 }
 
+.depth-heatmap-price-axis .depth-heatmap-venue-axis-label {
+  z-index: 2;
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
 .depth-heatmap-legend {
   display: flex;
   align-items: center;

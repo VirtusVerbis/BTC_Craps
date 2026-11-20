@@ -26,7 +26,7 @@ export interface HeatmapGridColumn {
   gap: boolean
 }
 
-const pickSampleInCoarseColumn = (
+export const pickSampleInCoarseColumn = (
   samples: readonly DepthSample[],
   rangeStart: number,
   intervalStart: number,

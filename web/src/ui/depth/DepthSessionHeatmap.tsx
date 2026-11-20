@@ -30,9 +30,20 @@ import {
 import type { MicrostructureState } from '../../data/microstructure/types'
 import { DepthInfoIcon } from './DepthInfoIcon'
 import { formatWallUsd } from './depthWallRowMetrics'
-import { DEPTH_VENUE_ORDER } from './depthVenueTheme'
+import { DEPTH_VENUE_ORDER, depthVenueShort } from './depthVenueTheme'
+import {
+  HEATMAP_VENUE_MID_LINE_VENUES,
+  resolveVenueMidPolylines,
+} from '../../data/microstructure/depthHeatmapVenueMids'
+import {
+  HEATMAP_VENUE_MID_POLL_MS,
+  loadHeatmapVenueMidHistoryWithCacheSWR,
+  readVenueMidHistoryCache,
+} from '../../data/heatmapVenueMidCache'
+import type { VenueMidHistory } from '../../data/heatmapVenueMidHistory'
 import { drawHeatmapCandleOverlay } from './depthHeatmapCandles'
 import { drawDraggedHeatmapDepth } from './depthHeatmapDragPaint'
+import { drawHeatmapVenueMidPolylines } from './depthHeatmapVenueMidLines'
 import { offRangeChipStyle } from './depthHeatmapOffRangeChip'
 import {
   aggregateMaxUsdByPrice,
@@ -44,6 +55,10 @@ import {
   type OffRangeEdge,
   type OffRangeSummary,
 } from './depthHeatmapDepthProfile'
+import {
+  buildHeatmapVenueAxisLabels,
+  HEATMAP_VENUE_AXIS_LABEL_VENUES,
+} from './depthHeatmapVenueAxisLabels'
 
 const HEATMAP_CANDLE_POLL_MS = 45_000
 
@@ -114,6 +129,7 @@ const drawHeatmap = (
   timeRange: { start: number; end: number },
   candleIntervalMs: number,
   offRange: OffRangeSummary,
+  venueMidPolylines: ReturnType<typeof resolveVenueMidPolylines>,
 ) => {
   const rowH = h / axis.rows
   ctx.fillStyle = '#0a0e17'
@@ -147,6 +163,7 @@ const drawHeatmap = (
     ctx.lineWidth = 1
   }
 
+  drawHeatmapVenueMidPolylines(ctx, venueMidPolylines, w, h, axis, timeRange)
   drawHeatmapCandleOverlay(ctx, candles, w, h, axis, timeRange, candleIntervalMs)
 }
 
@@ -165,6 +182,9 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
   const [chartSize, setChartSize] = useState({ w: 900, h: 400 })
   const [axisMaxUsd, setAxisMaxUsd] = useState(1)
   const [candles, setCandles] = useState<Candle[]>([])
+  const [venueMidHistory, setVenueMidHistory] = useState<VenueMidHistory | null>(() =>
+    readVenueMidHistoryCache(readWindowMin()),
+  )
   const [offRangePools, setOffRangePools] = useState<OffRangeSummary>({ above: null, below: null })
   const [priceAxis, setPriceAxis] = useState<HeatmapPriceAxis>(() => ({
     priceMin: 99_000,
@@ -176,7 +196,9 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
   const bucketCount = bucketCountForWindow(windowMin)
   const candleBarMs = heatmapCandleBarMs(windowMin)
   const displayPlan = useMemo(() => timelineDisplayPlan(bucketCount), [bucketCount])
+  const timelineNowRef = useRef(0)
   const timelineNow = snapTimelineNow(micro.sampledAt)
+  timelineNowRef.current = timelineNow > 0 ? timelineNow : timelineNowRef.current
   const liveMid = micro.venues.binancePerp.mid
 
   const heatmapViewport = useMemo(() => heatmapViewportForChartHeight(chartSize.h), [chartSize.h])
@@ -195,18 +217,56 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
 
   useEffect(() => {
     let cancelled = false
-    const load = () => {
+    const loadCandles = () => {
       void fetchHeatmapTimelineCandles(windowMin).then((rows) => {
         if (!cancelled) setCandles(rows)
       })
     }
-    load()
-    const id = window.setInterval(load, HEATMAP_CANDLE_POLL_MS)
+    loadCandles()
+    const candleId = window.setInterval(loadCandles, HEATMAP_CANDLE_POLL_MS)
     return () => {
       cancelled = true
-      window.clearInterval(id)
+      window.clearInterval(candleId)
     }
   }, [windowMin])
+
+  useEffect(() => {
+    setVenueMidHistory(readVenueMidHistoryCache(windowMin))
+  }, [windowMin])
+
+  useEffect(() => {
+    let cancelled = false
+    const loadVenueMids = () => {
+      const endMs = Date.now()
+      const axisEnd = timelineNowRef.current > 0 ? timelineNowRef.current : endMs
+      const windowRange = heatmapWindowTimeRange(bucketCount, axisEnd, displayPlan.groupSize)
+      const span = Math.max(60_000, windowRange.end - windowRange.start)
+      const bounds = {
+        startMs: endMs - span - 2 * 60_000,
+        endMs,
+      }
+      void loadHeatmapVenueMidHistoryWithCacheSWR(
+        windowMin,
+        (cached) => {
+          if (!cancelled) setVenueMidHistory(cached)
+        },
+        bounds,
+        endMs,
+      )
+        .then((rows) => {
+          if (!cancelled) setVenueMidHistory(rows)
+        })
+        .catch((err) => {
+          if (import.meta.env.DEV) console.warn('[DepthSessionHeatmap] venue mid history load failed', err)
+        })
+    }
+    loadVenueMids()
+    const midId = window.setInterval(loadVenueMids, HEATMAP_VENUE_MID_POLL_MS)
+    return () => {
+      cancelled = true
+      window.clearInterval(midId)
+    }
+  }, [windowMin, bucketCount, displayPlan.groupSize])
 
   useEffect(() => {
     const row = chartRowRef.current
@@ -266,6 +326,15 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
 
     const windowRange = heatmapWindowTimeRange(bucketCount, timelineNow, displayPlan.groupSize)
     const timeRange = { start: windowRange.start, end: windowRange.end }
+    const venueMidPolylines = resolveVenueMidPolylines(
+      venueMidHistory,
+      candleBarMs,
+      columns,
+      samplesByVenue.out,
+      micro,
+      windowRange.start,
+      windowRange.end,
+    )
     const layoutCols = displayPlan.displayCols
 
     const refMids: number[] = []
@@ -273,6 +342,13 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
       if (col.refMid > 0) refMids.push(col.refMid)
     }
     if (liveMid > 0) refMids.push(liveMid)
+    for (const venue of HEATMAP_VENUE_MID_LINE_VENUES) {
+      for (const seg of venueMidPolylines[venue] ?? []) {
+        for (const p of seg) {
+          if (p.mid > 0) refMids.push(p.mid)
+        }
+      }
+    }
 
     const candleExtent: number[] = []
     for (const c of candles) {
@@ -305,7 +381,20 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     const byPrice = aggregateMaxUsdByPrice(columns)
     const latestCol = latestHeatmapColumn(columns)
     const offRange = nearestOffRangeLargePools(latestCol, axis, refMid, undefined, heatmapViewport.bandBps)
-    drawHeatmap(ctx, columns, w, h, maxVal, axis, liveMid, candles, timeRange, candleBarMs, offRange)
+    drawHeatmap(
+      ctx,
+      columns,
+      w,
+      h,
+      maxVal,
+      axis,
+      liveMid,
+      candles,
+      timeRange,
+      candleBarMs,
+      offRange,
+      venueMidPolylines,
+    )
     setAxisMaxUsd(maxVal)
     setOffRangePools(offRange)
 
@@ -331,6 +420,8 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     samplesByVenue,
     liveMid,
     candles,
+    venueMidHistory,
+    candleBarMs,
     heatmapViewport,
     fillAvailableHeight,
   ])
@@ -348,6 +439,28 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     }),
     [priceAxis, midRangePrice],
   )
+  const venueAxisLabels = useMemo(() => {
+    const windowRange = heatmapWindowTimeRange(bucketCount, timelineNow, displayPlan.groupSize)
+    const timeRange = { start: windowRange.start, end: windowRange.end }
+    return buildHeatmapVenueAxisLabels(
+      HEATMAP_VENUE_AXIS_LABEL_VENUES,
+      venueMidHistory,
+      candles,
+      priceAxis,
+      timeRange,
+      candleBarMs,
+      chartSize.h,
+    )
+  }, [
+    bucketCount,
+    timelineNow,
+    displayPlan.groupSize,
+    venueMidHistory,
+    candles,
+    priceAxis,
+    candleBarMs,
+    chartSize.h,
+  ])
   const chipMid =
     liveMid > 0 ? liveMid : Math.max(0, (priceAxis.priceMax + priceAxis.priceMin) / 2)
   const showOffRangeAbove =
@@ -461,6 +574,16 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
           >
             {axisBottom}
           </span>
+          {venueAxisLabels.map((label) => (
+            <span
+              key={label.venue}
+              className="depth-timeline-axis-tick depth-heatmap-venue-axis-label"
+              style={{ top: `${label.topPct}%`, color: label.color }}
+              title={`${depthVenueShort[label.venue]}: latest kline close`}
+            >
+              {label.text}
+            </span>
+          ))}
         </div>
       </div>
     </section>

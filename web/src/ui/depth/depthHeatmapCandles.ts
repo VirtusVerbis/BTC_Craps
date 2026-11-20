@@ -22,7 +22,7 @@ export const heatmapTimeToX = (t: number, w: number, range: HeatmapTimeRange): n
   return ((t - range.start) / span) * w
 }
 
-const priceToY = (price: number, h: number, axis: HeatmapPriceAxis): number => {
+export const heatmapPriceToY = (price: number, h: number, axis: HeatmapPriceAxis): number => {
   const rowH = h / axis.rows
   const row = (axis.priceMax - price) / axis.tick
   return row * rowH
@@ -69,10 +69,10 @@ export const drawHeatmapCandleOverlay = (
     const xCenter = heatmapTimeToX(c.openTime + intervalMs / 2, w, timeRange)
     if (xCenter < -candleW || xCenter > w + candleW) continue
 
-    const highY = priceToY(c.high, h, axis)
-    const lowY = priceToY(c.low, h, axis)
-    const openY = priceToY(c.open, h, axis)
-    const closeY = priceToY(c.close, h, axis)
+    const highY = heatmapPriceToY(c.high, h, axis)
+    const lowY = heatmapPriceToY(c.low, h, axis)
+    const openY = heatmapPriceToY(c.open, h, axis)
+    const closeY = heatmapPriceToY(c.close, h, axis)
     if (!Number.isFinite(highY) || !Number.isFinite(lowY)) continue
     if (lowY > h + 4 || highY < -4) continue
 

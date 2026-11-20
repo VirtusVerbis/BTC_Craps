@@ -11,6 +11,26 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/binance-api/, ''),
       },
+      '/binance-fapi': {
+        target: 'https://fapi.binance.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/binance-fapi/, ''),
+      },
+      '/bybit-api': {
+        target: 'https://api.bybit.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/bybit-api/, ''),
+      },
+      '/okx-api': {
+        target: 'https://www.okx.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/okx-api/, ''),
+      },
+      '/kraken-api': {
+        target: 'https://api.kraken.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/kraken-api/, ''),
+      },
       '/coinbase-api': {
         target: 'https://api.exchange.coinbase.com',
         changeOrigin: true,

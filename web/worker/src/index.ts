@@ -7,6 +7,7 @@
  */
 
 import { shouldStoreSnapshot } from './kvBudget'
+import { matchExchangeProxyPrefix, fetchExchangeProxy } from './exchangeProxy'
 
 interface Env {
   OI_SNAPSHOT: {
@@ -73,7 +74,7 @@ const SECURITY_HEADERS: Record<string, string> = {
     "font-src 'self'",
     "media-src 'self' blob: https://www.youtube.com",
     "frame-src https://www.youtube.com https://www.youtube-nocookie.com",
-    "connect-src 'self' https://api.binance.com wss://stream.binance.com:9443 https://fapi.binance.com wss://fstream.binance.com https://api.exchange.coinbase.com wss://ws-feed.exchange.coinbase.com https://api.hyperliquid.xyz wss://api.hyperliquid.xyz wss://stream.bybit.com wss://ws.okx.com wss://ws.kraken.com https://mempool.space https://www.youtube.com https://s.ytimg.com",
+    "connect-src 'self' https://api.binance.com wss://stream.binance.com:9443 https://fapi.binance.com wss://fstream.binance.com https://api.exchange.coinbase.com wss://ws-feed.exchange.coinbase.com https://api.hyperliquid.xyz wss://api.hyperliquid.xyz https://api.bybit.com wss://stream.bybit.com https://www.okx.com wss://ws.okx.com https://api.kraken.com wss://ws.kraken.com https://mempool.space https://www.youtube.com https://s.ytimg.com",
     'upgrade-insecure-requests',
   ].join('; '),
 }
@@ -317,6 +318,9 @@ export default {
       const raw = await env.OI_SNAPSHOT.get('latest')
       const body = request.method === 'HEAD' ? null : (raw ?? 'null')
       return withSecurityHeaders(new Response(body, { headers: JSON_HEADERS }), request)
+    }
+    if (matchExchangeProxyPrefix(url.pathname)) {
+      return withSecurityHeaders(await fetchExchangeProxy(request), request)
     }
     if (env.ASSETS) return withSecurityHeaders(await env.ASSETS.fetch(request), request)
     return withSecurityHeaders(new Response('not found', { status: 404 }), request)
