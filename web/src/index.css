@@ -2481,11 +2481,25 @@ html.shooter-gesture-lock body {
 }
 
 .depth-panel-toolbar {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: space-between;
+  gap: 0.5rem;
   padding: 0.75rem 1rem;
   border-bottom: 1px solid rgba(246, 240, 218, 0.2);
+}
+
+.depth-panel-toolbar .depth-panel-title {
+  justify-self: start;
+}
+
+.depth-panel-toolbar-center {
+  justify-self: center;
+  white-space: nowrap;
+}
+
+.depth-panel-toolbar .depth-panel-close:last-child {
+  justify-self: end;
 }
 
 .depth-panel-title {

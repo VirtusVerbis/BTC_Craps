@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import type { MicrostructureState, WallEvent, WallRecord } from '../../data/microstructure/types'
 import { DepthBookChart } from './DepthBookChart'
 import { DepthSessionHeatmap } from './DepthSessionHeatmap'
@@ -8,12 +8,6 @@ import { depthVenueShort, depthVenueUiColor } from './depthVenueTheme'
 import { DEPTH_WALL_TAPE_MAX_ROWS } from './depthUiConstants'
 import { renderWallSize } from './depthWallRowMetrics'
 import { wallEventKey, wallStage1Highlight, wallStage2Flash } from './depthWallHighlight'
-import {
-  persistLiveWallsOpen,
-  persistTapeOpen,
-  readLiveWallsOpen,
-  readTapeOpen,
-} from './depthWallSectionToggles'
 import { useDepthPanelNarrow } from './useDepthPanelNarrow'
 
 const wallReasonLabel: Record<string, string> = {
@@ -42,27 +36,28 @@ const sortEventsByPeakBtcDesc = (rows: readonly WallEvent[]): WallEvent[] =>
 interface DepthConsolidatedWallsProps {
   micro: MicrostructureState
   forceChartsGrow?: boolean
+  liveWallsOpen: boolean
+  setLiveWallsOpen: Dispatch<SetStateAction<boolean>>
+  tapeOpen: boolean
+  setTapeOpen: Dispatch<SetStateAction<boolean>>
 }
 
-export const DepthConsolidatedWalls = ({ micro, forceChartsGrow = false }: DepthConsolidatedWallsProps) => {
+export const DepthConsolidatedWalls = ({
+  micro,
+  forceChartsGrow = false,
+  liveWallsOpen,
+  setLiveWallsOpen,
+  tapeOpen,
+  setTapeOpen,
+}: DepthConsolidatedWallsProps) => {
   const now = micro.sampledAt
   const prevLivePeaksRef = useRef<Map<string, number>>(new Map())
   const [livePulseKeys, setLivePulseKeys] = useState<Set<string>>(() => new Set())
-  const [liveWallsOpen, setLiveWallsOpen] = useState(readLiveWallsOpen)
-  const [tapeOpen, setTapeOpen] = useState(readTapeOpen)
 
   const narrowPanel = useDepthPanelNarrow()
   const wallsTapeCollapsed = !liveWallsOpen || !tapeOpen
   /** Snapshot collapsed (desktop grow), or mobile with walls/tape collapsed (scroll panel still has a flex slot). */
   const chartsFlexGrow = wallsTapeCollapsed && (forceChartsGrow || narrowPanel)
-
-  useEffect(() => {
-    persistLiveWallsOpen(liveWallsOpen)
-  }, [liveWallsOpen])
-
-  useEffect(() => {
-    persistTapeOpen(tapeOpen)
-  }, [tapeOpen])
 
   const { chartWalls, liveBids, liveAsks } = useMemo(() => buildDisplayWallsFromMicro(micro), [micro])
 

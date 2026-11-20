@@ -2,11 +2,9 @@ const STORAGE_OVERVIEW_OPEN = 'depthMarketOverviewOpen'
 
 export const readOverviewOpen = (): boolean => {
   try {
-    const v = sessionStorage.getItem(STORAGE_OVERVIEW_OPEN)
-    if (v === '0') return false
-    return true
+    return sessionStorage.getItem(STORAGE_OVERVIEW_OPEN) === '1'
   } catch {
-    return true
+    return false
   }
 }
 

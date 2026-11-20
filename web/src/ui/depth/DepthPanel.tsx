@@ -6,6 +6,12 @@ import { DepthConsolidatedWalls } from './DepthConsolidatedWalls'
 import { DepthGlobalHeader } from './DepthGlobalHeader'
 import { DepthMergedTimeline } from './DepthMergedTimeline'
 import { persistOverviewOpen, readOverviewOpen } from './depthOverviewToggle'
+import {
+  persistLiveWallsOpen,
+  persistTapeOpen,
+  readLiveWallsOpen,
+  readTapeOpen,
+} from './depthWallSectionToggles'
 
 interface DepthPanelProps {
   open: boolean
@@ -16,10 +22,28 @@ interface DepthPanelProps {
 
 export const DepthPanel = ({ open, onClose, micro, openInterest }: DepthPanelProps) => {
   const [overviewOpen, setOverviewOpen] = useState(readOverviewOpen)
+  const [liveWallsOpen, setLiveWallsOpen] = useState(readLiveWallsOpen)
+  const [tapeOpen, setTapeOpen] = useState(readTapeOpen)
 
   useEffect(() => {
     persistOverviewOpen(overviewOpen)
   }, [overviewOpen])
+
+  useEffect(() => {
+    persistLiveWallsOpen(liveWallsOpen)
+  }, [liveWallsOpen])
+
+  useEffect(() => {
+    persistTapeOpen(tapeOpen)
+  }, [tapeOpen])
+
+  const allSectionsOpen = overviewOpen && liveWallsOpen && tapeOpen
+  const toggleAllSections = () => {
+    const next = !allSectionsOpen
+    setOverviewOpen(next)
+    setLiveWallsOpen(next)
+    setTapeOpen(next)
+  }
 
   const chartsEqualGrow = !overviewOpen
 
@@ -31,6 +55,14 @@ export const DepthPanel = ({ open, onClose, micro, openInterest }: DepthPanelPro
     >
       <div className="depth-panel-toolbar">
         <h2 className="depth-panel-title">Depth</h2>
+        <button
+          type="button"
+          className="depth-panel-close depth-panel-toolbar-center"
+          onClick={toggleAllSections}
+          aria-label={allSectionsOpen ? 'Collapse all depth sections' : 'Expand all depth sections'}
+        >
+          {allSectionsOpen ? 'Collapse All' : 'Expand All'}
+        </button>
         <button type="button" className="depth-panel-close" onClick={onClose}>
           Close
         </button>
@@ -61,7 +93,14 @@ export const DepthPanel = ({ open, onClose, micro, openInterest }: DepthPanelPro
         </section>
         <div className={chartsEqualGrow ? 'depth-charts-stack depth-charts-stack--equal-grow' : 'depth-charts-stack'}>
           <DepthMergedTimeline micro={micro} />
-          <DepthConsolidatedWalls micro={micro} forceChartsGrow={chartsEqualGrow} />
+          <DepthConsolidatedWalls
+            micro={micro}
+            forceChartsGrow={chartsEqualGrow}
+            liveWallsOpen={liveWallsOpen}
+            setLiveWallsOpen={setLiveWallsOpen}
+            tapeOpen={tapeOpen}
+            setTapeOpen={setTapeOpen}
+          />
         </div>
       </div>
     </div>
