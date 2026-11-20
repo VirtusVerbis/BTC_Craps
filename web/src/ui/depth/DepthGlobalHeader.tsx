@@ -4,6 +4,7 @@ import { formatLiqBtc, formatLiqUsd } from '../format'
 import { FeedGlyph } from '../FeedGlyph'
 import { DepthInfoIcon } from './DepthInfoIcon'
 import type { DepthGlossaryKey } from './depthGlossary'
+import { formatVenueMid } from './depthVenueMidFormat'
 import { DEPTH_VENUE_ORDER, depthVenueColorBid, depthVenueShort } from './depthVenueTheme'
 
 const venueGlossary: Record<VenueId, DepthGlossaryKey> = {
@@ -29,9 +30,6 @@ const formatTakerNet = (buy: number, sell: number): string => {
   const sign = net >= 0 ? '+' : ''
   return `${sign}${net.toFixed(1)}`
 }
-
-const formatVenueMid = (mid: number): string =>
-  mid > 0 ? `$${mid.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : '—'
 
 const formatOi = (value: number): string => Math.round(value).toLocaleString('en-US')
 const formatPct = (value: number): string => `${Math.round(value)}%`

@@ -117,6 +117,11 @@ export const depthGlossary: Record<DepthGlossaryKey, GlossaryEntry> = {
         detail: 'BN-P B / HL A etc. in venue legend colors.',
       },
       {
+        label: 'Mid prices',
+        detail:
+          'Each venue’s book mid ($, whole dollars) on the center line in legend color. Overlap: stacked at the top, highest mid on top. Stack: one price per row.',
+      },
+      {
         label: 'Layout',
         detail: 'Stack, overlap, fixed bps, and stretch are explained by the other i buttons on this chart.',
       },

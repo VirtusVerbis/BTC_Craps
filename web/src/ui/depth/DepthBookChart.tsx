@@ -10,6 +10,7 @@ import {
 import type { MicrostructureState, VenueId, WallRecord } from '../../data/microstructure/types'
 import { DepthInfoIcon } from './DepthInfoIcon'
 import { formatWallUsdCompact } from './depthWallRowMetrics'
+import { formatVenueMid, venueMidChartLabelColor } from './depthVenueMidFormat'
 import { DEPTH_VENUE_ORDER, depthVenueColorAsk, depthVenueColorBid, depthVenueShort } from './depthVenueTheme'
 
 const STORAGE_BOOK_MODE = 'depthBookChartMode'
@@ -96,6 +97,7 @@ const drawFixedAxisLabels = (
 
 const CURVE_LABEL_FONT = '18px sans-serif'
 const CURVE_LABEL_LINE_H = 20
+const MID_PRICE_FIRST_BASELINE = 18
 
 const venueLabelColor = (venue: VenueId, side: 'bid' | 'ask'): string => {
   const raw = side === 'bid' ? depthVenueColorBid[venue] : depthVenueColorAsk[venue]
@@ -113,6 +115,45 @@ interface CurveLabelSpec {
   y: number
   color: string
 }
+
+const paintVenueMidOnMidline = (
+  ctx: CanvasRenderingContext2D,
+  midX: number,
+  topY: number,
+  venue: VenueId,
+  mid: number,
+): void => {
+  ctx.font = CURVE_LABEL_FONT
+  ctx.textAlign = 'center'
+  ctx.fillStyle = venueMidChartLabelColor(venue, mid)
+  ctx.fillText(formatVenueMid(mid), midX, topY + MID_PRICE_FIRST_BASELINE)
+  ctx.textAlign = 'start'
+}
+
+const paintOverlapMidPriceStack = (
+  ctx: CanvasRenderingContext2D,
+  midX: number,
+  topY: number,
+  venues: MicrostructureState['venues'],
+): void => {
+  const rows = DEPTH_VENUE_ORDER.map((venue) => ({ venue, mid: venues[venue].mid })).sort((a, b) => {
+    const am = a.mid > 0 ? a.mid : Number.NEGATIVE_INFINITY
+    const bm = b.mid > 0 ? b.mid : Number.NEGATIVE_INFINITY
+    return bm - am
+  })
+  ctx.font = CURVE_LABEL_FONT
+  ctx.textAlign = 'center'
+  let lineY = topY + MID_PRICE_FIRST_BASELINE
+  for (const { venue, mid } of rows) {
+    ctx.fillStyle = venueMidChartLabelColor(venue, mid)
+    ctx.fillText(formatVenueMid(mid), midX, lineY)
+    lineY += CURVE_LABEL_LINE_H
+  }
+  ctx.textAlign = 'start'
+}
+
+const overlapMidPriceStackMinCurveLabelY = (chartTopY: number): number =>
+  chartTopY + MID_PRICE_FIRST_BASELINE + DEPTH_VENUE_ORDER.length * CURVE_LABEL_LINE_H + 4
 
 const resolveLabelCollisions = (labels: CurveLabelSpec[], minY: number, maxY: number): void => {
   if (labels.length === 0) return
@@ -227,6 +268,8 @@ const drawVenueChart = (
   ctx.moveTo(midX, y)
   ctx.lineTo(midX, y + h)
   ctx.stroke()
+
+  paintVenueMidOnMidline(ctx, midX, y, snap.venue, snap.mid)
 
   if (label) {
     ctx.fillStyle = 'rgba(246, 240, 218, 0.85)'
@@ -528,9 +571,11 @@ export const DepthBookChart = ({ micro, topWalls, fillAvailableHeight = false }:
       ctx.lineTo(midX, y + chartH)
       ctx.stroke()
 
+      paintOverlapMidPriceStack(ctx, midX, y, micro.venues)
+
       const bidLabels: CurveLabelSpec[] = []
       const askLabels: CurveLabelSpec[] = []
-      const labelMinY = y + 14
+      const labelMinY = overlapMidPriceStackMinCurveLabelY(y)
       const labelMaxY = baseY - 4
 
       for (const { venue, curve, sideExtents } of venueCurves) {
