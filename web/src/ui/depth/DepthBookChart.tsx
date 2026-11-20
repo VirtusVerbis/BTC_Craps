@@ -9,8 +9,8 @@ import {
 } from '../../data/microstructure/depthBookCurve'
 import type { MicrostructureState, VenueId, WallRecord } from '../../data/microstructure/types'
 import { DepthInfoIcon } from './DepthInfoIcon'
-import { formatWallUsdCompact } from './depthWallRowMetrics'
 import { formatVenueMid, venueMidChartLabelColor } from './depthVenueMidFormat'
+import { formatWallUsdCompact } from './depthWallRowMetrics'
 import { DEPTH_VENUE_ORDER, depthVenueColorAsk, depthVenueColorBid, depthVenueShort } from './depthVenueTheme'
 
 const STORAGE_BOOK_MODE = 'depthBookChartMode'
@@ -359,7 +359,7 @@ const drawWallMarkers = (
     ctx.lineTo(px, baseY)
     ctx.stroke()
     ctx.setLineDash([])
-    const text = `${depthVenueShort[wall.venue]} ${wall.side === 'bid' ? 'B' : 'A'} ${formatWallUsdCompact(wall.peakUsd)}`
+    const text = formatWallUsdCompact(wall.price)
     ctx.fillStyle = venueLabelColor(wall.venue, wall.side)
     const textW = ctx.measureText(text).width
     const labelY = topY - 2

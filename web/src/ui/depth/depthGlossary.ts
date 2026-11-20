@@ -114,7 +114,8 @@ export const depthGlossary: Record<DepthGlossaryKey, GlossaryEntry> = {
       },
       {
         label: 'Labels',
-        detail: 'BN-P B / HL A etc. in venue legend colors.',
+        detail:
+          'Wall dashes: resting level ($k / $m / $b compact) in venue legend colors; green/red dash = bid/ask.',
       },
       {
         label: 'Mid prices',
