@@ -7,12 +7,24 @@ import {
   heatmapCandleBarMs,
   type HeatmapTimelineWindowMin,
 } from './heatmapCandleSeries'
+import {
+  HEATMAP_VENUE_MID_QUICK_RETRY_MS,
+  HEATMAP_VENUE_MID_STAGGER_MS,
+  pauseMs,
+  recordVenueMidFetchRateLimited,
+  recordVenueMidFetchSuccess,
+} from './heatmapVenueMidFetchPolicy'
 import { DEPTH_VENUE_ORDER } from './microstructure/venueOrder'
 import type { VenueId } from './microstructure/types'
 
 const HEATMAP_VENUE_MID_LINE_VENUES: readonly VenueId[] = DEPTH_VENUE_ORDER.filter(
   (v) => v !== 'binanceSpot',
 )
+
+/** Venues used for REST mid-line backfill (excludes binanceSpot). */
+export const heatmapVenueMidHistoryVenues: readonly VenueId[] = HEATMAP_VENUE_MID_LINE_VENUES
+
+export type VenueMidFetchResult = { candles: Candle[]; rateLimited: boolean }
 
 export type VenueMidHistory = Partial<Record<VenueId, Candle[]>>
 
@@ -21,13 +33,24 @@ const HEATMAP_CANDLE_MARGIN_MS = 2 * 60_000
 const midHistoryRestBase = (proxyPrefix: string, prodOrigin: string): string =>
   exchangeRestBase(proxyPrefix, prodOrigin)
 
-const safeVenueCandles = async (fn: () => Promise<Candle[]>): Promise<Candle[]> => {
+const emptyFetch = (): VenueMidFetchResult => ({ candles: [], rateLimited: false })
+
+const safeVenueMidFetch = async (fn: () => Promise<VenueMidFetchResult>): Promise<VenueMidFetchResult> => {
   try {
     return await fn()
   } catch (err) {
     if (import.meta.env.DEV) console.warn('[heatmapVenueMidHistory] venue fetch failed', err)
-    return []
+    return emptyFetch()
   }
+}
+
+const withQuickRateLimitRetry = async (
+  fn: () => Promise<VenueMidFetchResult>,
+): Promise<VenueMidFetchResult> => {
+  const first = await safeVenueMidFetch(fn)
+  if (!first.rateLimited) return first
+  await pauseMs(HEATMAP_VENUE_MID_QUICK_RETRY_MS)
+  return safeVenueMidFetch(fn)
 }
 
 /** Values in ~1e9 are unix seconds (API); ~1e12+ are already epoch ms. */
@@ -118,13 +141,19 @@ const krakenOhlcRows = (result: Record<string, unknown> | undefined): number[][]
   return []
 }
 
-const fetchKrakenCandles = async (startMs: number, barMs: number): Promise<Candle[]> => {
+const krakenErrorLooksRateLimited = (errors: readonly string[]): boolean =>
+  errors.some((e) => /frequency|rate|limit|throttle|too many/i.test(e))
+
+const fetchKrakenCandlesOnce = async (startMs: number, barMs: number): Promise<VenueMidFetchResult> => {
   const base = midHistoryRestBase('/kraken-api', 'https://api.kraken.com')
   const interval = krakenIntervalMin(barMs)
   const since = Math.floor(startMs / 1000)
   const res = await fetch(`${base}/0/public/OHLC?pair=XBTUSD&interval=${interval}&since=${since}`)
-  if (!res.ok) return []
-  const raw = (await res.json()) as { result?: Record<string, unknown> }
+  if (!res.ok) return { candles: [], rateLimited: res.status === 429 }
+  const raw = (await res.json()) as { error?: string[]; result?: Record<string, unknown> }
+  if (raw.error && raw.error.length > 0) {
+    return { candles: [], rateLimited: krakenErrorLooksRateLimited(raw.error) }
+  }
   const rows = krakenOhlcRows(raw.result)
   const out: Candle[] = []
   for (const row of rows) {
@@ -143,8 +172,11 @@ const fetchKrakenCandles = async (startMs: number, barMs: number): Promise<Candl
       close,
     })
   }
-  return out.sort((a, b) => a.openTime - b.openTime)
+  return { candles: out.sort((a, b) => a.openTime - b.openTime), rateLimited: false }
 }
+
+const fetchKrakenCandles = (startMs: number, barMs: number): Promise<VenueMidFetchResult> =>
+  withQuickRateLimitRetry(() => fetchKrakenCandlesOnce(startMs, barMs))
 
 const bybitInterval = (barMs: number): string => {
   if (barMs < 60_000) return '1'
@@ -185,7 +217,13 @@ const okxBar = (barMs: number): string => {
   return '15m'
 }
 
-const fetchOkxCandles = async (_nowMs: number, barMs: number, windowMin: HeatmapTimelineWindowMin): Promise<Candle[]> => {
+const OKX_RATE_LIMIT_CODES = new Set(['50011', '50026', '50013'])
+
+const fetchOkxCandlesOnce = async (
+  _nowMs: number,
+  barMs: number,
+  windowMin: HeatmapTimelineWindowMin,
+): Promise<VenueMidFetchResult> => {
   const base = midHistoryRestBase('/okx-api', 'https://www.okx.com')
   const limit = Math.min(300, windowMin + 20)
   const params = new URLSearchParams({
@@ -194,8 +232,11 @@ const fetchOkxCandles = async (_nowMs: number, barMs: number, windowMin: Heatmap
     limit: String(limit),
   })
   const res = await fetch(`${base}/api/v5/market/candles?${params}`)
-  if (!res.ok) return []
-  const raw = (await res.json()) as { data?: string[][] }
+  if (!res.ok) return { candles: [], rateLimited: res.status === 429 }
+  const raw = (await res.json()) as { code?: string; data?: string[][]; msg?: string }
+  if (raw.code !== undefined && raw.code !== '0') {
+    return { candles: [], rateLimited: OKX_RATE_LIMIT_CODES.has(raw.code) }
+  }
   const rows = raw.data ?? []
   const out: Candle[] = []
   for (const row of rows) {
@@ -208,8 +249,14 @@ const fetchOkxCandles = async (_nowMs: number, barMs: number, windowMin: Heatmap
     if (!(openTime > 0 && close > 0)) continue
     out.push({ openTime, open, high, low, close })
   }
-  return out.sort((a, b) => a.openTime - b.openTime)
+  return { candles: out.sort((a, b) => a.openTime - b.openTime), rateLimited: false }
 }
+
+const fetchOkxCandles = (
+  nowMs: number,
+  barMs: number,
+  windowMin: HeatmapTimelineWindowMin,
+): Promise<VenueMidFetchResult> => withQuickRateLimitRetry(() => fetchOkxCandlesOnce(nowMs, barMs, windowMin))
 
 const hyperliquidInterval = (barMs: number): string => {
   if (barMs < 60_000) return '1m'
@@ -254,10 +301,15 @@ const normalizeToBarMs = (candles: readonly Candle[], barMs: number, windowMin: 
 
 export type HeatmapVenueMidFetchBounds = { startMs: number; endMs: number }
 
+export type FetchHeatmapVenueMidHistoryOptions = {
+  skipVenues?: ReadonlySet<VenueId>
+}
+
 /** REST backfill for heatmap venue mid lines (kline close ≈ price path). */
 export const fetchHeatmapVenueMidHistory = async (
   windowMin: HeatmapTimelineWindowMin,
   bounds?: HeatmapVenueMidFetchBounds,
+  options?: FetchHeatmapVenueMidHistoryOptions,
 ): Promise<VenueMidHistory> => {
   const barMs = heatmapCandleBarMs(windowMin)
   const windowMs = windowMin * 60_000
@@ -266,23 +318,73 @@ export const fetchHeatmapVenueMidHistory = async (
   const startSec = Math.floor(start / 1000)
   const endSec = Math.ceil(now / 1000)
   const coinbaseGran = barMs >= 60_000 ? 60 : 60
+  const skip = options?.skipVenues
 
-  const [binancePerp, coinbase, hyperliquid, bybitPerp, okxPerp, krakenSpot] = await Promise.all([
-    safeVenueCandles(() => binancePerpCandlesForWindow(windowMin, start, barMs)),
-    safeVenueCandles(() => fetchCoinbaseCandles(startSec, endSec, coinbaseGran)),
-    safeVenueCandles(() => fetchHyperliquidCandles(start, now, barMs)),
-    safeVenueCandles(() => fetchBybitCandles(start, barMs)),
-    safeVenueCandles(() => fetchOkxCandles(now, barMs, windowMin)),
-    safeVenueCandles(() => fetchKrakenCandles(start, barMs)),
-  ])
+  const venueFetchers: { venue: VenueId; fetch: () => Promise<VenueMidFetchResult> }[] = [
+    {
+      venue: 'binancePerp',
+      fetch: () =>
+        safeVenueMidFetch(async () => ({
+          candles: await binancePerpCandlesForWindow(windowMin, start, barMs),
+          rateLimited: false,
+        })),
+    },
+    {
+      venue: 'coinbase',
+      fetch: () =>
+        safeVenueMidFetch(async () => ({
+          candles: await fetchCoinbaseCandles(startSec, endSec, coinbaseGran),
+          rateLimited: false,
+        })),
+    },
+    {
+      venue: 'hyperliquid',
+      fetch: () =>
+        safeVenueMidFetch(async () => ({
+          candles: await fetchHyperliquidCandles(start, now, barMs),
+          rateLimited: false,
+        })),
+    },
+    {
+      venue: 'bybitPerp',
+      fetch: () =>
+        safeVenueMidFetch(async () => ({
+          candles: await fetchBybitCandles(start, barMs),
+          rateLimited: false,
+        })),
+    },
+    {
+      venue: 'okxPerp',
+      fetch: () => fetchOkxCandles(now, barMs, windowMin),
+    },
+    {
+      venue: 'krakenSpot',
+      fetch: () => fetchKrakenCandles(start, barMs),
+    },
+  ]
 
-  const out: VenueMidHistory = {
-    binancePerp: filterCandlesToWindow(normalizeToBarMs(binancePerp, barMs, windowMin), start, now),
-    coinbase: filterCandlesToWindow(normalizeToBarMs(coinbase, barMs, windowMin), start, now),
-    hyperliquid: filterCandlesToWindow(normalizeToBarMs(hyperliquid, barMs, windowMin), start, now),
-    bybitPerp: filterCandlesToWindow(normalizeToBarMs(bybitPerp, barMs, windowMin), start, now),
-    okxPerp: filterCandlesToWindow(normalizeToBarMs(okxPerp, barMs, windowMin), start, now),
-    krakenSpot: filterCandlesToWindow(normalizeToBarMs(krakenSpot, barMs, windowMin), start, now),
+  const rawCandles: Partial<Record<VenueId, Candle[]>> = {}
+  let staggered = false
+  for (const { venue, fetch } of venueFetchers) {
+    if (skip?.has(venue)) continue
+    if (staggered) await pauseMs(HEATMAP_VENUE_MID_STAGGER_MS)
+    staggered = true
+
+    const result = await fetch()
+    rawCandles[venue] = result.candles
+    if (result.rateLimited) {
+      recordVenueMidFetchRateLimited(venue, now)
+    } else if (result.candles.length >= 2) {
+      recordVenueMidFetchSuccess(venue)
+    }
+  }
+
+  const out: VenueMidHistory = {}
+  for (const venue of HEATMAP_VENUE_MID_LINE_VENUES) {
+    const rows = rawCandles[venue]
+    if (!rows?.length) continue
+    const normalized = filterCandlesToWindow(normalizeToBarMs(rows, barMs, windowMin), start, now)
+    if (normalized.length) out[venue] = normalized
   }
 
   for (const venue of HEATMAP_VENUE_MID_LINE_VENUES) {

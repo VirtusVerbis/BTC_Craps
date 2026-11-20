@@ -8,6 +8,7 @@ import {
   venueMidHistoryHasSeries,
 } from './heatmapVenueMidCache'
 import type { VenueMidHistory } from './heatmapVenueMidHistory'
+import { mergeVenueMidHistory } from './heatmapVenueMidMerge'
 
 const storage = (): Storage => {
   const map = new Map<string, string>()
@@ -23,18 +24,30 @@ const storage = (): Storage => {
   }
 }
 
+let fetchReturnPartial = false
+
 vi.mock('./heatmapVenueMidHistory', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./heatmapVenueMidHistory')>()
   return {
     ...actual,
     fetchHeatmapVenueMidHistory: vi.fn(async (_windowMin, bounds) => {
       const end = bounds?.endMs ?? Date.now()
-      return {
+      const base = {
         coinbase: [
           { openTime: end - 120_000, open: 1, high: 1, low: 1, close: 100_000 },
           { openTime: end - 60_000, open: 1, high: 1, low: 1, close: 100_100 },
         ],
       }
+      if (!fetchReturnPartial) {
+        return {
+          ...base,
+          okxPerp: [
+            { openTime: end - 120_000, open: 1, high: 1, low: 1, close: 99_000 },
+            { openTime: end - 60_000, open: 1, high: 1, low: 1, close: 99_100 },
+          ],
+        }
+      }
+      return base
     }),
   }
 })
@@ -43,6 +56,7 @@ describe('heatmapVenueMidCache', () => {
   beforeEach(() => {
     vi.stubGlobal('localStorage', storage())
     vi.clearAllMocks()
+    fetchReturnPartial = false
   })
 
   afterEach(() => {
@@ -77,6 +91,39 @@ describe('heatmapVenueMidCache', () => {
     await loadHeatmapVenueMidHistoryWithCache(60, undefined, Date.now())
     const hit = readVenueMidHistoryCache(60)
     expect(hit?.coinbase?.length).toBe(2)
+  })
+
+  it('preserves prior venue slices when refetch omits them', async () => {
+    const now = 1_700_000_200_000
+    await loadHeatmapVenueMidHistoryWithCache(15, undefined, now)
+    let hit = readVenueMidHistoryCache(15)
+    expect(hit?.okxPerp?.length).toBe(2)
+
+    fetchReturnPartial = true
+    await loadHeatmapVenueMidHistoryWithCache(15, undefined, now + HEATMAP_VENUE_MID_CACHE_TTL_MS + 1)
+    hit = readVenueMidHistoryCache(15)
+    expect(hit?.okxPerp?.length).toBe(2)
+    expect(hit?.okxPerp?.[1]?.close).toBe(99_100)
+    expect(hit?.coinbase?.[1]?.close).toBe(100_100)
+  })
+
+  it('mergeVenueMidHistory keeps stale okx from prior', () => {
+    const end = 1_700_000_000_000
+    const merged = mergeVenueMidHistory(
+      {
+        okxPerp: [
+          { openTime: end - 120_000, open: 1, high: 1, low: 1, close: 50 },
+          { openTime: end - 60_000, open: 1, high: 1, low: 1, close: 51 },
+        ],
+      },
+      {
+        coinbase: [
+          { openTime: end - 120_000, open: 1, high: 1, low: 1, close: 100 },
+          { openTime: end - 60_000, open: 1, high: 1, low: 1, close: 101 },
+        ],
+      },
+    )
+    expect(merged.okxPerp?.[1]?.close).toBe(51)
   })
 
   it('venueMidHistoryHasSeries tolerates descending candle order', () => {

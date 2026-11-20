@@ -4,10 +4,12 @@ import {
   type HeatmapVenueMidFetchBounds,
   type VenueMidHistory,
 } from './heatmapVenueMidHistory'
+import { getVenuesInFetchBackoff } from './heatmapVenueMidFetchPolicy'
+import { mergeVenueMidHistory } from './heatmapVenueMidMerge'
 import { fetchHeatmapVenueMidHistory } from './heatmapVenueMidHistory'
 
 /** How long cached mid-line history is reused before a full REST refetch. */
-export const HEATMAP_VENUE_MID_CACHE_TTL_MS = 180_000
+export const HEATMAP_VENUE_MID_CACHE_TTL_MS = 600_000
 /** Background check interval (skips network when cache is still fresh). */
 export const HEATMAP_VENUE_MID_POLL_MS = HEATMAP_VENUE_MID_CACHE_TTL_MS
 
@@ -127,11 +129,17 @@ export const loadHeatmapVenueMidHistoryWithCache = async (
     if (hit) return hit
   }
 
-  const fresh = await fetchHeatmapVenueMidHistory(windowMin, bounds ?? { startMs: now - windowMin * 60_000, endMs: now })
-  if (venueMidHistoryHasBars(fresh)) {
-    writeStored(windowMin, barMs, fresh, now)
+  const prior = readVenueMidHistoryCache(windowMin, barMs)
+  const fresh = await fetchHeatmapVenueMidHistory(
+    windowMin,
+    bounds ?? { startMs: now - windowMin * 60_000, endMs: now },
+    { skipVenues: getVenuesInFetchBackoff(now) },
+  )
+  const merged = mergeVenueMidHistory(prior, fresh)
+  if (venueMidHistoryHasBars(merged)) {
+    writeStored(windowMin, barMs, merged, now)
   }
-  return fresh
+  return merged
 }
 
 /** Stale-while-revalidate: may return cached history immediately via `onCached`. */
@@ -150,9 +158,12 @@ export const loadHeatmapVenueMidHistoryWithCacheSWR = async (
   }
 
   const fetchBounds = bounds ?? { startMs: now - windowMin * 60_000, endMs: now }
-  const fresh = await fetchHeatmapVenueMidHistory(windowMin, fetchBounds)
-  if (venueMidHistoryHasBars(fresh)) {
-    writeStored(windowMin, barMs, fresh, now)
+  const fresh = await fetchHeatmapVenueMidHistory(windowMin, fetchBounds, {
+    skipVenues: getVenuesInFetchBackoff(now),
+  })
+  const merged = mergeVenueMidHistory(cached, fresh)
+  if (venueMidHistoryHasBars(merged)) {
+    writeStored(windowMin, barMs, merged, now)
   }
-  return fresh
+  return merged
 }
