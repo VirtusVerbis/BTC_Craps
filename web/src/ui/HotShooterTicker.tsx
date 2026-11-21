@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type Ref } from 'react'
 import { ROLL_STREAK_COLOR_STEP_MS } from './rollStreak'
 import {
-  LIQ_LABEL_Y,
+  BOTTOM_ACTION_ROW_Y,
   LIQ_TICKER_FONT_PX,
   LIQ_TICKER_HEIGHT_PX,
   LIQ_TICKER_SPEED_PX_PER_SEC,
@@ -73,7 +73,7 @@ const HotShooterPass = ({ onDone }: { onDone: () => void }) => {
       ref={boxRef}
       className="liq-ticker"
       style={{
-        top: LIQ_LABEL_Y - LIQ_TICKER_HEIGHT_PX * 2,
+        top: BOTTOM_ACTION_ROW_Y - LIQ_TICKER_HEIGHT_PX * 2,
         height: LIQ_TICKER_HEIGHT_PX,
         fontSize: LIQ_TICKER_FONT_PX,
       }}

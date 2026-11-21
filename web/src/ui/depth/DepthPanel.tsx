@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import type { OpenInterestSnapshot } from '../../data/openInterest'
 import type { MicrostructureService } from '../../data/microstructure/microstructureService'
 import { DEPTH_PANEL_SLIDE_MS } from './depthConstants'
 import { DepthConsolidatedWalls } from './DepthConsolidatedWalls'
@@ -18,14 +17,12 @@ interface DepthPanelProps {
   open: boolean
   onClose: () => void
   microstructureService: MicrostructureService
-  openInterest: OpenInterestSnapshot | null
 }
 
 export const DepthPanel = ({
   open,
   onClose,
   microstructureService,
-  openInterest,
 }: DepthPanelProps) => {
   const micro = useMicrostructure(microstructureService, open)
   const [overviewOpen, setOverviewOpen] = useState(readOverviewOpen)
@@ -97,7 +94,7 @@ export const DepthPanel = ({
               </button>
               <span className="depth-overview-title">Market snapshot</span>
             </h3>
-            {overviewOpen ? <DepthGlobalHeader micro={micro} openInterest={openInterest} /> : null}
+            {overviewOpen ? <DepthGlobalHeader micro={micro} /> : null}
           </section>
           <div
             className={

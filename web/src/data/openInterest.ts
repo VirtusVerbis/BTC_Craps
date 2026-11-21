@@ -19,23 +19,6 @@ export interface OpenInterestSnapshot {
 /** How often the page re-reads the worker snapshot. */
 export const OI_POLL_MS = 60_000
 
-/**
- * Used when the worker is not running locally, so the felt still has stacks.
- * A live `/oi` response replaces it.
- */
-const DEV_SAMPLE: OpenInterestSnapshot = {
-  sampledAt: 0,
-  openInterest: 96669,
-  ratio: 1.3267,
-  longPct: 57.02,
-  shortPct: 42.98,
-  liqBarStart: null,
-  longLiqBtc: null,
-  shortLiqBtc: null,
-  longLiqUsd: null,
-  shortLiqUsd: null,
-}
-
 const optionalLiq = (value: unknown): number | null => {
   if (value == null || value === '') return null
   const n = Number(value)
@@ -82,6 +65,8 @@ export const parseOpenInterest = (value: unknown): OpenInterestSnapshot | null =
   }
 }
 
+export { OpenInterestProvider, useOpenInterestFromContext as useOpenInterest } from './openInterestProvider'
+
 export const fetchOpenInterest = async (): Promise<OpenInterestSnapshot | null> => {
   try {
     const res = await fetch('/oi')
@@ -90,32 +75,6 @@ export const fetchOpenInterest = async (): Promise<OpenInterestSnapshot | null> 
   } catch {
     return null
   }
-}
-
-export const useOpenInterest = (): OpenInterestSnapshot | null => {
-  const [snapshot, setSnapshot] = useState<OpenInterestSnapshot | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    const load = () => {
-      void fetchOpenInterest().then((next) => {
-        if (cancelled) return
-        if (next) {
-          setSnapshot(next)
-          return
-        }
-        if (import.meta.env.DEV) setSnapshot((current) => current ?? DEV_SAMPLE)
-      })
-    }
-    load()
-    const id = window.setInterval(load, OI_POLL_MS)
-    return () => {
-      cancelled = true
-      window.clearInterval(id)
-    }
-  }, [])
-
-  return snapshot
 }
 
 /** Counts down to the next 5-minute boundary. The tick is local; no bar means there is nothing to wait on. */

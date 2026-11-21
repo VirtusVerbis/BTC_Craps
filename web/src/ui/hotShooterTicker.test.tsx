@@ -3,7 +3,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { HotShooterTicker } from './HotShooterTicker'
-import { LIQ_LABEL_Y, LIQ_TICKER_FONT_PX, LIQ_TICKER_HEIGHT_PX } from './overlayConstants'
+import { BOTTOM_ACTION_ROW_Y, LIQ_TICKER_FONT_PX, LIQ_TICKER_HEIGHT_PX } from './overlayConstants'
 import { ROLL_STREAK_THRESHOLD } from './rollStreak'
 
 const mount = (current: number) => {
@@ -47,7 +47,7 @@ describe('hot shooter ticker', () => {
     const bar = view.host.querySelector('.liq-ticker')
     expect(bar).not.toBeNull()
     expect(bar?.textContent).toContain('Hot Shooter!')
-    expect((bar as HTMLElement).style.top).toBe(`${LIQ_LABEL_Y - LIQ_TICKER_HEIGHT_PX * 2}px`)
+    expect((bar as HTMLElement).style.top).toBe(`${BOTTOM_ACTION_ROW_Y - LIQ_TICKER_HEIGHT_PX * 2}px`)
     expect((bar as HTMLElement).style.height).toBe(`${LIQ_TICKER_HEIGHT_PX}px`)
     expect((bar as HTMLElement).style.fontSize).toBe(`${LIQ_TICKER_FONT_PX}px`)
     expect(bar?.querySelectorAll('.liq-ticker-phrase')).toHaveLength(1)

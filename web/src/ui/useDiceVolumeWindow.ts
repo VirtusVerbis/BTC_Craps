@@ -55,7 +55,12 @@ export const useDiceVolumeWindow = (market: MarketSnapshot): VolumeTotals => {
       emptyTotals(),
     )
     setTotals(sum)
-  }, [market])
+  }, [
+    market.binance.buyVolume,
+    market.binance.sellVolume,
+    market.coinbase.buyVolume,
+    market.coinbase.sellVolume,
+  ])
 
   return totals
 }

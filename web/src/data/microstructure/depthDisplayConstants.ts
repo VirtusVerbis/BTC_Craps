@@ -5,6 +5,8 @@
 /** Raw depth sample + UI grid alignment interval. */
 export const DEPTH_BUCKET_MS = 2_500
 export const DEPTH_SAMPLE_MS = DEPTH_BUCKET_MS
+/** Slower sampling when depth UI is closed or tab is hidden; timeline grids carry forward gaps. */
+export const DEPTH_SAMPLE_IDLE_MS = 10_000
 export const DEPTH_EMIT_MS = 1_250
 
 export const DEPTH_WINDOW_15_MIN_BUCKETS = 360

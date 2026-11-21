@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import type { OpenInterestSnapshot } from '../../data/openInterest'
+import { useOpenInterest } from '../../data/openInterest'
 import type { FeedStatus, MicrostructureState, VenueId } from '../../data/microstructure/types'
 import { formatLiqBtc, formatLiqUsd } from '../format'
 import { FeedGlyph } from '../FeedGlyph'
@@ -42,10 +42,10 @@ const formatPct = (value: number): string => `${Math.round(value)}%`
 
 interface DepthGlobalHeaderProps {
   micro: MicrostructureState
-  openInterest: OpenInterestSnapshot | null
 }
 
-export const DepthGlobalHeader = ({ micro, openInterest }: DepthGlobalHeaderProps) => {
+export const DepthGlobalHeader = ({ micro }: DepthGlobalHeaderProps) => {
+  const openInterest = useOpenInterest()
   const takerScrollRef = useRef<HTMLDivElement>(null)
   useDepthPingPongScroll(takerScrollRef, true)
 

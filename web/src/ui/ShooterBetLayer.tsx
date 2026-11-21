@@ -1,7 +1,7 @@
 import { useEffect, useState, type PointerEvent } from 'react'
 import type { ChipColor } from './chipConstants'
 import { chipFaceUrl } from './chips/chipFace'
-import { OI_LABEL_X, OI_LABEL_Y } from './overlayConstants'
+import { BOTTOM_ACTION_ROW_Y, OI_LABEL_X, OI_LABEL_Y } from './overlayConstants'
 import { formatLiqUsd } from './format'
 import { formatShotClock } from './gestureThrow'
 import { SHOOTER_BET_AREAS_ON, SHOOTER_HITS, SHOOTER_ODDS_HITBOX_ON, anchorFor, hitAt, isOddsHit } from './shooterBetGeometry'
@@ -137,7 +137,7 @@ export const ShooterBetLayer = ({
         <button
           className="shooter-bet-action shooter-bet-place"
           type="button"
-          style={{ right: `calc(100% - ${OI_LABEL_X}px)` }}
+          style={{ right: `calc(100% - ${OI_LABEL_X}px)`, top: BOTTOM_ACTION_ROW_Y }}
           onClick={() => controlsRef.current?.placeBet()}
         >
           Place Bet

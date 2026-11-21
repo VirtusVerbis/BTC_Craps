@@ -13,6 +13,9 @@ export const LIQ_LABEL_X = 15
 /** Top of the countdown line. Same band as the O/I block. */
 export const LIQ_LABEL_Y = OI_LABEL_Y
 
+/** Depth / Place Bet row, one band above the liq countdown (`LIQ_LABEL_Y`). */
+export const BOTTOM_ACTION_ROW_Y = LIQ_LABEL_Y - 56
+
 /** One side of a 5-minute bar, in USD. Lower this to force the ticker while testing. */
 export const LIQ_NOTABLE_USD = 10_000_000
 

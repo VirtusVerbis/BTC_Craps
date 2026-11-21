@@ -7,7 +7,7 @@ import {
   type MutableRefObject,
   type RefObject,
 } from 'react'
-import type { MarketSnapshot } from '../game/types'
+import { useMarketFeed } from '../data/marketFeedContext'
 import { useOpenInterest } from '../data/openInterest'
 import {
   applyRollDeltas,
@@ -310,7 +310,6 @@ const liveSpeech = (
 }
 
 export const useDiceThrow = (
-  market: MarketSnapshot,
   enabled: boolean,
   rolls: readonly number[],
   onCountedRoll?: (result: ThrowResult) => number | void,
@@ -329,6 +328,7 @@ export const useDiceThrow = (
   eyeMarkApplyRef?: MutableRefObject<EyeMarkFrameApply | null>,
   betControlsRef?: { current: BetControls | null },
 ): DicePresentation | null => {
+  const { market } = useMarketFeed()
   const oi = useOpenInterest()
   const volume = useDiceVolumeWindow(market)
   const volumeRef = useRef(volume)

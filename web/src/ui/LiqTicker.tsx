@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { OpenInterestSnapshot } from '../data/openInterest'
 import { liqTickerLines } from './liqTickerLines'
 import {
-  LIQ_LABEL_Y,
+  BOTTOM_ACTION_ROW_Y,
   LIQ_NOTABLE_USD,
   LIQ_TICKER_COLOR,
   LIQ_TICKER_FONT_PX,
@@ -78,7 +78,7 @@ export const LiqTicker = ({ snapshot }: { snapshot: OpenInterestSnapshot | null 
       ref={boxRef}
       className="liq-ticker"
       style={{
-        top: LIQ_LABEL_Y - LIQ_TICKER_HEIGHT_PX,
+        top: BOTTOM_ACTION_ROW_Y - LIQ_TICKER_HEIGHT_PX,
         height: LIQ_TICKER_HEIGHT_PX,
         fontSize: LIQ_TICKER_FONT_PX,
         color: LIQ_TICKER_COLOR,

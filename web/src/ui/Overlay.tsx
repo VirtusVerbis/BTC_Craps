@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import type { BlockState } from '../data/blockHeight'
+import { useMarketFeed } from '../data/marketFeedContext'
+import { BlockHeightService, type BlockState } from '../data/blockHeight'
 import type { FeedStatus } from '../data/marketData'
 import { useLiqCountdown, useOpenInterest } from '../data/openInterest'
-import type { MarketSnapshot } from '../game/types'
 import { mobileAssetManifest } from './mobileAssetManifest'
 import { resolveMobileAssetUrl } from './mobileAssetUrls'
 import { formatElapsed, formatExchangePriceLabel, formatLiqBtc, formatLiqUsd } from './format'
@@ -29,9 +29,14 @@ import {
   type RollStreakView,
 } from './rollStreak'
 
+const initialBlockState: BlockState = {
+  blockHeight: null,
+  elapsedMs: 0,
+  blockFlashOn: false,
+  staleFlashOn: false,
+}
+
 interface OverlayProps {
-  market: MarketSnapshot
-  block: BlockState
   onTimeClick: () => void
   shooter: ShooterBook
   bonusStakes: BonusStakes
@@ -42,10 +47,6 @@ interface OverlayProps {
   shooterMode: boolean
   wipedOut: boolean
   session: { usd: number; btc: number }
-  status: {
-    binance: FeedStatus
-    coinbase: FeedStatus
-  }
 }
 
 const RollStreakLabel = ({ view }: { view: RollStreakView }) => {
@@ -145,8 +146,6 @@ const formatOpenInterest = (value: number): string => Math.round(value).toLocale
 const formatAccountPct = (value: number): string => `${Math.round(value)}%`
 
 export const Overlay = ({
-  market,
-  block,
   onTimeClick,
   shooter,
   bonusStakes,
@@ -155,8 +154,15 @@ export const Overlay = ({
   shooterMode,
   wipedOut,
   session,
-  status,
 }: OverlayProps) => {
+  const { market, status } = useMarketFeed()
+  const [block, setBlock] = useState<BlockState>(initialBlockState)
+
+  useEffect(() => {
+    const blockService = new BlockHeightService(setBlock)
+    blockService.start()
+    return () => blockService.stop()
+  }, [])
   const makeEmAll = SHOOTER_ON ? formatMakeEmAll(bonusStakes.all) : null
   const allTall = formatAllTall(bonusStakes.tall)
   const allSmall = formatAllSmall(bonusStakes.small)

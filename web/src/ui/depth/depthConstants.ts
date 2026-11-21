@@ -1,4 +1,4 @@
-import { LIQ_LABEL_X, LIQ_LABEL_Y } from '../overlayConstants'
+import { BOTTOM_ACTION_ROW_Y, LIQ_LABEL_X } from '../overlayConstants'
 
 /** Duration for Depth panel slide open and close (ms). */
 export const DEPTH_PANEL_SLIDE_MS = 320
@@ -6,5 +6,5 @@ export const DEPTH_PANEL_SLIDE_MS = 320
 /** Left edge aligned with the liq `next` block. */
 export const DEPTH_TAB_X = LIQ_LABEL_X
 
-/** Horizontal band above the `next` countdown (`LIQ_LABEL_Y`). */
-export const DEPTH_TAB_Y = LIQ_LABEL_Y - 56
+/** Same row as Place Bet, above the `next` countdown. */
+export const DEPTH_TAB_Y = BOTTOM_ACTION_ROW_Y

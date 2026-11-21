@@ -56,16 +56,25 @@ const emptySnapshot = (exchange: 'binance' | 'coinbase'): ExchangeSnapshot => ({
   updatedAt: 0,
 })
 
-export class MarketDataService {
-  private market: MarketSnapshot = {
+const initialFeedUpdate = (): MarketFeedUpdate => ({
+  market: {
     binance: emptySnapshot('binance'),
     coinbase: emptySnapshot('coinbase'),
-  }
-
-  private status: MarketFeedUpdate['status'] = {
+  },
+  status: {
     binance: 'disconnected',
     coinbase: 'disconnected',
-  }
+  },
+})
+
+export class MarketDataService {
+  private snapshot: MarketFeedUpdate = initialFeedUpdate()
+
+  private market: MarketSnapshot = this.snapshot.market
+
+  private status: MarketFeedUpdate['status'] = this.snapshot.status
+
+  private readonly listeners = new Set<() => void>()
 
   private latestBinancePrice = 0
   private latestCoinbasePrice = 0
@@ -111,10 +120,26 @@ export class MarketDataService {
 
   private microHooks: MicrostructureFeedHooks = {}
 
-  constructor(private readonly onUpdate: (update: MarketFeedUpdate) => void) {}
+  constructor(private readonly onUpdate?: (update: MarketFeedUpdate) => void) {}
+
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener)
+    listener()
+    return () => this.listeners.delete(listener)
+  }
+
+  getSnapshot(): MarketFeedUpdate {
+    return this.snapshot
+  }
 
   setMicrostructureHooks(hooks: MicrostructureFeedHooks): void {
     this.microHooks = hooks
+  }
+
+  private notifySnapshot(): void {
+    this.snapshot = { market: this.market, status: this.status }
+    this.onUpdate?.(this.snapshot)
+    for (const listener of this.listeners) listener()
   }
 
   private setStatus(exchange: 'binance' | 'coinbase', status: FeedStatus) {
@@ -349,6 +374,6 @@ export class MarketDataService {
         updatedAt: now,
       },
     }
-    this.onUpdate({ market: this.market, status: this.status })
+    this.notifySnapshot()
   }
 }

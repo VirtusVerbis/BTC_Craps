@@ -15,6 +15,7 @@ import { DEPTH_VENUE_ORDER } from './venueOrder'
 import {
   DEPTH_EMIT_MS,
   DEPTH_SAMPLE_CAP,
+  DEPTH_SAMPLE_IDLE_MS,
   DEPTH_SAMPLE_MS,
 } from './depthDisplayConstants'
 import { binBookToPriceBuckets, HEATMAP_PRICE_BAND_BPS_MAX } from './depthHeatmapPriceBins'
@@ -136,7 +137,9 @@ export class MicrostructureService {
   private basisBinance = 0
   private basisCoinbase = 0
 
+  private running = false
   private sampleTimer: number | null = null
+  private sampleIntervalMs = DEPTH_SAMPLE_IDLE_MS
   private emitTimer: number | null = null
   private hlTimer: number | null = null
   private coinbaseBookRestTimer: number | null = null
@@ -157,6 +160,7 @@ export class MicrostructureService {
       this.okxClient.connect()
       this.krakenClient.connect()
     }
+    if (this.sampleTimer !== null) this.reconcileCadence()
   }
 
   private readonly perpClient = new SafeWebSocketClient({
@@ -262,10 +266,13 @@ export class MicrostructureService {
   }
 
   subscribe(listener: (state: MicrostructureState) => void): () => void {
-    this.state = this.buildState()
     this.listeners.add(listener)
-    listener(this.state)
-    return () => this.listeners.delete(listener)
+    this.reconcileCadence()
+    this.sampleVenues()
+    return () => {
+      this.listeners.delete(listener)
+      this.reconcileCadence()
+    }
   }
 
   getState(): MicrostructureState {
@@ -276,12 +283,64 @@ export class MicrostructureService {
   }
 
   setBasisPrices(binance: number, coinbase: number): void {
-    if (binance > 0) this.basisBinance = binance
-    if (coinbase > 0) this.basisCoinbase = coinbase
+    const nextBinance = binance > 0 ? binance : this.basisBinance
+    const nextCoinbase = coinbase > 0 ? coinbase : this.basisCoinbase
+    if (nextBinance === this.basisBinance && nextCoinbase === this.basisCoinbase) return
+    this.basisBinance = nextBinance
+    this.basisCoinbase = nextCoinbase
     this.emit()
   }
 
+  private wantsActiveSampling(): boolean {
+    return (
+      this.listeners.size > 0 &&
+      typeof document !== 'undefined' &&
+      document.visibilityState === 'visible'
+    )
+  }
+
+  private targetSampleIntervalMs(): number {
+    return this.wantsActiveSampling() ? DEPTH_SAMPLE_MS : DEPTH_SAMPLE_IDLE_MS
+  }
+
+  private rescheduleSampleTimer(ms: number): void {
+    if (this.sampleTimer !== null) {
+      window.clearInterval(this.sampleTimer)
+      this.sampleTimer = null
+    }
+    this.sampleIntervalMs = ms
+    this.sampleTimer = window.setInterval(() => this.sampleVenues(), ms)
+  }
+
+  private startEmitTimer(): void {
+    if (this.emitTimer !== null) return
+    this.emitTimer = window.setInterval(() => this.emit(), DEPTH_EMIT_MS)
+  }
+
+  private stopEmitTimer(): void {
+    if (this.emitTimer === null) return
+    window.clearInterval(this.emitTimer)
+    this.emitTimer = null
+  }
+
+  /** Sample + emit cadence from UI listeners and tab visibility. */
+  reconcileCadence(): void {
+    if (!this.running) return
+
+    const sampleMs = this.targetSampleIntervalMs()
+    if (this.sampleTimer === null) {
+      this.sampleIntervalMs = sampleMs
+      this.sampleTimer = window.setInterval(() => this.sampleVenues(), sampleMs)
+    } else if (sampleMs !== this.sampleIntervalMs) {
+      this.rescheduleSampleTimer(sampleMs)
+    }
+
+    if (this.listeners.size > 0) this.startEmitTimer()
+    else this.stopEmitTimer()
+  }
+
   start(): void {
+    this.running = true
     this.bindMarketDataHooks()
 
     this.perpClient.connect()
@@ -292,12 +351,7 @@ export class MicrostructureService {
     this.krakenClient.connect()
     void this.pollHyperliquid()
 
-    if (this.sampleTimer === null) {
-      this.sampleTimer = window.setInterval(() => this.sampleVenues(), DEPTH_SAMPLE_MS)
-    }
-    if (this.emitTimer === null) {
-      this.emitTimer = window.setInterval(() => this.emit(), DEPTH_EMIT_MS)
-    }
+    this.reconcileCadence()
     if (this.hlTimer === null) {
       this.hlTimer = window.setInterval(() => void this.pollHyperliquid(), HL_META_MS)
     }
@@ -313,6 +367,7 @@ export class MicrostructureService {
   }
 
   stop(): void {
+    this.running = false
     document.removeEventListener('visibilitychange', this.onVisibility)
     if (this.sampleTimer !== null) window.clearInterval(this.sampleTimer)
     if (this.emitTimer !== null) window.clearInterval(this.emitTimer)
