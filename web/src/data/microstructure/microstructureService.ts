@@ -262,12 +262,16 @@ export class MicrostructureService {
   }
 
   subscribe(listener: (state: MicrostructureState) => void): () => void {
+    this.state = this.buildState()
     this.listeners.add(listener)
     listener(this.state)
     return () => this.listeners.delete(listener)
   }
 
   getState(): MicrostructureState {
+    if (this.listeners.size === 0) {
+      this.state = this.buildState()
+    }
     return this.state
   }
 
@@ -621,6 +625,7 @@ export class MicrostructureService {
   }
 
   private emit(): void {
+    if (this.listeners.size === 0) return
     this.state = this.buildState()
     for (const listener of this.listeners) listener(this.state)
   }

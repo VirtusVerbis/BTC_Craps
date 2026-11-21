@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { OpenInterestSnapshot } from '../../data/openInterest'
-import type { MicrostructureState } from '../../data/microstructure/types'
+import type { MicrostructureService } from '../../data/microstructure/microstructureService'
 import { DEPTH_PANEL_SLIDE_MS } from './depthConstants'
 import { DepthConsolidatedWalls } from './DepthConsolidatedWalls'
 import { DepthGlobalHeader } from './DepthGlobalHeader'
@@ -12,15 +12,22 @@ import {
   readLiveWallsOpen,
   readTapeOpen,
 } from './depthWallSectionToggles'
+import { useMicrostructure } from './useMicrostructure'
 
 interface DepthPanelProps {
   open: boolean
   onClose: () => void
-  micro: MicrostructureState
+  microstructureService: MicrostructureService
   openInterest: OpenInterestSnapshot | null
 }
 
-export const DepthPanel = ({ open, onClose, micro, openInterest }: DepthPanelProps) => {
+export const DepthPanel = ({
+  open,
+  onClose,
+  microstructureService,
+  openInterest,
+}: DepthPanelProps) => {
+  const micro = useMicrostructure(microstructureService, open)
   const [overviewOpen, setOverviewOpen] = useState(readOverviewOpen)
   const [liveWallsOpen, setLiveWallsOpen] = useState(readLiveWallsOpen)
   const [tapeOpen, setTapeOpen] = useState(readTapeOpen)
@@ -67,42 +74,48 @@ export const DepthPanel = ({ open, onClose, micro, openInterest }: DepthPanelPro
           Close
         </button>
       </div>
-      <div
-        className={
-          chartsEqualGrow
-            ? 'depth-panel-scroll depth-panel-scroll--fill depth-panel-scroll--overview-collapsed'
-            : 'depth-panel-scroll depth-panel-scroll--fill'
-        }
-        role="region"
-        aria-label="Depth microstructure"
-      >
-        <section className="depth-overview-section">
-          <h3 className="depth-wall-subhead depth-overview-head">
-            <button
-              type="button"
-              className="depth-wall-section-toggle"
-              onClick={() => setOverviewOpen((v) => !v)}
-              aria-expanded={overviewOpen}
-              aria-label={overviewOpen ? 'Collapse market snapshot' : 'Expand market snapshot'}
-            >
-              <span aria-hidden>{overviewOpen ? '▾' : '▸'}</span>
-            </button>
-            <span className="depth-overview-title">Market snapshot</span>
-          </h3>
-          {overviewOpen ? <DepthGlobalHeader micro={micro} openInterest={openInterest} /> : null}
-        </section>
-        <div className={chartsEqualGrow ? 'depth-charts-stack depth-charts-stack--equal-grow' : 'depth-charts-stack'}>
-          <DepthMergedTimeline micro={micro} />
-          <DepthConsolidatedWalls
-            micro={micro}
-            forceChartsGrow={chartsEqualGrow}
-            liveWallsOpen={liveWallsOpen}
-            setLiveWallsOpen={setLiveWallsOpen}
-            tapeOpen={tapeOpen}
-            setTapeOpen={setTapeOpen}
-          />
+      {open ? (
+        <div
+          className={
+            chartsEqualGrow
+              ? 'depth-panel-scroll depth-panel-scroll--fill depth-panel-scroll--overview-collapsed'
+              : 'depth-panel-scroll depth-panel-scroll--fill'
+          }
+          role="region"
+          aria-label="Depth microstructure"
+        >
+          <section className="depth-overview-section">
+            <h3 className="depth-wall-subhead depth-overview-head">
+              <button
+                type="button"
+                className="depth-wall-section-toggle"
+                onClick={() => setOverviewOpen((v) => !v)}
+                aria-expanded={overviewOpen}
+                aria-label={overviewOpen ? 'Collapse market snapshot' : 'Expand market snapshot'}
+              >
+                <span aria-hidden>{overviewOpen ? '▾' : '▸'}</span>
+              </button>
+              <span className="depth-overview-title">Market snapshot</span>
+            </h3>
+            {overviewOpen ? <DepthGlobalHeader micro={micro} openInterest={openInterest} /> : null}
+          </section>
+          <div
+            className={
+              chartsEqualGrow ? 'depth-charts-stack depth-charts-stack--equal-grow' : 'depth-charts-stack'
+            }
+          >
+            <DepthMergedTimeline micro={micro} />
+            <DepthConsolidatedWalls
+              micro={micro}
+              forceChartsGrow={chartsEqualGrow}
+              liveWallsOpen={liveWallsOpen}
+              setLiveWallsOpen={setLiveWallsOpen}
+              tapeOpen={tapeOpen}
+              setTapeOpen={setTapeOpen}
+            />
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   )
 }

@@ -7,7 +7,6 @@ import { MicrostructureService } from './data/microstructure/microstructureServi
 import { useOpenInterest } from './data/openInterest'
 import { DepthPanel } from './ui/depth/DepthPanel'
 import { DepthTab } from './ui/depth/DepthTab'
-import { useMicrostructure } from './ui/depth/useMicrostructure'
 import { emptyCharacterPnl } from './ui/characterPnl'
 import { emptyBonusStakes, loadShooterBook } from './ui/shooterProfile'
 import { loadDieColor, nextDieColor, saveDieColor, type DieColorId } from './ui/diceColor'
@@ -372,8 +371,12 @@ function App() {
   useShooterPageLock(manualShooter)
   const onShooterMode = useCallback(() => {
     setManualShooter((current) => {
-      if (current) shooterControlsRef.current?.launchAutoNow()
-      return !current
+      if (current) {
+        shooterControlsRef.current?.launchAutoNow()
+        return false
+      }
+      setDepthOpen(false)
+      return true
     })
   }, [])
 
@@ -389,7 +392,6 @@ function App() {
     () => new MicrostructureService(marketService),
     [marketService],
   )
-  const microstructure = useMicrostructure(microstructureService)
   const openInterest = useOpenInterest()
 
   useEffect(() => {
@@ -411,6 +413,7 @@ function App() {
     microstructureService.setBasisPrices(feed.market.binance.price, feed.market.coinbase.price)
   }, [feed.market.binance.price, feed.market.coinbase.price, microstructureService])
 
+  // Depth and Shooter mode are mutually exclusive (see onShooterMode).
   const onDepthOpen = useCallback(() => {
     if (manualShooter) shooterControlsRef.current?.launchAutoNow()
     setManualShooter(false)
@@ -512,7 +515,7 @@ function App() {
             <DepthPanel
               open={depthOpen}
               onClose={() => setDepthOpen(false)}
-              micro={microstructure}
+              microstructureService={microstructureService}
               openInterest={openInterest}
             />
             <DepthTab onOpen={onDepthOpen} panelOpen={depthOpen} />

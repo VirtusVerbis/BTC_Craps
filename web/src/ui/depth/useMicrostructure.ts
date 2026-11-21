@@ -3,13 +3,18 @@ import type { MicrostructureService } from '../../data/microstructure/microstruc
 import type { MicrostructureState } from '../../data/microstructure/types'
 import { emptyMicrostructureState } from '../../data/microstructure/emptyState'
 
-export const useMicrostructure = (service: MicrostructureService | null): MicrostructureState => {
-  const [state, setState] = useState<MicrostructureState>(emptyMicrostructureState())
+export const useMicrostructure = (
+  service: MicrostructureService | null,
+  enabled = true,
+): MicrostructureState => {
+  const [state, setState] = useState<MicrostructureState>(
+    () => service?.getState() ?? emptyMicrostructureState(),
+  )
 
   useEffect(() => {
-    if (!service) return undefined
+    if (!service || !enabled) return undefined
     return service.subscribe(setState)
-  }, [service])
+  }, [service, enabled])
 
   return state
 }
