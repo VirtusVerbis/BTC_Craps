@@ -2832,6 +2832,126 @@ html.shooter-gesture-lock body {
   margin-left: auto;
 }
 
+.depth-ta-toggle {
+  flex-shrink: 0;
+  margin-left: 0.35rem;
+  margin-right: 1.5rem;
+}
+
+.depth-ta-strip {
+  position: absolute;
+  z-index: 5;
+  margin: 0;
+  padding: 0.45rem 0.6rem;
+  max-width: min(100%, 28rem);
+  pointer-events: none;
+  border-left: 3px solid #ffe566;
+  border-radius: 6px;
+  font-size: var(--depth-font-sm);
+  line-height: 1.35;
+  color: rgba(246, 240, 218, 0.92);
+  background: rgba(10, 14, 23, 0.9);
+  border: 1px solid rgba(246, 240, 218, 0.18);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+.depth-ta-strip--top-right {
+  top: 0.45rem;
+  right: 0.45rem;
+  left: auto;
+}
+
+.depth-ta-strip--top-left {
+  top: 0.45rem;
+  left: 0.45rem;
+  right: auto;
+  max-height: calc(100% - 5.75rem);
+  overflow-y: auto;
+}
+
+.depth-ta-strip--bottom-right {
+  bottom: 0.45rem;
+  right: 0.45rem;
+  left: auto;
+  top: auto;
+}
+
+.depth-ta-strip-name {
+  margin: 0;
+  font-weight: 700;
+}
+
+.depth-ta-strip-bias {
+  margin: 0.15rem 0 0;
+  font-weight: 600;
+  color: #ffe566;
+}
+
+.depth-ta-strip-blurb,
+.depth-ta-strip-wall,
+.depth-ta-strip-oi {
+  margin: 0.2rem 0 0;
+  opacity: 0.92;
+}
+
+.depth-session-heatmap:has(.depth-ta-toggle.depth-toggle-active) .depth-heatmap-chart-wrap {
+  cursor: pointer;
+}
+
+.depth-ta-transport {
+  position: absolute;
+  left: 0.5rem;
+  bottom: 0.5rem;
+  z-index: 6;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem;
+  border-radius: 8px;
+  background: rgba(10, 14, 23, 0.88);
+  border: 1px solid rgba(246, 240, 218, 0.22);
+}
+
+.depth-ta-transport-btn {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid rgba(246, 240, 218, 0.35);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.35);
+  color: rgba(246, 240, 218, 0.95);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.depth-ta-transport-btn--play {
+  min-width: 3rem;
+}
+
+.depth-ta-transport-glyph {
+  font-size: 0.95rem;
+  letter-spacing: -0.12em;
+  font-weight: 700;
+}
+
+.depth-ta-transport-btn:hover {
+  border-color: #ffe566;
+}
+
+.depth-ta-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .depth-toggle {
   border: 1px solid rgba(246, 240, 218, 0.35);
   border-radius: 6px;
@@ -2991,6 +3111,7 @@ html.shooter-gesture-lock body {
   display: flex;
   flex-direction: column;
   overflow: visible;
+  cursor: default;
 }
 
 .depth-heatmap-offrange-chip {

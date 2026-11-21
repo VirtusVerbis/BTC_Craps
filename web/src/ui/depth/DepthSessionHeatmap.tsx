@@ -42,6 +42,19 @@ import {
 } from '../../data/heatmapVenueMidCache'
 import type { VenueMidHistory } from '../../data/heatmapVenueMidHistory'
 import { drawHeatmapCandleOverlay } from './depthHeatmapCandles'
+import {
+  drawHeatmapCandlesWithTaHighlights,
+  drawHeatmapTaAnnotations,
+  highlightedOpenTimes,
+} from './depthHeatmapTaDraw'
+import { taLiquidityLineForAnchor } from '../../data/ta/taLiquidityContext'
+import { taOiSnippet } from '../../data/ta/taOiSnippet'
+import { useOpenInterest } from '../../data/openInterest'
+import { useTaCarousel } from './useTaCarousel'
+import { TaHeatmapStrip } from './TaHeatmapStrip'
+import { taStripPlacementForInstances } from './taStripPlacement'
+import { TaHeatmapTransport } from './TaHeatmapTransport'
+import type { PatternInstance } from '../../data/ta/taTypes'
 import { drawDraggedHeatmapDepth } from './depthHeatmapDragPaint'
 import { drawHeatmapVenueMidPolylines } from './depthHeatmapVenueMidLines'
 import { offRangeChipStyle } from './depthHeatmapOffRangeChip'
@@ -117,6 +130,16 @@ const offRangeChipAria = (direction: 'above' | 'below', edge: OffRangeEdge, mid:
   return `${side}: nearest pool ≥ $1M, ${bpsFromMid(mid, edge.price)} bps from perp mid, ${formatWallUsd(edge.usd)} at ${formatAxisPrice(edge.price)}`
 }
 
+type TaDrawOpts = {
+  instances: readonly PatternInstance[]
+}
+
+const biasLabel = (bias: PatternInstance['bias']): string => {
+  if (bias === 'bullish') return 'Bullish bias'
+  if (bias === 'bearish') return 'Bearish bias'
+  return 'Neutral'
+}
+
 const drawHeatmap = (
   ctx: CanvasRenderingContext2D,
   columns: readonly HeatmapGridColumn[],
@@ -130,6 +153,7 @@ const drawHeatmap = (
   candleIntervalMs: number,
   offRange: OffRangeSummary,
   venueMidPolylines: ReturnType<typeof resolveVenueMidPolylines>,
+  ta?: TaDrawOpts,
 ) => {
   const rowH = h / axis.rows
   ctx.fillStyle = '#0a0e17'
@@ -164,7 +188,13 @@ const drawHeatmap = (
   }
 
   drawHeatmapVenueMidPolylines(ctx, venueMidPolylines, w, h, axis, timeRange)
-  drawHeatmapCandleOverlay(ctx, candles, w, h, axis, timeRange, candleIntervalMs)
+  if (ta && ta.instances.length > 0) {
+    const highlights = highlightedOpenTimes(ta.instances, candles)
+    drawHeatmapCandlesWithTaHighlights(ctx, candles, w, h, axis, timeRange, candleIntervalMs, highlights)
+    drawHeatmapTaAnnotations(ctx, ta.instances, candles, w, h, axis, timeRange, candleIntervalMs)
+  } else {
+    drawHeatmapCandleOverlay(ctx, candles, w, h, axis, timeRange, candleIntervalMs)
+  }
 }
 
 interface DepthSessionHeatmapProps {
@@ -178,6 +208,10 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
   const chartRowRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const scaleStateRef = useRef<TimelineScaleState>({ tick: 0, max: 1 })
+  const [taEnabled, setTaEnabled] = useState(false)
+  const [frozenTimelineEnd, setFrozenTimelineEnd] = useState<number | null>(null)
+  const [taAnnounce, setTaAnnounce] = useState<string | null>(null)
+  const openInterest = useOpenInterest()
   const [windowMin, setWindowMin] = useState<TimelineWindowMin>(readWindowMin())
   const [chartSize, setChartSize] = useState({ w: 900, h: 400 })
   const [axisMaxUsd, setAxisMaxUsd] = useState(1)
@@ -197,11 +231,114 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
   const candleBarMs = heatmapCandleBarMs(windowMin)
   const displayPlan = useMemo(() => timelineDisplayPlan(bucketCount), [bucketCount])
   const timelineNowRef = useRef(0)
-  const timelineNow = snapTimelineNow(micro.sampledAt)
+  const liveTimelineNow = snapTimelineNow(micro.sampledAt)
+  const timelineNow =
+    taEnabled && frozenTimelineEnd != null ? frozenTimelineEnd : liveTimelineNow
   timelineNowRef.current = timelineNow > 0 ? timelineNow : timelineNowRef.current
   const liveMid = micro.venues.binancePerp.mid
 
   const heatmapViewport = useMemo(() => heatmapViewportForChartHeight(chartSize.h), [chartSize.h])
+
+  const ta = useTaCarousel({ enabled: taEnabled, candles })
+
+  const samplesByVenue = useMemo(() => {
+    const out = {} as Record<(typeof DEPTH_VENUE_ORDER)[number], (typeof micro.venues)[keyof typeof micro.venues]['depthSamples']>
+    const statuses = {} as Record<(typeof DEPTH_VENUE_ORDER)[number], (typeof micro.venues)[keyof typeof micro.venues]['status']>
+    for (const venue of DEPTH_VENUE_ORDER) {
+      out[venue] = micro.venues[venue].depthSamples
+      statuses[venue] = micro.venues[venue].status
+    }
+    return { out, statuses }
+  }, [micro.venues])
+
+  const taWallLine = useMemo(() => {
+    if (!taEnabled || ta.instances.length === 0) return null
+    const inst = ta.instances[0]!
+    const anchor = candles[inst.anchorIndex]
+    if (!anchor) return null
+    const mergedColumns = buildMergedSessionHeatmap(
+      samplesByVenue.out,
+      samplesByVenue.statuses,
+      DEPTH_VENUE_ORDER,
+      bucketCount,
+      timelineNow,
+      displayPlan.groupSize,
+    )
+    const withLive = overlayLiveBooksOnLatestHeatmapColumn(
+      mergedColumns,
+      micro,
+      DEPTH_VENUE_ORDER,
+      heatmapViewport.bandBps,
+    )
+    const columns = applyHeatmapViewportToColumns(withLive, heatmapViewport.bandBps)
+    const windowRange = heatmapWindowTimeRange(bucketCount, timelineNow, displayPlan.groupSize)
+    const refMids: number[] = []
+    for (const col of columns) {
+      if (col.refMid > 0) refMids.push(col.refMid)
+    }
+    if (liveMid > 0) refMids.push(liveMid)
+    const candleExtent: number[] = []
+    for (const c of candles) {
+      if (c.openTime < windowRange.start - candleBarMs || c.openTime >= windowRange.end + candleBarMs) continue
+      candleExtent.push(c.high, c.low)
+    }
+    const axis = heatmapPriceAxis(candleExtent, refMids, undefined, { minHalfBps: heatmapViewport.minHalfBps })
+    const latestCol = latestHeatmapColumn(columns)
+    const offRange = nearestOffRangeLargePools(latestCol, axis, liveMid > 0 ? liveMid : columns[columns.length - 1]?.refMid ?? 0, undefined, heatmapViewport.bandBps)
+    const wall = taLiquidityLineForAnchor(
+      inst.anchorPrice,
+      anchor.openTime,
+      columns,
+      axis,
+      offRange,
+      heatmapViewport.minHalfBps,
+      liveMid > 0 ? liveMid : axis.priceMin + (axis.priceMax - axis.priceMin) / 2,
+    )
+    return wall?.label ?? null
+  }, [
+    taEnabled,
+    ta.instances,
+    candles,
+    samplesByVenue,
+    bucketCount,
+    timelineNow,
+    displayPlan.groupSize,
+    heatmapViewport,
+    micro,
+    candleBarMs,
+    liveMid,
+  ])
+
+  const taOiLine = useMemo(() => {
+    if (!taEnabled || ta.instances.length === 0) return null
+    return taOiSnippet(openInterest)
+  }, [taEnabled, ta.instances.length, openInterest])
+
+  const taStripPlacement = useMemo(() => {
+    if (!taEnabled) return 'top-right' as const
+    const windowRange = heatmapWindowTimeRange(bucketCount, timelineNow, displayPlan.groupSize)
+    const timeRange = { start: windowRange.start, end: windowRange.end }
+    return taStripPlacementForInstances(
+      ta.instances,
+      candles,
+      chartSize.w,
+      chartSize.h,
+      priceAxis,
+      timeRange,
+      candleBarMs,
+    )
+  }, [
+    taEnabled,
+    ta.instances,
+    candles,
+    chartSize.w,
+    chartSize.h,
+    priceAxis,
+    bucketCount,
+    timelineNow,
+    displayPlan.groupSize,
+    candleBarMs,
+  ])
 
   useEffect(() => {
     try {
@@ -297,16 +434,6 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     return () => ro.disconnect()
   }, [fillAvailableHeight])
 
-  const samplesByVenue = useMemo(() => {
-    const out = {} as Record<(typeof DEPTH_VENUE_ORDER)[number], (typeof micro.venues)[keyof typeof micro.venues]['depthSamples']>
-    const statuses = {} as Record<(typeof DEPTH_VENUE_ORDER)[number], (typeof micro.venues)[keyof typeof micro.venues]['status']>
-    for (const venue of DEPTH_VENUE_ORDER) {
-      out[venue] = micro.venues[venue].depthSamples
-      statuses[venue] = micro.venues[venue].status
-    }
-    return { out, statuses }
-  }, [micro.venues])
-
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -394,6 +521,7 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
       candleBarMs,
       offRange,
       venueMidPolylines,
+      taEnabled && ta.instances.length > 0 ? { instances: ta.instances } : undefined,
     )
     setAxisMaxUsd(maxVal)
     setOffRangePools(offRange)
@@ -424,6 +552,8 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     candleBarMs,
     heatmapViewport,
     fillAvailableHeight,
+    taEnabled,
+    ta.instances,
   ])
 
   const axisMaxLabel = formatWallUsd(axisMaxUsd)
@@ -490,6 +620,20 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
           <span className="depth-heatmap-legend-ramp" />
           <span className="depth-heatmap-legend-max">{axisMaxLabel}</span>
         </div>
+        <button
+          type="button"
+          className={taEnabled ? 'depth-toggle depth-toggle-active depth-ta-toggle' : 'depth-toggle depth-ta-toggle'}
+          aria-pressed={taEnabled}
+          onClick={() => {
+            const next = !taEnabled
+            setTaEnabled(next)
+            ta.toggleTa(next)
+            setFrozenTimelineEnd(null)
+            if (!next) setTaAnnounce(null)
+          }}
+        >
+          TA
+        </button>
         <div className="depth-timeline-actions" role="group" aria-label="Heatmap window">
           <button
             type="button"
@@ -522,7 +666,56 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
           role="img"
           aria-label={heatmapAria}
         >
-          <div className="depth-heatmap-chart-wrap">
+          <div
+            className="depth-heatmap-chart-wrap"
+            onClick={() => {
+              if (!taEnabled) return
+              if (ta.playing) {
+                setFrozenTimelineEnd(liveTimelineNow > 0 ? liveTimelineNow : Date.now())
+                ta.setPaused(true)
+                setTaAnnounce('Paused')
+              } else {
+                setFrozenTimelineEnd(null)
+                ta.setPlaying(true)
+                ta.rescan()
+                setTaAnnounce('Resumed')
+              }
+            }}
+          >
+            <TaHeatmapStrip
+              visible={taEnabled}
+              placement={taStripPlacement}
+              entry={ta.entry}
+              hasHits={ta.instances.length > 0}
+              biasLabel={ta.instances.length > 0 ? biasLabel(ta.instances[0]!.bias) : null}
+              wallLine={taWallLine}
+              oiLine={taOiLine}
+              announceExtra={taAnnounce}
+            />
+            <TaHeatmapTransport
+              visible={taEnabled}
+              playing={ta.playing}
+              onPrev={() => {
+                ta.prev()
+                setFrozenTimelineEnd(liveTimelineNow > 0 ? liveTimelineNow : frozenTimelineEnd)
+              }}
+              onTogglePlayPause={() => {
+                if (ta.playing) {
+                  setFrozenTimelineEnd(liveTimelineNow > 0 ? liveTimelineNow : Date.now())
+                  ta.setPaused(true)
+                  setTaAnnounce('Paused')
+                } else {
+                  setFrozenTimelineEnd(null)
+                  ta.setPlaying(true)
+                  ta.rescan()
+                  setTaAnnounce('Resumed')
+                }
+              }}
+              onNext={() => {
+                ta.next()
+                setFrozenTimelineEnd(liveTimelineNow > 0 ? liveTimelineNow : frozenTimelineEnd)
+              }}
+            />
             <canvas
               ref={canvasRef}
               className="depth-timeline-canvas depth-timeline-canvas-hero depth-heatmap-canvas"
