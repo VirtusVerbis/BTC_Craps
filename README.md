@@ -103,7 +103,7 @@ The P/L stays hidden until the first win or loss, then shows BTC and USD. The le
 
 **Roll Streak** sits under the P/L, as `Roll Streak 10 / 36`: this hand, then the longest hand so far. Every decided roll counts, including the come-out. Making the point does not end the hand. A 7-out resets the first number to 0 and is not itself counted. The record stays, and it is the number the browser keeps. Once the hand goes past 10, the whole label turns rainbow.
 
-**Hot Shooter.** The first time a hand passes 10, a rainbow ticker scrolls "Hot Shooter!" above the liquidation line for about 13 seconds. It plays once for that hand. After the streak falls back to 10 or below, including a 7-out, the next hand can set it off again.
+**Hot Shooter.** The first time a hand passes 10, a rainbow ticker scrolls "Hot Shooter!" above the liquidation line until the phrase leaves the screen. It plays once for that hand. After the streak falls back to 10 or below, including a 7-out, the next hand can set it off again.
 
 ## The dice
 

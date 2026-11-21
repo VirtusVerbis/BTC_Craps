@@ -1022,6 +1022,14 @@ body {
   animation-iteration-count: infinite;
 }
 
+.liq-ticker-track.is-scrolling-once {
+  visibility: visible;
+  animation-name: liq-ticker-scroll;
+  animation-timing-function: linear;
+  animation-iteration-count: 1;
+  animation-fill-mode: forwards;
+}
+
 .liq-ticker-phrase {
   white-space: nowrap;
   font-weight: 800;

@@ -2,12 +2,6 @@ import { rollStreakNeedsRainbow } from './rollStreak'
 
 export const HOT_SHOOTER_TEXT = 'Hot Shooter!'
 
-/**
- * How long the banner stays up.
- * The pass already on screen finishes, so the phrase is not cut off.
- */
-export const HOT_SHOOTER_MS = 13_000
-
 export interface HotShooterGate {
   armed: boolean
   playId: number

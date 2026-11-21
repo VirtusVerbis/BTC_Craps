@@ -20,6 +20,7 @@ import { BG2_MAX_CANDLES } from './ui/androidMirrorConstants'
 import { BONUS_FLASH_MS, BONUS_LABEL_EXTRA_MS } from './ui/bonusConstants'
 import { applyBonusRoll, bonusFlashTotals, emptyBonusHand } from './ui/bonusCraps'
 import { bonusTestHand, isBonusTestSeed, type BonusTestSeed } from './ui/bonusTest'
+import { HOT_SHOOTER_TEST_HOOK_ON, isHotShooterTestQuery } from './ui/hotShooterTest'
 import type { ThrowResult } from './ui/dicePhysics'
 import { loadHistogramRolls, pushRoll, saveHistogramRolls } from './ui/histogramModel'
 import type { ChipFrameApply } from './ui/chips/ChipPresenterHost'
@@ -252,6 +253,24 @@ function AppShell({
       delete window.btcCrapsBonus
     }
   }, [armBonusTest])
+  const [hotShooterTestPlay, setHotShooterTestPlay] = useState(0)
+  const playHotShooterTest = useCallback(() => {
+    setHotShooterTestPlay((serial) => serial + 1)
+  }, [])
+  useEffect(() => {
+    if (!import.meta.env.DEV || !HOT_SHOOTER_TEST_HOOK_ON) return
+    window.btcCrapsHotShooter = { play: playHotShooterTest }
+    const params = new URLSearchParams(window.location.search)
+    if (isHotShooterTestQuery(params.get('hotShooter'))) {
+      playHotShooterTest()
+      params.delete('hotShooter')
+      const query = params.toString()
+      window.history.replaceState(null, '', `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`)
+    }
+    return () => {
+      delete window.btcCrapsHotShooter
+    }
+  }, [playHotShooterTest])
   const histogram = useHistogramVisibility(splashDone, histogramBoost)
   const precisionShotRef = useRef<Omit<PrecisionThrow, 'speed' | 'lean'> | null>(null)
   const chipApplyRef = useRef<ChipFrameApply | null>(null)
@@ -409,6 +428,7 @@ function AppShell({
               shooterMode={manualShooter}
               wipedOut={dice?.wipedOut ?? false}
               session={dice?.session ?? emptySessionPnl()}
+              hotShooterTestPlay={HOT_SHOOTER_TEST_HOOK_ON ? hotShooterTestPlay : 0}
             />
             <ShooterBetLayer
               active={dice?.phase === 'holding'}

@@ -59,4 +59,23 @@ describe('hot shooter ticker', () => {
     expect(view.host.querySelector('.liq-ticker')?.textContent).toContain('Hot Shooter!')
     view.unmount()
   })
+
+  it('plays once when testPlaySerial increments', () => {
+    ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+    vi.stubGlobal('requestAnimationFrame', () => 1)
+    vi.stubGlobal('cancelAnimationFrame', () => {})
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root: Root = createRoot(host)
+    act(() => {
+      root.render(<HotShooterTicker current={0} testPlaySerial={0} />)
+    })
+    expect(host.querySelector('.liq-ticker')).toBeNull()
+    act(() => {
+      root.render(<HotShooterTicker current={0} testPlaySerial={1} />)
+    })
+    expect(host.textContent).toContain('Hot Shooter!')
+    act(() => root.unmount())
+    host.remove()
+  })
 })

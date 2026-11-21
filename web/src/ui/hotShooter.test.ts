@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ROLL_STREAK_THRESHOLD } from './rollStreak'
-import { HOT_SHOOTER_MS, HOT_SHOOTER_TEXT, openHotShooterGate, stepHotShooterGate } from './hotShooter'
+import { HOT_SHOOTER_TEXT, openHotShooterGate, stepHotShooterGate } from './hotShooter'
 
 describe('hot shooter banner', () => {
   it('starts once when the current hand passes the threshold', () => {
@@ -14,7 +14,6 @@ describe('hot shooter banner', () => {
     expect(started).toEqual({ armed: false, playId: 1 })
     expect(stepHotShooterGate(started, ROLL_STREAK_THRESHOLD + 5)).toEqual(started)
     expect(HOT_SHOOTER_TEXT).toBe('Hot Shooter!')
-    expect(HOT_SHOOTER_MS).toBe(13_000)
   })
 
   it('arms again after the hand ends and starts on the next pass', () => {

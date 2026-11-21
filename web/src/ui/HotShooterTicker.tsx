@@ -6,7 +6,7 @@ import {
   LIQ_TICKER_HEIGHT_PX,
   LIQ_TICKER_SPEED_PX_PER_SEC,
 } from './overlayConstants'
-import { HOT_SHOOTER_MS, HOT_SHOOTER_TEXT, openHotShooterGate, stepHotShooterGate, type HotShooterGate } from './hotShooter'
+import { HOT_SHOOTER_TEXT, openHotShooterGate, stepHotShooterGate, type HotShooterGate } from './hotShooter'
 import { tickerPass, type TickerPass } from './tickerPass'
 
 /** Empty bar shows before the words start moving. Matches the liquidation ticker. */
@@ -31,7 +31,6 @@ const RainbowPhrase = ({
 const HotShooterPass = ({ onDone }: { onDone: () => void }) => {
   const [scrolling, setScrolling] = useState(false)
   const [pass, setPass] = useState<TickerPass | null>(null)
-  const finishAfterPass = useRef(false)
   const boxRef = useRef<HTMLDivElement>(null)
   const phraseRef = useRef<HTMLSpanElement>(null)
   const onDoneRef = useRef(onDone)
@@ -53,21 +52,6 @@ const HotShooterPass = ({ onDone }: { onDone: () => void }) => {
     return () => window.clearTimeout(id)
   }, [pass])
 
-  useEffect(() => {
-    if (!scrolling) return undefined
-    finishAfterPass.current = false
-    const id = window.setTimeout(() => {
-      finishAfterPass.current = true
-    }, HOT_SHOOTER_MS)
-    return () => window.clearTimeout(id)
-  }, [scrolling])
-
-  const finishPass = () => {
-    if (!finishAfterPass.current) return
-    finishAfterPass.current = false
-    onDoneRef.current()
-  }
-
   return (
     <div
       ref={boxRef}
@@ -79,13 +63,16 @@ const HotShooterPass = ({ onDone }: { onDone: () => void }) => {
       }}
     >
       <div
-        className={scrolling && pass ? 'liq-ticker-track is-scrolling' : 'liq-ticker-track'}
+        className={scrolling && pass ? 'liq-ticker-track is-scrolling-once' : 'liq-ticker-track'}
         style={{
           animationDuration: pass ? `${pass.passMs}ms` : undefined,
           ['--liq-ticker-start' as string]: pass ? `${pass.start}px` : '0px',
           ['--liq-ticker-end' as string]: pass ? `${pass.end}px` : '0px',
         }}
-        onAnimationIteration={finishPass}
+        onAnimationEnd={(event) => {
+          if (event.target !== event.currentTarget || event.animationName !== 'liq-ticker-scroll') return
+          onDoneRef.current()
+        }}
       >
         <RainbowPhrase text={HOT_SHOOTER_TEXT} phraseRef={phraseRef} />
       </div>
@@ -93,7 +80,25 @@ const HotShooterPass = ({ onDone }: { onDone: () => void }) => {
   )
 }
 
-export const HotShooterTicker = ({ current }: { current: number }) => {
+interface HotShooterTickerProps {
+  current: number
+  /** Dev-only serial from `btcCrapsHotShooter.play()`. Negative ids avoid clashing with gate play ids. */
+  testPlaySerial?: number
+}
+
+const queuePlay = (
+  id: number,
+  queuedId: { current: number | null },
+  setActiveId: (update: (showing: number | null) => number | null) => void,
+) => {
+  setActiveId((showing) => {
+    if (showing == null) return id
+    if (showing !== id) queuedId.current = id
+    return showing
+  })
+}
+
+export const HotShooterTicker = ({ current, testPlaySerial = 0 }: HotShooterTickerProps) => {
   const gateRef = useRef<HotShooterGate | null>(null)
   const queuedId = useRef<number | null>(null)
   const [playId, setPlayId] = useState(0)
@@ -112,12 +117,13 @@ export const HotShooterTicker = ({ current }: { current: number }) => {
 
   useEffect(() => {
     if (playId === 0) return
-    setActiveId((showing) => {
-      if (showing == null) return playId
-      if (showing !== playId) queuedId.current = playId
-      return showing
-    })
+    queuePlay(playId, queuedId, setActiveId)
   }, [playId])
+
+  useEffect(() => {
+    if (!testPlaySerial) return
+    queuePlay(-testPlaySerial, queuedId, setActiveId)
+  }, [testPlaySerial])
 
   if (activeId == null) return null
 

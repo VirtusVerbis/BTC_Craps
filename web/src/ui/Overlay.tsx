@@ -47,6 +47,8 @@ interface OverlayProps {
   shooterMode: boolean
   wipedOut: boolean
   session: { usd: number; btc: number }
+  /** Dev-only: incremented by `btcCrapsHotShooter.play()`. */
+  hotShooterTestPlay?: number
 }
 
 const RollStreakLabel = ({ view }: { view: RollStreakView }) => {
@@ -154,6 +156,7 @@ export const Overlay = ({
   shooterMode,
   wipedOut,
   session,
+  hotShooterTestPlay = 0,
 }: OverlayProps) => {
   const { market, status } = useMarketFeed()
   const [block, setBlock] = useState<BlockState>(initialBlockState)
@@ -449,7 +452,9 @@ export const Overlay = ({
         <p>Long {openInterest ? formatAccountPct(openInterest.longPct) : '—'} (Pass)</p>
         <p>Short {openInterest ? formatAccountPct(openInterest.shortPct) : '—'} (Don't)</p>
       </div>
-      {SHOOTER_ON ? <HotShooterTicker current={rollStreak.current} /> : null}
+      {SHOOTER_ON ? (
+        <HotShooterTicker current={rollStreak.current} testPlaySerial={hotShooterTestPlay} />
+      ) : null}
       <NewShooterBanner enabled={shooterMode} />
       <ShooterWipedBanner visible={wipedOut} />
       <LiqTicker snapshot={openInterest} />
