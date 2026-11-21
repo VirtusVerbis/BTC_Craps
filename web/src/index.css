@@ -2865,7 +2865,7 @@ html.shooter-gesture-lock body {
   top: 0.45rem;
   left: 0.45rem;
   right: auto;
-  max-height: calc(100% - 5.75rem);
+  max-height: calc(100% - 6.5rem);
   overflow-y: auto;
 }
 
@@ -2906,32 +2906,32 @@ html.shooter-gesture-lock body {
   pointer-events: auto;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.25rem;
+  gap: 0.65rem;
+  padding: 0.35rem;
   border-radius: 8px;
   background: rgba(10, 14, 23, 0.88);
   border: 1px solid rgba(246, 240, 218, 0.22);
 }
 
 .depth-ta-transport-btn {
-  min-width: 2.75rem;
-  min-height: 2.75rem;
-  padding: 0.35rem 0.5rem;
+  min-width: 3.58rem;
+  min-height: 3.58rem;
+  padding: 0.45rem 0.65rem;
   border: 1px solid rgba(246, 240, 218, 0.35);
   border-radius: 6px;
   background: rgba(0, 0, 0, 0.35);
   color: rgba(246, 240, 218, 0.95);
-  font-size: 1rem;
+  font-size: 1.3rem;
   line-height: 1;
   cursor: pointer;
 }
 
 .depth-ta-transport-btn--play {
-  min-width: 3rem;
+  min-width: 3.9rem;
 }
 
 .depth-ta-transport-glyph {
-  font-size: 0.95rem;
+  font-size: 1.24rem;
   letter-spacing: -0.12em;
   font-weight: 700;
 }
