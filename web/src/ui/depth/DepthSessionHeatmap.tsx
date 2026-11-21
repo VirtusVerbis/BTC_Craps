@@ -3,7 +3,6 @@ import { type Candle } from '../../data/candles'
 import { fetchHeatmapTimelineCandles, heatmapCandleBarMs } from '../../data/heatmapCandleSeries'
 import {
   heatmapAxisMidRangePrice,
-  heatmapPriceAxis,
   heatmapPriceToTopPercent,
   type HeatmapPriceAxis,
 } from '../../data/microstructure/depthHeatmapPriceAxis'
@@ -31,10 +30,7 @@ import type { MicrostructureState } from '../../data/microstructure/types'
 import { DepthInfoIcon } from './DepthInfoIcon'
 import { formatWallUsd } from './depthWallRowMetrics'
 import { DEPTH_VENUE_ORDER, depthVenueShort } from './depthVenueTheme'
-import {
-  HEATMAP_VENUE_MID_LINE_VENUES,
-  resolveVenueMidPolylines,
-} from '../../data/microstructure/depthHeatmapVenueMids'
+import { resolveVenueMidPolylines } from '../../data/microstructure/depthHeatmapVenueMids'
 import {
   HEATMAP_VENUE_MID_POLL_MS,
   loadHeatmapVenueMidHistoryWithCacheSWR,
@@ -72,6 +68,10 @@ import {
   buildHeatmapVenueAxisLabels,
   HEATMAP_VENUE_AXIS_LABEL_VENUES,
 } from './depthHeatmapVenueAxisLabels'
+import { buildSpotKlinePolyline } from '../../data/microstructure/depthHeatmapSpotKline'
+import { computeHeatmapSessionPriceAxis } from '../../data/microstructure/depthHeatmapAxisPolicy'
+import { drawHeatmapSpotKlinePolyline } from './depthHeatmapSpotKlineLine'
+import { HeatmapSpotAvgAxisLabel } from './HeatmapSpotAvgAxisLabel'
 
 const HEATMAP_CANDLE_POLL_MS = 45_000
 
@@ -153,6 +153,8 @@ const drawHeatmap = (
   candleIntervalMs: number,
   offRange: OffRangeSummary,
   venueMidPolylines: ReturnType<typeof resolveVenueMidPolylines>,
+  liveSpotMid: number,
+  rangeEnd: number,
   ta?: TaDrawOpts,
 ) => {
   const rowH = h / axis.rows
@@ -186,6 +188,15 @@ const drawHeatmap = (
     ctx.setLineDash([])
     ctx.lineWidth = 1
   }
+
+  const spotKline = buildSpotKlinePolyline(
+    candles,
+    candleIntervalMs,
+    timeRange,
+    rangeEnd,
+    liveSpotMid > 0 ? liveSpotMid : undefined,
+  )
+  drawHeatmapSpotKlinePolyline(ctx, spotKline, w, h, axis, timeRange)
 
   drawHeatmapVenueMidPolylines(ctx, venueMidPolylines, w, h, axis, timeRange)
   if (ta && ta.instances.length > 0) {
@@ -236,6 +247,7 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     taEnabled && frozenTimelineEnd != null ? frozenTimelineEnd : liveTimelineNow
   timelineNowRef.current = timelineNow > 0 ? timelineNow : timelineNowRef.current
   const liveMid = micro.venues.binancePerp.mid
+  const liveSpotMid = micro.venues.binanceSpot.mid
 
   const heatmapViewport = useMemo(() => heatmapViewportForChartHeight(chartSize.h), [chartSize.h])
 
@@ -272,17 +284,27 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     )
     const columns = applyHeatmapViewportToColumns(withLive, heatmapViewport.bandBps)
     const windowRange = heatmapWindowTimeRange(bucketCount, timelineNow, displayPlan.groupSize)
-    const refMids: number[] = []
-    for (const col of columns) {
-      if (col.refMid > 0) refMids.push(col.refMid)
-    }
-    if (liveMid > 0) refMids.push(liveMid)
-    const candleExtent: number[] = []
-    for (const c of candles) {
-      if (c.openTime < windowRange.start - candleBarMs || c.openTime >= windowRange.end + candleBarMs) continue
-      candleExtent.push(c.high, c.low)
-    }
-    const axis = heatmapPriceAxis(candleExtent, refMids, undefined, { minHalfBps: heatmapViewport.minHalfBps })
+    const timeRangeTa = { start: windowRange.start, end: windowRange.end }
+    const venueMidPolylinesTa = resolveVenueMidPolylines(
+      venueMidHistory,
+      candleBarMs,
+      columns,
+      samplesByVenue.out,
+      micro,
+      windowRange.start,
+      windowRange.end,
+    )
+    const axis = computeHeatmapSessionPriceAxis(
+      candles,
+      timeRangeTa,
+      candleBarMs,
+      windowMin,
+      columns,
+      venueMidPolylinesTa,
+      liveMid,
+      liveSpotMid > 0 ? liveSpotMid : undefined,
+      { minHalfBps: heatmapViewport.minHalfBps },
+    )
     const latestCol = latestHeatmapColumn(columns)
     const offRange = nearestOffRangeLargePools(latestCol, axis, liveMid > 0 ? liveMid : columns[columns.length - 1]?.refMid ?? 0, undefined, heatmapViewport.bandBps)
     const wall = taLiquidityLineForAnchor(
@@ -307,6 +329,9 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     micro,
     candleBarMs,
     liveMid,
+    liveSpotMid,
+    venueMidHistory,
+    windowMin,
   ])
 
   const taOiLine = useMemo(() => {
@@ -464,27 +489,17 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     )
     const layoutCols = displayPlan.displayCols
 
-    const refMids: number[] = []
-    for (const col of columns) {
-      if (col.refMid > 0) refMids.push(col.refMid)
-    }
-    if (liveMid > 0) refMids.push(liveMid)
-    for (const venue of HEATMAP_VENUE_MID_LINE_VENUES) {
-      for (const seg of venueMidPolylines[venue] ?? []) {
-        for (const p of seg) {
-          if (p.mid > 0) refMids.push(p.mid)
-        }
-      }
-    }
-
-    const candleExtent: number[] = []
-    for (const c of candles) {
-      if (c.openTime < timeRange.start - candleBarMs || c.openTime >= timeRange.end + candleBarMs) continue
-      candleExtent.push(c.high, c.low)
-    }
-
-    // Y scale from mids + OHLC only — distant resting depth must not compress candle bodies.
-    const axis = heatmapPriceAxis(candleExtent, refMids, undefined, { minHalfBps: heatmapViewport.minHalfBps })
+    const axis = computeHeatmapSessionPriceAxis(
+      candles,
+      timeRange,
+      candleBarMs,
+      windowMin,
+      columns,
+      venueMidPolylines,
+      liveMid,
+      liveSpotMid > 0 ? liveSpotMid : undefined,
+      { minHalfBps: heatmapViewport.minHalfBps },
+    )
     setPriceAxis(axis)
 
     const windowMax = heatmapGridMax(columns)
@@ -521,6 +536,8 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
       candleBarMs,
       offRange,
       venueMidPolylines,
+      liveSpotMid,
+      windowRange.end,
       taEnabled && ta.instances.length > 0 ? { instances: ta.instances } : undefined,
     )
     setAxisMaxUsd(maxVal)
@@ -547,9 +564,11 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     chartSize,
     samplesByVenue,
     liveMid,
+    liveSpotMid,
     candles,
     venueMidHistory,
     candleBarMs,
+    windowMin,
     heatmapViewport,
     fillAvailableHeight,
     taEnabled,
@@ -569,6 +588,16 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     }),
     [priceAxis, midRangePrice],
   )
+  const liveVenueMidsForRail = useMemo(() => {
+    const out = {} as Partial<Record<(typeof HEATMAP_VENUE_AXIS_LABEL_VENUES)[number], number>>
+    for (const venue of HEATMAP_VENUE_AXIS_LABEL_VENUES) {
+      if (venue === 'binanceSpot') continue
+      const snap = micro.venues[venue]
+      if (snap.status === 'connected' && snap.mid > 0) out[venue] = snap.mid
+    }
+    return out
+  }, [micro.venues])
+
   const venueAxisLabels = useMemo(() => {
     const windowRange = heatmapWindowTimeRange(bucketCount, timelineNow, displayPlan.groupSize)
     const timeRange = { start: windowRange.start, end: windowRange.end }
@@ -580,6 +609,9 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
       timeRange,
       candleBarMs,
       chartSize.h,
+      windowRange.end,
+      liveSpotMid > 0 ? liveSpotMid : undefined,
+      liveVenueMidsForRail,
     )
   }, [
     bucketCount,
@@ -590,6 +622,8 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     priceAxis,
     candleBarMs,
     chartSize.h,
+    liveSpotMid,
+    liveVenueMidsForRail,
   ])
   const chipMid =
     liveMid > 0 ? liveMid : Math.max(0, (priceAxis.priceMax + priceAxis.priceMin) / 2)
@@ -767,16 +801,24 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
           >
             {axisBottom}
           </span>
-          {venueAxisLabels.map((label) => (
-            <span
-              key={label.venue}
-              className="depth-timeline-axis-tick depth-heatmap-venue-axis-label"
-              style={{ top: `${label.topPct}%`, color: label.color }}
-              title={`${depthVenueShort[label.venue]}: latest kline close`}
-            >
-              {label.text}
-            </span>
-          ))}
+          {venueAxisLabels.map((label) =>
+            label.venue === 'spotAvg' ? (
+              <HeatmapSpotAvgAxisLabel
+                key="spotAvg"
+                text={label.text}
+                topPct={label.topPct}
+              />
+            ) : (
+              <span
+                key={label.venue}
+                className="depth-timeline-axis-tick depth-heatmap-venue-axis-label"
+                style={{ top: `${label.topPct}%`, color: label.color }}
+                title={`${depthVenueShort[label.venue]}: latest kline close`}
+              >
+                {label.text}
+              </span>
+            ),
+          )}
         </div>
       </div>
     </section>

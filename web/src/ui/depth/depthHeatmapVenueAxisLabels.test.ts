@@ -5,6 +5,8 @@ import {
   buildHeatmapVenueAxisLabels,
   latestKlineCloseInWindow,
   layoutHeatmapVenueAxisLabels,
+  type HeatmapVenueAxisLabel,
+  venueAxisLabelMinGapPct,
 } from './depthHeatmapVenueAxisLabels'
 
 const axis = (min: number, max: number): HeatmapPriceAxis => ({
@@ -31,6 +33,35 @@ describe('latestKlineCloseInWindow', () => {
 })
 
 describe('layoutHeatmapVenueAxisLabels', () => {
+  it('keeps higher prices above the fixed mid-axis line', () => {
+    const axisMid = { price: 100_400, topPct: 50 }
+    const rows = layoutHeatmapVenueAxisLabels(
+      [
+        {
+          venue: 'binanceSpot',
+          price: 100_420,
+          topPct: 44,
+          text: '$100,420',
+          color: '#fff',
+        },
+        {
+          venue: 'spotAvg',
+          price: 100_425,
+          topPct: 42,
+          text: '~$100,425',
+          color: 'transparent',
+        },
+      ] satisfies HeatmapVenueAxisLabel[],
+      400,
+      { priceMin: 100_000, priceMax: 100_800, tick: 6, rows: 134 },
+    )
+    const avg = rows.find((r) => r.venue === 'spotAvg')!
+    const spot = rows.find((r) => r.venue === 'binanceSpot')!
+    expect(avg.topPct).toBeLessThan(axisMid.topPct)
+    expect(spot.topPct).toBeLessThan(axisMid.topPct)
+    expect(avg.topPct).toBeLessThan(spot.topPct)
+  })
+
   it('separates overlapping labels', () => {
     const out = layoutHeatmapVenueAxisLabels(
       [
@@ -39,7 +70,8 @@ describe('layoutHeatmapVenueAxisLabels', () => {
       ],
       400,
     )
-    expect(out[1]!.topPct).toBeGreaterThan(out[0]!.topPct)
+    const gap = venueAxisLabelMinGapPct(400)
+    expect(out[1]!.topPct - out[0]!.topPct).toBeGreaterThanOrEqual(gap - 0.01)
   })
 })
 
@@ -55,6 +87,10 @@ describe('buildHeatmapVenueAxisLabels', () => {
       { start: 0, end: 20_000 },
       60_000,
       400,
+      20_000,
+      undefined,
+      undefined,
+      false,
     )
     expect(rows).toHaveLength(0)
   })
