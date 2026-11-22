@@ -2835,7 +2835,18 @@ html.shooter-gesture-lock body {
 .depth-ta-toggle {
   flex-shrink: 0;
   margin-left: 0.35rem;
+  margin-right: 0.35rem;
+}
+
+.depth-struct-toggle {
+  flex-shrink: 0;
   margin-right: 1.5rem;
+}
+
+/** 15m/30m: hide STRUCT but keep slot so TA alignment matches 60m/24h. */
+.depth-struct-toggle:disabled {
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .depth-ta-strip {
@@ -2894,7 +2905,8 @@ html.shooter-gesture-lock body {
   opacity: 0.92;
 }
 
-.depth-session-heatmap:has(.depth-ta-toggle.depth-toggle-active) .depth-heatmap-chart-wrap {
+.depth-session-heatmap:has(.depth-ta-toggle.depth-toggle-active) .depth-heatmap-chart-wrap,
+.depth-session-heatmap:has(.depth-struct-toggle.depth-toggle-active) .depth-heatmap-chart-wrap {
   cursor: pointer;
 }
 

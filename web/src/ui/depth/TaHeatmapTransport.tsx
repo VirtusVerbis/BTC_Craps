@@ -1,18 +1,26 @@
 type TaHeatmapTransportProps = {
   visible: boolean
   playing: boolean
+  toolbarAriaLabel?: string
   onPrev: () => void
   onTogglePlayPause: () => void
   onNext: () => void
 }
 
-export const TaHeatmapTransport = ({ visible, playing, onPrev, onTogglePlayPause, onNext }: TaHeatmapTransportProps) => {
+export const TaHeatmapTransport = ({
+  visible,
+  playing,
+  toolbarAriaLabel = 'Technical analysis pattern carousel',
+  onPrev,
+  onTogglePlayPause,
+  onNext,
+}: TaHeatmapTransportProps) => {
   if (!visible) return null
   return (
     <div
       className="depth-ta-transport"
       role="toolbar"
-      aria-label="Technical analysis pattern carousel"
+      aria-label={toolbarAriaLabel}
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
     >

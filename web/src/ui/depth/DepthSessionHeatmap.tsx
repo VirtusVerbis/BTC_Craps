@@ -58,6 +58,8 @@ import {
 import { taLiquidityLineForAnchor } from '../../data/ta/taLiquidityContext'
 import { taOiSnippet } from '../../data/ta/taOiSnippet'
 import { useOpenInterest } from '../../data/openInterest'
+import { structWindowSupported } from '../../data/ta/structure/structWindow'
+import { useStructCarousel } from './useStructCarousel'
 import { useTaCarousel } from './useTaCarousel'
 import { TaHeatmapStrip } from './TaHeatmapStrip'
 import { taStripPlacementForInstances } from './taStripPlacement'
@@ -116,8 +118,18 @@ const HEATMAP_CANDLE_POLL_MS = HEATMAP_SPOT_CANDLE_TAIL_POLL_MS
 
 const STORAGE_HEATMAP_WINDOW = 'depthHeatmapWindowMin'
 const STORAGE_TIMELINE_WINDOW_LEGACY = 'depthTimelineWindowMin'
+const STORAGE_STRUCT_ENABLED = 'depthHeatmapStructEnabled'
 
 type HeatmapWindowMin = HeatmapTimelineWindowMin
+
+const readStructEnabled = (windowMin: HeatmapWindowMin): boolean => {
+  if (!structWindowSupported(windowMin)) return false
+  try {
+    return sessionStorage.getItem(STORAGE_STRUCT_ENABLED) === '1'
+  } catch {
+    return false
+  }
+}
 
 const readWindowMin = (): HeatmapWindowMin => {
   try {
@@ -282,6 +294,7 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
   const scrollRef = useRef<HTMLDivElement>(null)
   const scaleStateRef = useRef<TimelineScaleState>({ tick: 0, max: 1 })
   const [taEnabled, setTaEnabled] = useState(false)
+  const [structEnabled, setStructEnabled] = useState(() => readStructEnabled(readWindowMin()))
   const [frozenTimelineEnd, setFrozenTimelineEnd] = useState<number | null>(null)
   const [taAnnounce, setTaAnnounce] = useState<string | null>(null)
   const openInterest = useOpenInterest()
@@ -336,8 +349,9 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
   const displayPlan = useMemo(() => timelineDisplayPlan(bucketCount), [bucketCount])
   const timelineNowRef = useRef(0)
   const liveTimelineNow = snapTimelineNow(micro.sampledAt)
+  const patternOverlayOn = taEnabled || structEnabled
   const timelineNow =
-    taEnabled && frozenTimelineEnd != null ? frozenTimelineEnd : liveTimelineNow
+    patternOverlayOn && frozenTimelineEnd != null ? frozenTimelineEnd : liveTimelineNow
   timelineNowRef.current = timelineNow > 0 ? timelineNow : timelineNowRef.current
   const liveMid = micro.venues.binancePerp.mid
   const liveSpotMid = micro.venues.binanceSpot.mid
@@ -361,6 +375,11 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
   const heatmapViewport = useMemo(() => heatmapViewportForChartHeight(chartSize.h), [chartSize.h])
 
   const ta = useTaCarousel({ enabled: taEnabled, candles: heatmapChartCandles })
+  const struct = useStructCarousel({
+    enabled: structEnabled && structWindowSupported(windowMin),
+    candles: heatmapChartCandles,
+  })
+  const activePattern = taEnabled ? ta : struct
 
   const samplesByVenue = useMemo(() => {
     const out = {} as Record<(typeof DEPTH_VENUE_ORDER)[number], (typeof micro.venues)[keyof typeof micro.venues]['depthSamples']>
@@ -373,8 +392,8 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
   }, [micro.venues])
 
   const taWallLine = useMemo(() => {
-    if (!taEnabled || ta.instances.length === 0) return null
-    const inst = ta.instances[0]!
+    if (!patternOverlayOn || activePattern.instances.length === 0) return null
+    const inst = activePattern.instances[0]!
     const anchor = heatmapChartCandles[inst.anchorIndex]
     if (!anchor) return null
     const mergedColumns = buildMergedSessionHeatmap(
@@ -426,8 +445,8 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     )
     return wall?.label ?? null
   }, [
-    taEnabled,
-    ta.instances,
+    patternOverlayOn,
+    activePattern.instances,
     heatmapChartCandles,
     samplesByVenue,
     bucketCount,
@@ -443,16 +462,16 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
   ])
 
   const taOiLine = useMemo(() => {
-    if (!taEnabled || ta.instances.length === 0) return null
+    if (!patternOverlayOn || activePattern.instances.length === 0) return null
     return taOiSnippet(openInterest)
-  }, [taEnabled, ta.instances.length, openInterest])
+  }, [patternOverlayOn, activePattern.instances.length, openInterest])
 
   const taStripPlacement = useMemo(() => {
-    if (!taEnabled) return 'top-right' as const
+    if (!patternOverlayOn) return 'top-right' as const
     const windowRange = heatmapWindowTimeRange(bucketCount, timelineNow, displayPlan.groupSize)
     const timeRange = { start: windowRange.start, end: windowRange.end }
     return taStripPlacementForInstances(
-      ta.instances,
+      activePattern.instances,
       heatmapChartCandles,
       chartSize.w,
       chartSize.h,
@@ -461,8 +480,8 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
       candleBarMs,
     )
   }, [
-    taEnabled,
-    ta.instances,
+    patternOverlayOn,
+    activePattern.instances,
     heatmapChartCandles,
     chartSize.w,
     chartSize.h,
@@ -472,6 +491,28 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     displayPlan.groupSize,
     candleBarMs,
   ])
+
+  useEffect(() => {
+    if (!structWindowSupported(windowMin)) {
+      setStructEnabled(false)
+      struct.toggleStruct(false)
+      try {
+        sessionStorage.removeItem(STORAGE_STRUCT_ENABLED)
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [windowMin, struct])
+
+  useEffect(() => {
+    if (!structWindowSupported(windowMin)) return
+    try {
+      if (structEnabled) sessionStorage.setItem(STORAGE_STRUCT_ENABLED, '1')
+      else sessionStorage.removeItem(STORAGE_STRUCT_ENABLED)
+    } catch {
+      /* ignore */
+    }
+  }, [windowMin, structEnabled])
 
   useEffect(() => {
     try {
@@ -710,7 +751,7 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
       showDailySma
         ? { polylines: dailyMaForWindow.polylines, cross: dailyMaForWindow.cross }
         : undefined,
-      taEnabled && ta.instances.length > 0 ? { instances: ta.instances } : undefined,
+      patternOverlayOn && activePattern.instances.length > 0 ? { instances: activePattern.instances } : undefined,
     )
     setAxisMaxUsd(maxVal)
     setOffRangePools(offRange)
@@ -744,8 +785,8 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     windowMin,
     heatmapViewport,
     fillAvailableHeight,
-    taEnabled,
-    ta.instances,
+    patternOverlayOn,
+    activePattern.instances,
     dailySmaSeries,
     dailyMaForWindow,
     showDailySma,
@@ -838,6 +879,10 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
           aria-pressed={taEnabled}
           onClick={() => {
             const next = !taEnabled
+            if (next) {
+              setStructEnabled(false)
+              struct.toggleStruct(false)
+            }
             setTaEnabled(next)
             ta.toggleTa(next)
             setFrozenTimelineEnd(null)
@@ -845,6 +890,32 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
           }}
         >
           TA
+        </button>
+        <button
+          type="button"
+          className={
+            structEnabled
+              ? 'depth-toggle depth-toggle-active depth-struct-toggle'
+              : 'depth-toggle depth-struct-toggle'
+          }
+          aria-pressed={structEnabled}
+          disabled={!structWindowSupported(windowMin)}
+          aria-hidden={!structWindowSupported(windowMin)}
+          tabIndex={structWindowSupported(windowMin) ? 0 : -1}
+          onClick={() => {
+            if (!structWindowSupported(windowMin)) return
+            const next = !structEnabled
+            if (next) {
+              setTaEnabled(false)
+              ta.toggleTa(false)
+            }
+            setStructEnabled(next)
+            struct.toggleStruct(next)
+            setFrozenTimelineEnd(null)
+            if (!next) setTaAnnounce(null)
+          }}
+        >
+          STRUCT
         </button>
         <div className="depth-timeline-actions" role="group" aria-label="Heatmap window">
           <button
@@ -888,15 +959,15 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
           <div
             className="depth-heatmap-chart-wrap"
             onClick={() => {
-              if (!taEnabled) return
-              if (ta.playing) {
+              if (!patternOverlayOn) return
+              if (activePattern.playing) {
                 setFrozenTimelineEnd(liveTimelineNow > 0 ? liveTimelineNow : Date.now())
-                ta.setPaused(true)
+                activePattern.setPaused(true)
                 setTaAnnounce('Paused')
               } else {
                 setFrozenTimelineEnd(null)
-                ta.setPlaying(true)
-                ta.rescan()
+                activePattern.setPlaying(true)
+                activePattern.rescan()
                 setTaAnnounce('Resumed')
               }
             }}
@@ -906,36 +977,41 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
             ) : null}
             {showDailySma ? <HeatmapDailyMaCrossStrip cross={dailyMaForWindow.cross} /> : null}
             <TaHeatmapStrip
-              visible={taEnabled}
+              visible={patternOverlayOn}
               placement={taStripPlacement}
-              entry={ta.entry}
-              hasHits={ta.instances.length > 0}
-              biasLabel={ta.instances.length > 0 ? biasLabel(ta.instances[0]!.bias) : null}
+              entry={activePattern.entry}
+              hasHits={activePattern.instances.length > 0}
+              biasLabel={
+                activePattern.instances.length > 0 ? biasLabel(activePattern.instances[0]!.bias) : null
+              }
               wallLine={taWallLine}
               oiLine={taOiLine}
               announceExtra={taAnnounce}
             />
             <TaHeatmapTransport
-              visible={taEnabled}
-              playing={ta.playing}
+              visible={patternOverlayOn}
+              playing={activePattern.playing}
+              toolbarAriaLabel={
+                structEnabled ? 'Structure pattern carousel' : 'Technical analysis pattern carousel'
+              }
               onPrev={() => {
-                ta.prev()
+                activePattern.prev()
                 setFrozenTimelineEnd(liveTimelineNow > 0 ? liveTimelineNow : frozenTimelineEnd)
               }}
               onTogglePlayPause={() => {
-                if (ta.playing) {
+                if (activePattern.playing) {
                   setFrozenTimelineEnd(liveTimelineNow > 0 ? liveTimelineNow : Date.now())
-                  ta.setPaused(true)
+                  activePattern.setPaused(true)
                   setTaAnnounce('Paused')
                 } else {
                   setFrozenTimelineEnd(null)
-                  ta.setPlaying(true)
-                  ta.rescan()
+                  activePattern.setPlaying(true)
+                  activePattern.rescan()
                   setTaAnnounce('Resumed')
                 }
               }}
               onNext={() => {
-                ta.next()
+                activePattern.next()
                 setFrozenTimelineEnd(liveTimelineNow > 0 ? liveTimelineNow : frozenTimelineEnd)
               }}
             />
