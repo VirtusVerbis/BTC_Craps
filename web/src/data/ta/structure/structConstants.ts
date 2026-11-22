@@ -15,3 +15,6 @@ export const STRUCT_RANGE_COMPRESSION_MAX = 0.72
 
 /** Each range window is this many bars (half of ~60 bar chart). */
 export const STRUCT_RANGE_WINDOW_BARS = 24
+
+/** Head must exceed shoulders by at least this fraction of shoulder price. */
+export const STRUCT_HEAD_MIN_EXTRA_BPS = 15

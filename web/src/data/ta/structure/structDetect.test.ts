@@ -44,3 +44,18 @@ describe('struct window gating', () => {
     expect(detectStructPattern('doubleTop', [])).toEqual([])
   })
 })
+
+describe('swing failure high', () => {
+  it('detects sweep and close back below prior pivot high', () => {
+    const series = doubleTopSeries()
+    const pivotHigh = 100
+    const last = c(93, 92, pivotHigh + 0.2, 91.5, (series.length + 1) * 60_000)
+    const withSweep = [
+      ...series.slice(0, -1),
+      c(92, 99.5, pivotHigh + 0.05, 92, series.length * 60_000),
+      last,
+    ]
+    const hits = detectStructPattern('swingFailureHigh', withSweep)
+    expect(hits.length).toBeGreaterThan(0)
+  })
+})

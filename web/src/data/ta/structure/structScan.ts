@@ -5,8 +5,16 @@ import { fractalPivotHighs, fractalPivotLows } from './pivots'
 import {
   detectDoubleBottom,
   detectDoubleTop,
+  detectHeadAndShoulders,
+  detectInverseHeadAndShoulders,
   detectRangeBreakoutBear,
   detectRangeBreakoutBull,
+  detectRangeTrapBear,
+  detectRangeTrapBull,
+  detectStructureBreakBear,
+  detectStructureBreakBull,
+  detectSwingFailureHigh,
+  detectSwingFailureLow,
   detectTripleBottom,
   detectTripleTop,
 } from './structDetect'
@@ -45,6 +53,22 @@ export const detectStructPattern = (id: PatternId, candles: readonly Candle[]): 
       return detectRangeBreakoutBull(candles)
     case 'rangeBreakoutBear':
       return detectRangeBreakoutBear(candles)
+    case 'swingFailureHigh':
+      return detectSwingFailureHigh(candles, pivots.highs)
+    case 'swingFailureLow':
+      return detectSwingFailureLow(candles, pivots.lows)
+    case 'structureBreakBull':
+      return detectStructureBreakBull(candles, pivots.highs)
+    case 'structureBreakBear':
+      return detectStructureBreakBear(candles, pivots.lows)
+    case 'rangeTrapBull':
+      return detectRangeTrapBull(candles)
+    case 'rangeTrapBear':
+      return detectRangeTrapBear(candles)
+    case 'headAndShoulders':
+      return detectHeadAndShoulders(candles, pivots.highs)
+    case 'inverseHeadAndShoulders':
+      return detectInverseHeadAndShoulders(candles, pivots.lows)
     default:
       return []
   }
