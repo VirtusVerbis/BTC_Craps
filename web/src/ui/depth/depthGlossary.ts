@@ -186,7 +186,7 @@ export const depthGlossary: Record<DepthGlossaryKey, GlossaryEntry> = {
   depthSessionHeatmap: {
     title: 'Depth heatmap (price × time)',
     body:
-      'BTC resting liquidity over 15m, 30m, 60m, or 24h: time left to right, USD price on the right. Color is merged resting size near each venue’s mid (~±180 bps), scaled $0 to session max on the toolbar ramp; on 24h, color reflects only the recent live depth tail (~1h). Binance spot candles on top; yellow line = BN-S close; dashed white = Binance perp live mid.',
+      'BTC resting liquidity over 15m, 30m, 60m, or 24h: time left to right, USD price on the right. Color is merged resting size near each venue’s mid (~±180 bps), scaled $0 to session max on the toolbar ramp. Live depth ~the last hour; this device may replay up to 24h of visit segments from cache (empty gaps elsewhere). Binance spot candles on top; yellow line = BN-S close; dashed white = Binance perp live mid.',
     items: [
       {
         label: 'Heatmap color',

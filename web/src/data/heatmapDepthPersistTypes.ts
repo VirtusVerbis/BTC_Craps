@@ -18,7 +18,12 @@ export type HeatmapDepthPersistedBlob = {
   columns: HeatmapDepthPersistedColumn[]
 }
 
-/** Wall-clock retention for scroll-off (no rewrite of older slots). */
-export const HEATMAP_DEPTH_PERSIST_MAX_MS = 60 * 60_000
+/** Rolling wall-clock depth cache (visit segments; gaps empty on chart). */
+export const HEATMAP_DEPTH_PERSIST_MAX_MS = 24 * 60 * 60_000
+/**
+ * FIFO backstop when the tab stays open (~24h at 10s coarse slots).
+ * Oldest `t0` dropped after time trim.
+ */
+export const HEATMAP_DEPTH_PERSIST_MAX_COLUMNS = 10_000
 /** Debounced IndexedDB writes while depth is streaming. */
 export const HEATMAP_DEPTH_PERSIST_FLUSH_MS = 5_000

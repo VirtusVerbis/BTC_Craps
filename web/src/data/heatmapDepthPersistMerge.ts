@@ -1,42 +1,93 @@
-import { carriedPaintBucketsForColumnIndex } from './microstructure/depthHeatmapCarriedPaint'
+import { carriedUsdPerColumnForRow } from './microstructure/depthHeatmapCarriedPaint'
+import { priceAtRowCenter, type HeatmapPriceAxis } from './microstructure/depthHeatmapPriceAxis'
 import type { PriceBucket } from './microstructure/depthHeatmapPriceBins'
-import type { HeatmapPriceAxis } from './microstructure/depthHeatmapPriceAxis'
 import type { HeatmapGridColumn } from './microstructure/depthSessionHeatmapGrid'
-import { HEATMAP_DEPTH_PERSIST_MAX_MS } from './heatmapDepthPersistTypes'
+import { HEATMAP_DEPTH_PERSIST_MAX_COLUMNS, HEATMAP_DEPTH_PERSIST_MAX_MS } from './heatmapDepthPersistTypes'
 import type { HeatmapDepthPersistedColumn } from './heatmapDepthPersistTypes'
 
 const bucketsFromPersisted = (b: HeatmapDepthPersistedColumn): PriceBucket[] =>
   b.b.map(([p, usd]) => ({ p, usd }))
 
-/** Snapshot carried paint values for one column (matches live drag renderer). */
-export const heatmapDepthPersistedColumnCarried = (
-  colIndex: number,
-  columns: readonly HeatmapGridColumn[],
-  axis: HeatmapPriceAxis,
-): HeatmapDepthPersistedColumn | null => {
-  const col = columns[colIndex]
-  if (!col || col.gap) return null
-  const rows = carriedPaintBucketsForColumnIndex(colIndex, columns, axis)
-  if (rows.length === 0) return null
-  const b: [number, number][] = rows.map((r) => [r.p, r.usd])
-  return {
-    t0: col.intervalStart,
-    t1: col.intervalEnd,
-    m: col.refMid > 0 ? col.refMid : undefined,
-    b,
-  }
-}
-
+/** O(columns × rows): one carry pass per row, then fan out to columns. */
 export const heatmapDepthPersistedCarriedFromGrid = (
   columns: readonly HeatmapGridColumn[],
   axis: HeatmapPriceAxis,
 ): HeatmapDepthPersistedColumn[] => {
+  const colCount = columns.length
+  if (colCount === 0 || axis.rows <= 0) return []
+  const sparse: [number, number][][] = Array.from({ length: colCount }, () => [])
+  for (let row = 0; row < axis.rows; row++) {
+    const carried = carriedUsdPerColumnForRow(columns, row, axis)
+    const p = priceAtRowCenter(row, axis)
+    for (let i = 0; i < colCount; i++) {
+      const usd = carried[i]!
+      if (usd <= 0) continue
+      sparse[i]!.push([p, usd])
+    }
+  }
   const out: HeatmapDepthPersistedColumn[] = []
-  for (let i = 0; i < columns.length; i++) {
-    const row = heatmapDepthPersistedColumnCarried(i, columns, axis)
-    if (row) out.push(row)
+  for (let i = 0; i < colCount; i++) {
+    const col = columns[i]!
+    const b = sparse[i]!
+    if (col.gap || b.length === 0) continue
+    out.push({
+      t0: col.intervalStart,
+      t1: col.intervalEnd,
+      m: col.refMid > 0 ? col.refMid : undefined,
+      b,
+    })
   }
   return out
+}
+
+export const syncPersistedDepthByT0 = (
+  byT0: Map<number, HeatmapDepthPersistedColumn>,
+  columns: readonly HeatmapDepthPersistedColumn[],
+): void => {
+  byT0.clear()
+  for (const c of columns) byT0.set(c.t0, c)
+}
+
+/** Persisted columns overlapping the visible chart window (avoids scanning full 24h list per slot). */
+export const persistedDepthOverlappingWindow = (
+  byT0: ReadonlyMap<number, HeatmapDepthPersistedColumn>,
+  rangeStart: number,
+  rangeEnd: number,
+): HeatmapDepthPersistedColumn[] => {
+  const out: HeatmapDepthPersistedColumn[] = []
+  for (const c of byT0.values()) {
+    if (c.t0 < rangeEnd && c.t1 > rangeStart && c.b.length > 0) out.push(c)
+  }
+  return out
+}
+
+/** Incremental in-memory index update (paint path); trim time + cap. */
+export const mergeIncomingPersistedDepthByT0 = (
+  byT0: Map<number, HeatmapDepthPersistedColumn>,
+  incoming: readonly HeatmapDepthPersistedColumn[],
+  now = Date.now(),
+): void => {
+  const minT1 = now - HEATMAP_DEPTH_PERSIST_MAX_MS
+  for (const c of incoming) {
+    if (c.b.length > 0) byT0.set(c.t0, c)
+  }
+  for (const [t0, c] of byT0) {
+    if (c.t1 <= minT1) byT0.delete(t0)
+  }
+  if (byT0.size <= HEATMAP_DEPTH_PERSIST_MAX_COLUMNS) return
+  const sortedT0 = [...byT0.keys()].sort((a, b) => a - b)
+  const drop = sortedT0.length - HEATMAP_DEPTH_PERSIST_MAX_COLUMNS
+  for (let i = 0; i < drop; i++) byT0.delete(sortedT0[i]!)
+}
+
+/** Keep newest columns when over {@link HEATMAP_DEPTH_PERSIST_MAX_COLUMNS}. */
+export const capPersistedDepthColumns = (
+  columns: readonly HeatmapDepthPersistedColumn[],
+  maxColumns = HEATMAP_DEPTH_PERSIST_MAX_COLUMNS,
+): HeatmapDepthPersistedColumn[] => {
+  const sorted = [...columns].sort((a, b) => a.t0 - b.t0)
+  if (sorted.length <= maxColumns) return sorted
+  return sorted.slice(sorted.length - maxColumns)
 }
 
 export const trimPersistedColumnsWallClock = (
@@ -45,7 +96,8 @@ export const trimPersistedColumnsWallClock = (
   maxAgeMs = HEATMAP_DEPTH_PERSIST_MAX_MS,
 ): HeatmapDepthPersistedColumn[] => {
   const minT0 = now - maxAgeMs
-  return columns.filter((c) => c.t1 > minT0)
+  const inWindow = columns.filter((c) => c.t1 > minT0)
+  return capPersistedDepthColumns(inWindow)
 }
 
 /** Merge new live captures into prior blob keyed by intervalStart (live overwrites). */
@@ -61,7 +113,7 @@ export const upsertPersistedDepthColumns = (
   for (const c of incoming) {
     if (c.b.length > 0) byT0.set(c.t0, c)
   }
-  return [...byT0.values()].sort((a, b) => a.t0 - b.t0)
+  return capPersistedDepthColumns([...byT0.values()], HEATMAP_DEPTH_PERSIST_MAX_COLUMNS)
 }
 
 const columnHasLiveDepth = (col: HeatmapGridColumn): boolean => !col.gap && col.buckets.length > 0

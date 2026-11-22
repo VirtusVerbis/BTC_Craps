@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest'
 import type { HeatmapDepthPersistedColumn } from './heatmapDepthPersistTypes'
 import type { HeatmapGridColumn } from './microstructure/depthSessionHeatmapGrid'
 import {
+  capPersistedDepthColumns,
+  mergeIncomingPersistedDepthByT0,
   mergePersistedDepthIntoLiveColumns,
+  persistedDepthOverlappingWindow,
   trimPersistedColumnsWallClock,
   upsertPersistedDepthColumns,
 } from './heatmapDepthPersistMerge'
@@ -49,6 +52,45 @@ describe('trimPersistedColumnsWallClock', () => {
     const out = trimPersistedColumnsWallClock(cols, now, 60_000)
     expect(out).toHaveLength(1)
     expect(out[0]!.t0).toBe(now - 30_000)
+  })
+})
+
+describe('capPersistedDepthColumns', () => {
+  it('drops oldest t0 when over max', () => {
+    const cols: HeatmapDepthPersistedColumn[] = [
+      { t0: 0, t1: 1, b: [[100_000, 1] as [number, number]] },
+      { t0: 1, t1: 2, b: [[100_000, 1] as [number, number]] },
+      { t0: 2, t1: 3, b: [[100_000, 1] as [number, number]] },
+    ]
+    const out = capPersistedDepthColumns(cols, 2)
+    expect(out).toHaveLength(2)
+    expect(out[0]!.t0).toBe(1)
+    expect(out[1]!.t0).toBe(2)
+  })
+})
+
+describe('persistedDepthOverlappingWindow', () => {
+  it('returns only columns overlapping the window', () => {
+    const byT0 = new Map<number, HeatmapDepthPersistedColumn>([
+      [0, { t0: 0, t1: 10_000, b: [[100_000, 1] as [number, number]] }],
+      [50_000, { t0: 50_000, t1: 60_000, b: [[100_000, 2] as [number, number]] }],
+    ])
+    const out = persistedDepthOverlappingWindow(byT0, 5_000, 15_000)
+    expect(out).toHaveLength(1)
+    expect(out[0]!.t0).toBe(0)
+  })
+})
+
+describe('mergeIncomingPersistedDepthByT0', () => {
+  it('upserts by t0 into the map', () => {
+    const map = new Map<number, HeatmapDepthPersistedColumn>()
+    const now = 1_000_000
+    mergeIncomingPersistedDepthByT0(
+      map,
+      [{ t0: now - 5_000, t1: now, b: [[100_000, 3] as [number, number]] }],
+      now,
+    )
+    expect(map.get(now - 5_000)?.b[0]![1]).toBe(3)
   })
 })
 

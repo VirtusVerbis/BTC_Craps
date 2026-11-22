@@ -104,3 +104,9 @@ export const heatmapPriceToTopPercent = (price: number, axis: HeatmapPriceAxis):
 
 export const heatmapAxisMidRangePrice = (axis: HeatmapPriceAxis): number =>
   (axis.priceMax + axis.priceMin) / 2
+
+export const heatmapPriceAxisEqual = (a: HeatmapPriceAxis, b: HeatmapPriceAxis): boolean =>
+  a.priceMin === b.priceMin &&
+  a.priceMax === b.priceMax &&
+  a.tick === b.tick &&
+  a.rows === b.rows

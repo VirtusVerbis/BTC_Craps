@@ -14,6 +14,7 @@ import {
 } from '../../data/heatmapSpotCandleCache'
 import {
   heatmapAxisMidRangePrice,
+  heatmapPriceAxisEqual,
   heatmapPriceToTopPercent,
   type HeatmapPriceAxis,
 } from '../../data/microstructure/depthHeatmapPriceAxis'
@@ -122,8 +123,10 @@ import {
 } from '../../data/heatmapDepthPersistTypes'
 import {
   heatmapDepthPersistedCarriedFromGrid,
+  mergeIncomingPersistedDepthByT0,
   mergePersistedDepthIntoLiveColumns,
-  upsertPersistedDepthColumns,
+  persistedDepthOverlappingWindow,
+  syncPersistedDepthByT0,
 } from '../../data/heatmapDepthPersistMerge'
 
 /** Poll spot REST on tail cadence; full window backfill throttled in cache layer. */
@@ -336,9 +339,12 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     pendingWiderMin: null,
     pendingWiderMax: null,
   })
-  const depthPersistForPaintRef = useRef<HeatmapDepthPersistedColumn[]>([])
+  const depthPersistByT0Ref = useRef(new Map<number, HeatmapDepthPersistedColumn>())
   const depthPersistFlushBatchRef = useRef<HeatmapDepthPersistedColumn[]>([])
-  const depthPersistFlushTimerRef = useRef<number | null>(null)
+  const depthPersistCaptureRef = useRef<{
+    liveColumns: readonly HeatmapGridColumn[]
+    axis: HeatmapPriceAxis
+  } | null>(null)
   const [depthPersistHydrated, setDepthPersistHydrated] = useState(0)
 
   const bucketCount = bucketCountForWindow(windowMin)
@@ -408,52 +414,43 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     return { out, statuses }
   }, [micro.venues])
 
-  const flushDepthPersistNow = () => {
-    if (depthPersistFlushTimerRef.current != null) {
-      window.clearTimeout(depthPersistFlushTimerRef.current)
-      depthPersistFlushTimerRef.current = null
-    }
-    const batch = depthPersistFlushBatchRef.current
-    if (batch.length === 0) return
-    depthPersistFlushBatchRef.current = []
-    void flushHeatmapDepthPersistedColumns(batch).then(() => {
-      void loadHeatmapDepthPersistedColumns().then((cols) => {
-        depthPersistForPaintRef.current = cols
-      })
-    })
-  }
-
-  const queueDepthPersistFromColumns = (
-    liveColumns: readonly HeatmapGridColumn[],
-    axis: HeatmapPriceAxis,
-  ) => {
-    const incoming = heatmapDepthPersistedCarriedFromGrid(liveColumns, axis)
-    if (incoming.length === 0) return
-    depthPersistForPaintRef.current = upsertPersistedDepthColumns(depthPersistForPaintRef.current, incoming)
-    depthPersistFlushBatchRef.current = upsertPersistedDepthColumns(
-      depthPersistFlushBatchRef.current,
-      incoming,
-    )
-    if (depthPersistFlushTimerRef.current != null) return
-    depthPersistFlushTimerRef.current = window.setTimeout(() => {
-      depthPersistFlushTimerRef.current = null
-      flushDepthPersistNow()
-    }, HEATMAP_DEPTH_PERSIST_FLUSH_MS)
-  }
-
   useEffect(() => {
+    const flushDepthPersistNow = () => {
+      const batch = depthPersistFlushBatchRef.current
+      if (batch.length === 0) return
+      depthPersistFlushBatchRef.current = []
+      void flushHeatmapDepthPersistedColumns(batch).then(() => {
+        void loadHeatmapDepthPersistedColumns().then((cols) => {
+          syncPersistedDepthByT0(depthPersistByT0Ref.current, cols)
+          setDepthPersistHydrated((n) => n + 1)
+        })
+      })
+    }
+
+    const captureDepthPersistFromRef = () => {
+      const snap = depthPersistCaptureRef.current
+      if (!snap) return
+      const incoming = heatmapDepthPersistedCarriedFromGrid(snap.liveColumns, snap.axis)
+      if (incoming.length === 0) return
+      mergeIncomingPersistedDepthByT0(depthPersistByT0Ref.current, incoming)
+      depthPersistFlushBatchRef.current.push(...incoming)
+      flushDepthPersistNow()
+    }
+
     void loadHeatmapDepthPersistedColumns().then((cols) => {
-      depthPersistForPaintRef.current = cols
+      syncPersistedDepthByT0(depthPersistByT0Ref.current, cols)
       setDepthPersistHydrated((n) => n + 1)
     })
+    const captureId = window.setInterval(captureDepthPersistFromRef, HEATMAP_DEPTH_PERSIST_FLUSH_MS)
     const onHide = () => {
-      if (document.visibilityState === 'hidden') flushDepthPersistNow()
+      if (document.visibilityState === 'hidden') captureDepthPersistFromRef()
     }
-    window.addEventListener('pagehide', flushDepthPersistNow)
+    window.addEventListener('pagehide', captureDepthPersistFromRef)
     document.addEventListener('visibilitychange', onHide)
     return () => {
-      flushDepthPersistNow()
-      window.removeEventListener('pagehide', flushDepthPersistNow)
+      window.clearInterval(captureId)
+      captureDepthPersistFromRef()
+      window.removeEventListener('pagehide', captureDepthPersistFromRef)
       document.removeEventListener('visibilitychange', onHide)
     }
   }, [])
@@ -741,9 +738,14 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     )
     const withLive = overlayLiveBooksOnLatestHeatmapColumn(mergedColumns, micro, DEPTH_VENUE_ORDER, heatmapViewport.bandBps)
     const liveColumns = applyHeatmapViewportToColumns(withLive, heatmapViewport.bandBps)
-    const columns = mergePersistedDepthIntoLiveColumns(liveColumns, depthPersistForPaintRef.current)
 
     const windowRange = heatmapWindowTimeRange(bucketCount, timelineNow, displayPlan.groupSize)
+    const persistedInView = persistedDepthOverlappingWindow(
+      depthPersistByT0Ref.current,
+      windowRange.start,
+      windowRange.end,
+    )
+    const columns = mergePersistedDepthIntoLiveColumns(liveColumns, persistedInView)
     const timeRange = { start: windowRange.start, end: windowRange.end }
     const venueMidPolylines = resolveVenueMidPolylines(
       venueMidHistory,
@@ -777,10 +779,11 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
         )
     axisStabilizeRef.current = stabilized.state
     const axis = stabilized.axis
+    if (!heatmapPriceAxisEqual(axis, priceAxisPaintRef.current)) {
+      setPriceAxis(axis)
+    }
     priceAxisPaintRef.current = axis
-    setPriceAxis(axis)
-
-    queueDepthPersistFromColumns(liveColumns, axis)
+    depthPersistCaptureRef.current = { liveColumns, axis }
 
     const windowMax = heatmapGridMax(columns)
     const scaled = advanceTimelineScale(timelineNow, windowMax, scaleStateRef.current)
