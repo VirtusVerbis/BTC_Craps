@@ -125,7 +125,6 @@ import {
   heatmapDepthPersistedCarriedFromGrid,
   mergeIncomingPersistedDepthByT0,
   mergePersistedDepthIntoLiveColumns,
-  persistedDepthOverlappingWindow,
   syncPersistedDepthByT0,
 } from '../../data/heatmapDepthPersistMerge'
 
@@ -740,12 +739,7 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     const liveColumns = applyHeatmapViewportToColumns(withLive, heatmapViewport.bandBps)
 
     const windowRange = heatmapWindowTimeRange(bucketCount, timelineNow, displayPlan.groupSize)
-    const persistedInView = persistedDepthOverlappingWindow(
-      depthPersistByT0Ref.current,
-      windowRange.start,
-      windowRange.end,
-    )
-    const columns = mergePersistedDepthIntoLiveColumns(liveColumns, persistedInView)
+    const columns = mergePersistedDepthIntoLiveColumns(liveColumns, depthPersistByT0Ref.current)
     const timeRange = { start: windowRange.start, end: windowRange.end }
     const venueMidPolylines = resolveVenueMidPolylines(
       venueMidHistory,

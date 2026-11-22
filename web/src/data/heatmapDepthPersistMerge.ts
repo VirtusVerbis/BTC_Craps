@@ -118,32 +118,21 @@ export const upsertPersistedDepthColumns = (
 
 const columnHasLiveDepth = (col: HeatmapGridColumn): boolean => !col.gap && col.buckets.length > 0
 
-const findPersistedForSlot = (
-  intervalStart: number,
-  intervalEnd: number,
-  cached: readonly HeatmapDepthPersistedColumn[],
-): HeatmapDepthPersistedColumn | null => {
-  for (const c of cached) {
-    if (c.t0 === intervalStart) return c
-  }
-  for (const c of cached) {
-    if (c.t0 < intervalEnd && c.t1 > intervalStart && c.b.length > 0) return c
-  }
-  return null
-}
+const persistedSlotMatches = (col: HeatmapGridColumn, hit: HeatmapDepthPersistedColumn): boolean =>
+  hit.t0 === col.intervalStart && hit.t1 === col.intervalEnd
 
 /**
- * Wall-clock fill: live columns win; empty gaps use persisted buckets when times overlap.
+ * Wall-clock fill: live wins; gaps restore only on exact [t0,t1] match (no coarse→fine overlap paste).
  */
 export const mergePersistedDepthIntoLiveColumns = (
   liveColumns: readonly HeatmapGridColumn[],
-  persisted: readonly HeatmapDepthPersistedColumn[],
+  byT0: ReadonlyMap<number, HeatmapDepthPersistedColumn>,
 ): HeatmapGridColumn[] => {
-  if (persisted.length === 0) return [...liveColumns]
+  if (byT0.size === 0) return [...liveColumns]
   return liveColumns.map((col) => {
     if (columnHasLiveDepth(col)) return col
-    const hit = findPersistedForSlot(col.intervalStart, col.intervalEnd, persisted)
-    if (!hit) return col
+    const hit = byT0.get(col.intervalStart)
+    if (!hit || !persistedSlotMatches(col, hit)) return col
     const buckets = bucketsFromPersisted(hit)
     if (buckets.length === 0) return col
     return {

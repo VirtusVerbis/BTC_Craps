@@ -24,21 +24,31 @@ describe('mergePersistedDepthIntoLiveColumns', () => {
     const persisted: HeatmapDepthPersistedColumn[] = [
       { t0: 0, t1: 10_000, b: [[100_000, 1_000_000] as [number, number]] },
     ]
-    const out = mergePersistedDepthIntoLiveColumns(live, persisted)
+    const byT0 = new Map(persisted.map((c) => [c.t0, c]))
+    const out = mergePersistedDepthIntoLiveColumns(live, byT0)
     expect(out[0]!.buckets[0]!.usd).toBe(2_000_000)
   })
 
-  it('fills gap slots from persisted wall-clock overlap', () => {
+  it('fills gap only when t0 and t1 match persisted slot exactly', () => {
     const live = [col(0, 5_000, true), col(5_000, 10_000, true)]
-    const persisted: HeatmapDepthPersistedColumn[] = [
-      { t0: 0, t1: 10_000, b: [[99_984, 800_000] as [number, number]] },
-    ]
-    const out = mergePersistedDepthIntoLiveColumns(live, persisted)
+    const byT0 = new Map<number, HeatmapDepthPersistedColumn>([
+      [0, { t0: 0, t1: 5_000, b: [[99_984, 800_000] as [number, number]] }],
+    ])
+    const out = mergePersistedDepthIntoLiveColumns(live, byT0)
     expect(out[0]!.gap).toBe(false)
     expect(out[0]!.restoredCarry).toBe(true)
     expect(out[0]!.buckets[0]!.usd).toBe(800_000)
-    expect(out[1]!.gap).toBe(false)
-    expect(out[1]!.restoredCarry).toBe(true)
+    expect(out[1]!.gap).toBe(true)
+  })
+
+  it('does not upsample coarse persisted column into finer live slots', () => {
+    const live = [col(0, 5_000, true), col(5_000, 10_000, true)]
+    const byT0 = new Map<number, HeatmapDepthPersistedColumn>([
+      [0, { t0: 0, t1: 10_000, b: [[99_984, 800_000] as [number, number]] }],
+    ])
+    const out = mergePersistedDepthIntoLiveColumns(live, byT0)
+    expect(out[0]!.gap).toBe(true)
+    expect(out[1]!.gap).toBe(true)
   })
 })
 
