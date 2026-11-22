@@ -4,6 +4,7 @@ import { exchangeRestBase } from './exchangeRestBase'
 import { fetchBinanceFuturesBtc1mKlines } from './binanceFuturesCandles'
 import {
   aggregateCandles,
+  HEATMAP_CANDLE_MARGIN_MS,
   heatmapCandleBarMs,
   type HeatmapTimelineWindowMin,
 } from './heatmapCandleSeries'
@@ -27,8 +28,6 @@ export const heatmapVenueMidHistoryVenues: readonly VenueId[] = HEATMAP_VENUE_MI
 export type VenueMidFetchResult = { candles: Candle[]; rateLimited: boolean }
 
 export type VenueMidHistory = Partial<Record<VenueId, Candle[]>>
-
-const HEATMAP_CANDLE_MARGIN_MS = 2 * 60_000
 
 const midHistoryRestBase = (proxyPrefix: string, prodOrigin: string): string =>
   exchangeRestBase(proxyPrefix, prodOrigin)
@@ -184,14 +183,20 @@ const bybitInterval = (barMs: number): string => {
   return '15'
 }
 
-const fetchBybitCandles = async (startMs: number, barMs: number): Promise<Candle[]> => {
+const bybitKlineLimit = (startMs: number, endMs: number, barMs: number): number => {
+  const barMin = Math.max(1, Math.round(barMs / 60_000))
+  const spanBars = Math.ceil(Math.max(60_000, endMs - startMs) / barMs)
+  return Math.min(1000, Math.max(10, spanBars + barMin * 2))
+}
+
+const fetchBybitCandles = async (startMs: number, endMs: number, barMs: number): Promise<Candle[]> => {
   const base = midHistoryRestBase('/bybit-api', 'https://api.bybit.com')
   const params = new URLSearchParams({
     category: 'linear',
     symbol: 'BTCUSDT',
     interval: bybitInterval(barMs),
     start: String(Math.floor(startMs)),
-    limit: '1000',
+    limit: String(bybitKlineLimit(startMs, endMs, barMs)),
   })
   const res = await fetch(`${base}/v5/market/kline?${params}`)
   if (!res.ok) return []
@@ -349,7 +354,7 @@ export const fetchHeatmapVenueMidHistory = async (
       venue: 'bybitPerp',
       fetch: () =>
         safeVenueMidFetch(async () => ({
-          candles: await fetchBybitCandles(start, barMs),
+          candles: await fetchBybitCandles(start, now, barMs),
           rateLimited: false,
         })),
     },

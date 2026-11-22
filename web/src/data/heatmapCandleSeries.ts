@@ -30,11 +30,22 @@ export const aggregateCandles = (candles: readonly Candle[], bucketMs: number): 
   return [...byBucket.values()].sort((a, b) => a.openTime - b.openTime)
 }
 
+/** Extra history beyond the visible depth window when requesting klines. */
+export const HEATMAP_CANDLE_MARGIN_MS = 2 * 60_000
+
+export const heatmapSpotKlineFetchLimit = (windowMin: HeatmapTimelineWindowMin): number =>
+  Math.min(1000, windowMin + 15)
+
+export const heatmapSpotWindowStartMs = (windowMin: HeatmapTimelineWindowMin, now = Date.now()): number =>
+  now - windowMin * 60_000 - HEATMAP_CANDLE_MARGIN_MS
+
 const fetchBinanceBtc1sThrough = async (startTime: number, endTime: number): Promise<Candle[]> => {
   const out: Candle[] = []
   let cursor = Math.floor(startTime)
   const end = Math.floor(endTime)
-  for (let guard = 0; guard < 8 && cursor < end; guard++) {
+  const spanSec = Math.max(1, Math.ceil((end - startTime) / 1000))
+  const maxPages = Math.min(8, Math.ceil(spanSec / 1000) + 1)
+  for (let guard = 0; guard < maxPages && cursor < end; guard++) {
     const batch = await fetchBinanceBtcKlines('1s', 1000, cursor)
     if (batch.length === 0) break
     for (const c of batch) {
@@ -49,21 +60,91 @@ const fetchBinanceBtc1sThrough = async (startTime: number, endTime: number): Pro
   return out
 }
 
-const HEATMAP_CANDLE_MARGIN_MS = 2 * 60_000
+export const mergeHeatmapSpot1sCandles = (
+  windowStartMs: number,
+  prior: readonly Candle[] | null | undefined,
+  fresh: readonly Candle[],
+  now = Date.now(),
+): Candle[] => {
+  const cutoff = windowStartMs - 1000
+  const maxAge = now + 60_000
+  const byTime = new Map<number, Candle>()
+  for (const c of prior ?? []) {
+    if (c.openTime >= cutoff && c.openTime <= maxAge) byTime.set(c.openTime, c)
+  }
+  for (const c of fresh) {
+    if (c.openTime >= cutoff && c.openTime <= maxAge) byTime.set(c.openTime, c)
+  }
+  return [...byTime.values()].sort((a, b) => a.openTime - b.openTime)
+}
 
-/** Load spot candles for the depth heatmap timeline (1m on 60m; 1s→aggregate on 15m/30m). */
+export const displayCandlesFrom1s = (
+  windowMin: HeatmapTimelineWindowMin,
+  seconds: readonly Candle[],
+  now = Date.now(),
+): Candle[] => {
+  const barMs = heatmapCandleBarMs(windowMin)
+  const windowStart = heatmapSpotWindowStartMs(windowMin, now)
+  const trimmed = seconds.filter((c) => c.openTime >= windowStart - barMs)
+  return aggregateCandles(trimmed, barMs)
+}
+
+/** Load spot candles for the depth heatmap (~60 bars). 60m uses 1m; 15m/30m use 1s→aggregate for bar density. */
 export const fetchHeatmapTimelineCandles = async (
   windowMin: HeatmapTimelineWindowMin,
   now = Date.now(),
+  opts?: { fetchStartMs?: number },
 ): Promise<Candle[]> => {
-  const barMs = heatmapCandleBarMs(windowMin)
-  const windowMs = windowMin * 60_000
-  const start = now - windowMs - HEATMAP_CANDLE_MARGIN_MS
+  const windowStart = heatmapSpotWindowStartMs(windowMin, now)
 
   if (windowMin === 60) {
-    return fetchBinanceBtc1mKlines(Math.min(1000, windowMin + 15), start)
+    const start = Math.max(windowStart, opts?.fetchStartMs ?? windowStart)
+    const incremental = opts?.fetchStartMs != null && opts.fetchStartMs > windowStart
+    const limit = incremental
+      ? Math.min(1000, Math.ceil((now - start) / 60_000) + 3)
+      : heatmapSpotKlineFetchLimit(windowMin)
+    return fetchBinanceBtc1mKlines(limit, start)
   }
 
-  const secs = await fetchBinanceBtc1sThrough(start, now + 1000)
-  return aggregateCandles(secs, barMs)
+  const start = Math.max(windowStart, opts?.fetchStartMs ?? windowStart)
+  const seconds = await fetchBinanceBtc1sThrough(start, now + 1000)
+  return displayCandlesFrom1s(windowMin, seconds, now)
+}
+
+/** Raw 1s rows for cache merge (15m/30m only). */
+export const fetchHeatmapSpot1sSegment = async (
+  windowMin: HeatmapTimelineWindowMin,
+  fetchStartMs: number,
+  now = Date.now(),
+): Promise<Candle[]> => {
+  if (windowMin === 60) return []
+  const windowStart = heatmapSpotWindowStartMs(windowMin, now)
+  const start = Math.max(windowStart, fetchStartMs)
+  return fetchBinanceBtc1sThrough(start, now + 1000)
+}
+
+export const fetchHeatmapSpot1sFullWindow = async (
+  windowMin: HeatmapTimelineWindowMin,
+  now = Date.now(),
+): Promise<Candle[]> => {
+  if (windowMin === 60) return []
+  const start = heatmapSpotWindowStartMs(windowMin, now)
+  return fetchBinanceBtc1sThrough(start, now + 1000)
+}
+
+export const mergeHeatmapSpotCandles = (
+  windowMin: HeatmapTimelineWindowMin,
+  prior: readonly Candle[] | null | undefined,
+  fresh: readonly Candle[],
+  now = Date.now(),
+): Candle[] => {
+  const windowStart = heatmapSpotWindowStartMs(windowMin, now)
+  const byTime = new Map<number, Candle>()
+  for (const c of prior ?? []) {
+    if (c.openTime >= windowStart - 60_000) byTime.set(c.openTime, c)
+  }
+  for (const c of fresh) {
+    if (c.openTime >= windowStart - 60_000) byTime.set(c.openTime, c)
+  }
+  return [...byTime.values()].sort((a, b) => a.openTime - b.openTime)
 }

@@ -1,12 +1,25 @@
 import { describe, expect, it } from 'vitest'
 import type { Candle } from './candles'
-import { aggregateCandles, heatmapCandleBarMs } from './heatmapCandleSeries'
+import {
+  aggregateCandles,
+  displayCandlesFrom1s,
+  heatmapCandleBarMs,
+  heatmapSpotKlineFetchLimit,
+  heatmapSpotWindowStartMs,
+} from './heatmapCandleSeries'
 
 describe('heatmapCandleBarMs', () => {
   it('targets ~60 bars per window', () => {
     expect(heatmapCandleBarMs(60)).toBe(60_000)
     expect(heatmapCandleBarMs(30)).toBe(30_000)
     expect(heatmapCandleBarMs(15)).toBe(15_000)
+  })
+})
+
+describe('heatmapSpotKlineFetchLimit', () => {
+  it('requests window plus margin bars only', () => {
+    expect(heatmapSpotKlineFetchLimit(15)).toBe(30)
+    expect(heatmapSpotKlineFetchLimit(60)).toBe(75)
   })
 })
 
@@ -24,5 +37,19 @@ describe('aggregateCandles', () => {
     expect(out[0]!.close).toBe(101)
     expect(out[0]!.high).toBe(102)
     expect(out[1]!.openTime).toBe(15_000)
+  })
+})
+
+describe('displayCandlesFrom1s', () => {
+  it('produces more buckets than 1m-sourced rows would on a 15m window', () => {
+    const now = 60 * 60_000
+    const windowStart = heatmapSpotWindowStartMs(15, now)
+    const seconds: Candle[] = []
+    for (let t = windowStart; t < now; t += 1000) {
+      const px = 100_000 + Math.floor((t - windowStart) / 1000)
+      seconds.push({ openTime: t, open: px, high: px + 1, low: px - 1, close: px })
+    }
+    const display = displayCandlesFrom1s(15, seconds, now)
+    expect(display.length).toBeGreaterThanOrEqual(55)
   })
 })

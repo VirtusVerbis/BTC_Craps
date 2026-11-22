@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { heatmapPriceAxis } from './depthHeatmapPriceAxis'
 import {
+  candleBarFinalizedAt,
+  inWindowCandleExtent,
+  inWindowCandleExtentForAxis,
   inWindowRefMids,
   refMidsForAxisPolicy,
   spotWindowRangeBps,
+  spotWindowRangeBpsForAxis,
+  stabilizeHeatmapPriceAxis,
   volatilityThresholdBpsForWindow,
+  HEATMAP_AXIS_SHRINK_HOLD_MS,
+  HEATMAP_AXIS_WIDEN_HOLD_MS,
 } from './depthHeatmapAxisPolicy'
 import type { HeatmapGridColumn } from './depthSessionHeatmapGrid'
 import type { HeatmapVenueMidPolylines } from './depthHeatmapVenueMids'
@@ -65,5 +72,86 @@ describe('spotWindowRangeBps', () => {
       15_000,
     )
     expect(bps).toBeGreaterThan(0)
+  })
+})
+
+describe('inWindowCandleExtentForAxis', () => {
+  const barMs = 15_000
+  const range = { start: 0, end: 60_000 }
+
+  it('ignores live spot on the forming bar', () => {
+    const formingOpen = 50_000
+    const candles = [
+      { openTime: formingOpen, open: 100_000, high: 100_020, low: 99_980, close: 100_000 },
+    ]
+    const withLive = inWindowCandleExtent(candles, range, barMs, 101_000)
+    const axisAt = formingOpen + barMs - 1
+    const forAxis = inWindowCandleExtentForAxis(candles, range, barMs, axisAt)
+    expect(withLive).toContain(101_000)
+    expect(forAxis).toHaveLength(0)
+  })
+
+  it('includes a bar after it finalizes', () => {
+    const open = 40_000
+    const candles = [
+      { openTime: open, open: 100_000, high: 100_200, low: 99_800, close: 100_000 },
+    ]
+    expect(candleBarFinalizedAt(open, barMs, open + barMs)).toBe(true)
+    const extent = inWindowCandleExtentForAxis(candles, range, barMs, open + barMs)
+    expect(extent).toEqual(expect.arrayContaining([100_200, 99_800]))
+    const bps = spotWindowRangeBpsForAxis(candles, range, barMs, open + barMs)
+    expect(bps).toBeGreaterThan(0)
+  })
+
+  it('includes forming bar on 1m heatmap bars so open candle is not clipped', () => {
+    const barMs60 = 60_000
+    const formingOpen = 50_000
+    const candles = [
+      { openTime: formingOpen, open: 100_000, high: 100_150, low: 99_850, close: 100_020 },
+    ]
+    const extent = inWindowCandleExtentForAxis(candles, range, barMs60, formingOpen + 30_000)
+    expect(extent).toEqual(expect.arrayContaining([100_150, 99_850]))
+  })
+})
+
+describe('stabilizeHeatmapPriceAxis', () => {
+  const prev = { priceMin: 99_000, priceMax: 101_000, tick: 6, rows: 40 }
+  const nextTight = { priceMin: 99_500, priceMax: 100_500, tick: 6, rows: 40 }
+
+  it('holds tighter axis briefly', () => {
+    const t0 = 1_000_000
+    const emptyState = {
+      tighterSince: null,
+      pendingMin: null,
+      pendingMax: null,
+      widerSince: null,
+      pendingWiderMin: null,
+      pendingWiderMax: null,
+    }
+    const first = stabilizeHeatmapPriceAxis(prev, nextTight, t0, emptyState)
+    expect(first.axis).toBe(prev)
+    const held = stabilizeHeatmapPriceAxis(prev, nextTight, t0 + HEATMAP_AXIS_SHRINK_HOLD_MS - 1, first.state)
+    expect(held.axis).toBe(prev)
+    const released = stabilizeHeatmapPriceAxis(prev, nextTight, t0 + HEATMAP_AXIS_SHRINK_HOLD_MS, first.state)
+    expect(released.axis).toEqual(nextTight)
+  })
+
+  it('holds wider axis briefly', () => {
+    const wider = { priceMin: 98_000, priceMax: 102_000, tick: 6, rows: 40 }
+    const emptyState = {
+      tighterSince: null,
+      pendingMin: null,
+      pendingMax: null,
+      widerSince: null,
+      pendingWiderMin: null,
+      pendingWiderMax: null,
+    }
+    const t0 = 2_000_000
+    const first = stabilizeHeatmapPriceAxis(prev, wider, t0, emptyState)
+    expect(first.axis).toBe(prev)
+    const held = stabilizeHeatmapPriceAxis(prev, wider, t0 + HEATMAP_AXIS_WIDEN_HOLD_MS - 1, first.state)
+    expect(held.axis).toBe(prev)
+    const released = stabilizeHeatmapPriceAxis(prev, wider, t0 + HEATMAP_AXIS_WIDEN_HOLD_MS, first.state)
+    expect(released.axis).toEqual(wider)
   })
 })

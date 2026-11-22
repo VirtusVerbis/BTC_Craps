@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { type Candle } from '../../data/candles'
-import { fetchHeatmapTimelineCandles, heatmapCandleBarMs } from '../../data/heatmapCandleSeries'
+import { heatmapCandleBarMs } from '../../data/heatmapCandleSeries'
+import { heatmapSpotCandlesWithLiveMid } from '../../data/heatmapSpotLiveBar'
+import {
+  HEATMAP_SPOT_CANDLE_TAIL_POLL_MS,
+  loadHeatmapSpotCandlesWithCacheSWR,
+  readHeatmapSpotCandleCache,
+} from '../../data/heatmapSpotCandleCache'
 import {
   heatmapAxisMidRangePrice,
   heatmapPriceToTopPercent,
@@ -69,11 +75,16 @@ import {
   HEATMAP_VENUE_AXIS_LABEL_VENUES,
 } from './depthHeatmapVenueAxisLabels'
 import { buildSpotKlinePolyline } from '../../data/microstructure/depthHeatmapSpotKline'
-import { computeHeatmapSessionPriceAxis } from '../../data/microstructure/depthHeatmapAxisPolicy'
+import {
+  computeHeatmapSessionPriceAxis,
+  stabilizeHeatmapPriceAxis,
+  type HeatmapAxisStabilizeState,
+} from '../../data/microstructure/depthHeatmapAxisPolicy'
 import { drawHeatmapSpotKlinePolyline } from './depthHeatmapSpotKlineLine'
 import { HeatmapSpotAvgAxisLabel } from './HeatmapSpotAvgAxisLabel'
 
-const HEATMAP_CANDLE_POLL_MS = 45_000
+/** Poll spot REST on tail cadence; full window backfill throttled in cache layer. */
+const HEATMAP_CANDLE_POLL_MS = HEATMAP_SPOT_CANDLE_TAIL_POLL_MS
 
 const STORAGE_WINDOW = 'depthTimelineWindowMin'
 
@@ -237,9 +248,29 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     tick: HEATMAP_PRICE_TICK_USD,
     rows: 40,
   }))
+  const priceAxisPaintRef = useRef(priceAxis)
+  const axisStabilizeRef = useRef<HeatmapAxisStabilizeState>({
+    tighterSince: null,
+    pendingMin: null,
+    pendingMax: null,
+    widerSince: null,
+    pendingWiderMin: null,
+    pendingWiderMax: null,
+  })
 
   const bucketCount = bucketCountForWindow(windowMin)
   const candleBarMs = heatmapCandleBarMs(windowMin)
+
+  useEffect(() => {
+    axisStabilizeRef.current = {
+      tighterSince: null,
+      pendingMin: null,
+      pendingMax: null,
+      widerSince: null,
+      pendingWiderMin: null,
+      pendingWiderMax: null,
+    }
+  }, [windowMin, bucketCount])
   const displayPlan = useMemo(() => timelineDisplayPlan(bucketCount), [bucketCount])
   const timelineNowRef = useRef(0)
   const liveTimelineNow = snapTimelineNow(micro.sampledAt)
@@ -248,6 +279,17 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
   timelineNowRef.current = timelineNow > 0 ? timelineNow : timelineNowRef.current
   const liveMid = micro.venues.binancePerp.mid
   const liveSpotMid = micro.venues.binanceSpot.mid
+
+  const candlesForPaint = useMemo(
+    () =>
+      heatmapSpotCandlesWithLiveMid(
+        candles,
+        candleBarMs,
+        timelineNow,
+        liveSpotMid > 0 ? liveSpotMid : undefined,
+      ),
+    [candles, candleBarMs, timelineNow, liveSpotMid],
+  )
 
   const heatmapViewport = useMemo(() => heatmapViewportForChartHeight(chartSize.h), [chartSize.h])
 
@@ -301,9 +343,8 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
       windowMin,
       columns,
       venueMidPolylinesTa,
-      liveMid,
-      liveSpotMid > 0 ? liveSpotMid : undefined,
       { minHalfBps: heatmapViewport.minHalfBps },
+      windowRange.end,
     )
     const latestCol = latestHeatmapColumn(columns)
     const offRange = nearestOffRangeLargePools(latestCol, axis, liveMid > 0 ? liveMid : columns[columns.length - 1]?.refMid ?? 0, undefined, heatmapViewport.bandBps)
@@ -379,9 +420,15 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
 
   useEffect(() => {
     let cancelled = false
+    setCandles(readHeatmapSpotCandleCache(windowMin) ?? [])
     const loadCandles = () => {
-      void fetchHeatmapTimelineCandles(windowMin).then((rows) => {
-        if (!cancelled) setCandles(rows)
+      void loadHeatmapSpotCandlesWithCacheSWR(
+        windowMin,
+        (rows) => {
+          if (!cancelled && rows.length > 0) setCandles(rows)
+        },
+      ).then((rows) => {
+        if (!cancelled && rows.length > 0) setCandles(rows)
       })
     }
     loadCandles()
@@ -489,17 +536,25 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     )
     const layoutCols = displayPlan.displayCols
 
-    const axis = computeHeatmapSessionPriceAxis(
+    const rawAxis = computeHeatmapSessionPriceAxis(
       candles,
       timeRange,
       candleBarMs,
       windowMin,
       columns,
       venueMidPolylines,
-      liveMid,
-      liveSpotMid > 0 ? liveSpotMid : undefined,
       { minHalfBps: heatmapViewport.minHalfBps },
+      windowRange.end,
     )
+    const stabilized = stabilizeHeatmapPriceAxis(
+      priceAxisPaintRef.current,
+      rawAxis,
+      timelineNow,
+      axisStabilizeRef.current,
+    )
+    axisStabilizeRef.current = stabilized.state
+    const axis = stabilized.axis
+    priceAxisPaintRef.current = axis
     setPriceAxis(axis)
 
     const windowMax = heatmapGridMax(columns)
@@ -531,7 +586,7 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
       maxVal,
       axis,
       liveMid,
-      candles,
+      candlesForPaint,
       timeRange,
       candleBarMs,
       offRange,
@@ -566,6 +621,7 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     liveMid,
     liveSpotMid,
     candles,
+    candlesForPaint,
     venueMidHistory,
     candleBarMs,
     windowMin,
@@ -604,7 +660,7 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     return buildHeatmapVenueAxisLabels(
       HEATMAP_VENUE_AXIS_LABEL_VENUES,
       venueMidHistory,
-      candles,
+      candlesForPaint,
       priceAxis,
       timeRange,
       candleBarMs,
@@ -618,7 +674,7 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     timelineNow,
     displayPlan.groupSize,
     venueMidHistory,
-    candles,
+    candlesForPaint,
     priceAxis,
     candleBarMs,
     chartSize.h,
