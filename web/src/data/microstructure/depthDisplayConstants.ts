@@ -12,6 +12,8 @@ export const DEPTH_EMIT_MS = 1_250
 export const DEPTH_WINDOW_15_MIN_BUCKETS = 360
 export const DEPTH_WINDOW_30_MIN_BUCKETS = 720
 export const DEPTH_WINDOW_60_MIN_BUCKETS = 1440
+/** Session heatmap 24h window (depth color still ~60m live tail only). */
+export const DEPTH_WINDOW_24H_BUCKETS = 34_560
 
 /** Ring buffer size (60m at {@link DEPTH_SAMPLE_MS}). */
 export const DEPTH_SAMPLE_CAP = DEPTH_WINDOW_60_MIN_BUCKETS

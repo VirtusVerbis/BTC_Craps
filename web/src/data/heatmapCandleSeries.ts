@@ -1,6 +1,13 @@
 import { type Candle, fetchBinanceBtc1mKlines, fetchBinanceBtcKlines } from './candles'
 
-export type HeatmapTimelineWindowMin = 15 | 30 | 60
+export type HeatmapTimelineWindowMin = 15 | 30 | 60 | 1440
+
+/** 24h session heatmap (`windowMin` = minutes in a day). */
+export const HEATMAP_WINDOW_24H_MIN = 1440 as const
+
+/** 60m+ spot paths use 1m Binance klines instead of 1s backfill. */
+export const heatmapWindowUses1mKlines = (windowMin: HeatmapTimelineWindowMin): boolean =>
+  windowMin === 60 || windowMin === HEATMAP_WINDOW_24H_MIN
 
 /** Bar period so each window fits ~60 candles across the chart (same spacing as 60m × 1m). */
 export const heatmapCandleBarMs = (windowMin: HeatmapTimelineWindowMin): number => {
@@ -34,7 +41,9 @@ export const aggregateCandles = (candles: readonly Candle[], bucketMs: number): 
 export const HEATMAP_CANDLE_MARGIN_MS = 2 * 60_000
 
 export const heatmapSpotKlineFetchLimit = (windowMin: HeatmapTimelineWindowMin): number =>
-  Math.min(1000, windowMin + 15)
+  windowMin === HEATMAP_WINDOW_24H_MIN
+    ? Math.min(1500, windowMin + 15)
+    : Math.min(1000, windowMin + 15)
 
 export const heatmapSpotWindowStartMs = (windowMin: HeatmapTimelineWindowMin, now = Date.now()): number =>
   now - windowMin * 60_000 - HEATMAP_CANDLE_MARGIN_MS
@@ -55,6 +64,26 @@ const fetchBinanceBtc1sThrough = async (startTime: number, endTime: number): Pro
     const last = batch[batch.length - 1]!.openTime
     if (last <= cursor) break
     cursor = last + 1000
+    if (batch.length < 1000) break
+  }
+  return out
+}
+
+export const fetchBinanceBtc1mThrough = async (startTime: number, endTime: number): Promise<Candle[]> => {
+  const out: Candle[] = []
+  let cursor = Math.floor(startTime)
+  const end = Math.floor(endTime)
+  const maxPages = 4
+  for (let guard = 0; guard < maxPages && cursor < end; guard++) {
+    const batch = await fetchBinanceBtc1mKlines(1000, cursor)
+    if (batch.length === 0) break
+    for (const c of batch) {
+      if (c.openTime > end) break
+      if (c.openTime >= startTime) out.push(c)
+    }
+    const last = batch[batch.length - 1]!.openTime
+    if (last <= cursor) break
+    cursor = last + 60_000
     if (batch.length < 1000) break
   }
   return out
@@ -89,7 +118,17 @@ export const displayCandlesFrom1s = (
   return aggregateCandles(trimmed, barMs)
 }
 
-/** Load spot candles for the depth heatmap (~60 bars). 60m uses 1m; 15m/30m use 1s→aggregate for bar density. */
+/** Spot candles aggregated for chart paint (24h stores 1m in cache). */
+export const heatmapSpotCandlesForChart = (
+  windowMin: HeatmapTimelineWindowMin,
+  candles: readonly Candle[],
+): Candle[] => {
+  if (windowMin !== HEATMAP_WINDOW_24H_MIN || candles.length === 0) return [...candles]
+  const barMs = heatmapCandleBarMs(windowMin)
+  return aggregateCandles(candles, barMs)
+}
+
+/** Load spot candles for the depth heatmap (~60 bars). 60m/24h use 1m; 15m/30m use 1s→aggregate. */
 export const fetchHeatmapTimelineCandles = async (
   windowMin: HeatmapTimelineWindowMin,
   now = Date.now(),
@@ -97,13 +136,20 @@ export const fetchHeatmapTimelineCandles = async (
 ): Promise<Candle[]> => {
   const windowStart = heatmapSpotWindowStartMs(windowMin, now)
 
-  if (windowMin === 60) {
+  if (heatmapWindowUses1mKlines(windowMin)) {
     const start = Math.max(windowStart, opts?.fetchStartMs ?? windowStart)
     const incremental = opts?.fetchStartMs != null && opts.fetchStartMs > windowStart
-    const limit = incremental
-      ? Math.min(1000, Math.ceil((now - start) / 60_000) + 3)
-      : heatmapSpotKlineFetchLimit(windowMin)
-    return fetchBinanceBtc1mKlines(limit, start)
+    if (windowMin === 60) {
+      const limit = incremental
+        ? Math.min(1000, Math.ceil((now - start) / 60_000) + 3)
+        : heatmapSpotKlineFetchLimit(windowMin)
+      return fetchBinanceBtc1mKlines(limit, start)
+    }
+    if (incremental) {
+      const limit = Math.min(1000, Math.ceil((now - start) / 60_000) + 3)
+      return fetchBinanceBtc1mKlines(limit, start)
+    }
+    return fetchBinanceBtc1mThrough(start, now + 60_000)
   }
 
   const start = Math.max(windowStart, opts?.fetchStartMs ?? windowStart)
@@ -117,7 +163,7 @@ export const fetchHeatmapSpot1sSegment = async (
   fetchStartMs: number,
   now = Date.now(),
 ): Promise<Candle[]> => {
-  if (windowMin === 60) return []
+  if (heatmapWindowUses1mKlines(windowMin)) return []
   const windowStart = heatmapSpotWindowStartMs(windowMin, now)
   const start = Math.max(windowStart, fetchStartMs)
   return fetchBinanceBtc1sThrough(start, now + 1000)
@@ -127,7 +173,7 @@ export const fetchHeatmapSpot1sFullWindow = async (
   windowMin: HeatmapTimelineWindowMin,
   now = Date.now(),
 ): Promise<Candle[]> => {
-  if (windowMin === 60) return []
+  if (heatmapWindowUses1mKlines(windowMin)) return []
   const start = heatmapSpotWindowStartMs(windowMin, now)
   return fetchBinanceBtc1sThrough(start, now + 1000)
 }

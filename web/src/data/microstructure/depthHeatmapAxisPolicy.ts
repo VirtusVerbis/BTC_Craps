@@ -1,6 +1,6 @@
 import type { Candle } from '../candles'
 import { candleOpenTimeMs } from '../heatmapVenueMidHistory'
-import type { HeatmapTimelineWindowMin } from '../heatmapCandleSeries'
+import { heatmapWindowUses1mKlines, type HeatmapTimelineWindowMin } from '../heatmapCandleSeries'
 import type { HeatmapTimeRange } from '../../ui/depth/depthHeatmapCandles'
 import type { HeatmapGridColumn } from './depthSessionHeatmapGrid'
 import type { HeatmapVenueMidPolylines } from './depthHeatmapVenueMids'
@@ -10,7 +10,7 @@ import type { HeatmapPriceAxisOpts } from './depthHeatmapPriceAxis'
 
 /** Volatility bps threshold at 30m; scales linearly with window length. */
 export const volatilityThresholdBpsForWindow = (windowMin: HeatmapTimelineWindowMin): number =>
-  15 * (windowMin / 30)
+  windowMin === 1440 ? 60 : 15 * (windowMin / 30)
 
 const columnIntersectsRange = (
   col: HeatmapGridColumn,
@@ -269,6 +269,6 @@ export const computeHeatmapSessionPriceAxis = (
   const volBps = spotWindowRangeBpsForAxis(candles, timeRange, barMs, timelineNow)
   const fullRefMids = inWindowRefMidsForAxis(columns, polylines, timeRange)
   const refMids =
-    windowMin === 60 ? [...fullRefMids] : refMidsForAxisPolicy(volBps, threshold, fullRefMids)
+    heatmapWindowUses1mKlines(windowMin) ? [...fullRefMids] : refMidsForAxisPolicy(volBps, threshold, fullRefMids)
   return heatmapPriceAxis(candleExtent, refMids, undefined, axisOpts)
 }

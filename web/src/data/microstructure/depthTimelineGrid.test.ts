@@ -126,6 +126,12 @@ describe('alignDepthSamplesToGrid', () => {
     expect(plan.canvasWidth).toBeGreaterThanOrEqual(plan.displayCols * 6)
   })
 
+  it('reduces 24h heatmap buckets to ~180 display columns', () => {
+    const plan = timelineDisplayPlan(34_560)
+    expect(plan.groupSize).toBe(192)
+    expect(plan.displayCols).toBe(180)
+  })
+
   it('heatmap canvas metrics always fit viewport', () => {
     const fit = heatmapCanvasMetricsFit(180, 400)
     expect(fit.width).toBe(400)

@@ -1,10 +1,11 @@
 import { env } from '../config/env'
 import type { Candle } from './candles'
 import { exchangeRestBase } from './exchangeRestBase'
-import { fetchBinanceFuturesBtc1mKlines } from './binanceFuturesCandles'
+import { fetchBinanceFuturesBtc1mKlines, fetchBinanceFuturesBtc1mThrough } from './binanceFuturesCandles'
 import {
   aggregateCandles,
   HEATMAP_CANDLE_MARGIN_MS,
+  HEATMAP_WINDOW_24H_MIN,
   heatmapCandleBarMs,
   type HeatmapTimelineWindowMin,
 } from './heatmapCandleSeries'
@@ -73,11 +74,18 @@ const binancePerpCandlesForWindow = async (
   windowMin: HeatmapTimelineWindowMin,
   start: number,
   barMs: number,
+  endMs: number,
 ): Promise<Candle[]> => {
-  const limit = Math.min(1000, windowMin + 30)
-  let rows = await fetchBinanceFuturesBtc1mKlines(limit, start)
-  if (rows.length < 2) rows = await fetchBinanceFuturesBtc1mKlines(limit)
+  let rows: Candle[]
+  if (windowMin === HEATMAP_WINDOW_24H_MIN) {
+    rows = await fetchBinanceFuturesBtc1mThrough(start, endMs)
+  } else {
+    const limit = Math.min(1000, windowMin + 30)
+    rows = await fetchBinanceFuturesBtc1mKlines(limit, start)
+    if (rows.length < 2) rows = await fetchBinanceFuturesBtc1mKlines(limit)
+  }
   if (windowMin === 60) return rows
+  if (windowMin === HEATMAP_WINDOW_24H_MIN) return aggregateCandles(rows, barMs)
   return aggregateCandles(rows, barMs)
 }
 
@@ -300,6 +308,7 @@ const fetchHyperliquidCandles = async (startMs: number, endMs: number, barMs: nu
 const normalizeToBarMs = (candles: readonly Candle[], barMs: number, windowMin: HeatmapTimelineWindowMin): Candle[] => {
   if (candles.length === 0) return []
   if (windowMin === 60 && barMs >= 60_000) return normalizeCandleTimes(candles)
+  if (windowMin === HEATMAP_WINDOW_24H_MIN) return aggregateCandles(normalizeCandleTimes(candles), barMs)
   if (barMs < 60_000) return aggregateCandles(normalizeCandleTimes(candles), barMs)
   return aggregateCandles(normalizeCandleTimes(candles), barMs)
 }
@@ -330,7 +339,7 @@ export const fetchHeatmapVenueMidHistory = async (
       venue: 'binancePerp',
       fetch: () =>
         safeVenueMidFetch(async () => ({
-          candles: await binancePerpCandlesForWindow(windowMin, start, barMs),
+          candles: await binancePerpCandlesForWindow(windowMin, start, barMs, now),
           rateLimited: false,
         })),
     },

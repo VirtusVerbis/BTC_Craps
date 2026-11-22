@@ -1,6 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { type Candle } from '../../data/candles'
-import { heatmapCandleBarMs } from '../../data/heatmapCandleSeries'
+import {
+  heatmapCandleBarMs,
+  heatmapSpotCandlesForChart,
+  HEATMAP_WINDOW_24H_MIN,
+  type HeatmapTimelineWindowMin,
+} from '../../data/heatmapCandleSeries'
 import { heatmapSpotCandlesWithLiveMid } from '../../data/heatmapSpotLiveBar'
 import {
   HEATMAP_SPOT_CANDLE_TAIL_POLL_MS,
@@ -22,6 +27,7 @@ import {
   type HeatmapGridColumn,
 } from '../../data/microstructure/depthSessionHeatmapGrid'
 import { heatmapViewportForChartHeight } from '../../data/microstructure/depthHeatmapViewport'
+import { DEPTH_WINDOW_24H_BUCKETS } from '../../data/microstructure/depthDisplayConstants'
 import {
   advanceTimelineScale,
   heatmapCanvasMetricsFit,
@@ -108,31 +114,49 @@ import { HeatmapDailyMaRailLabels, heatmapDailyMaRailAria } from './HeatmapDaily
 /** Poll spot REST on tail cadence; full window backfill throttled in cache layer. */
 const HEATMAP_CANDLE_POLL_MS = HEATMAP_SPOT_CANDLE_TAIL_POLL_MS
 
-const STORAGE_WINDOW = 'depthTimelineWindowMin'
+const STORAGE_HEATMAP_WINDOW = 'depthHeatmapWindowMin'
+const STORAGE_TIMELINE_WINDOW_LEGACY = 'depthTimelineWindowMin'
 
-type TimelineWindowMin = 15 | 30 | 60
+type HeatmapWindowMin = HeatmapTimelineWindowMin
 
-const readWindowMin = (): TimelineWindowMin => {
+const readWindowMin = (): HeatmapWindowMin => {
   try {
-    const v = sessionStorage.getItem(STORAGE_WINDOW)
+    let v = sessionStorage.getItem(STORAGE_HEATMAP_WINDOW)
+    if (v == null) {
+      v = sessionStorage.getItem(STORAGE_TIMELINE_WINDOW_LEGACY)
+    }
     if (v === '15') return 15
     if (v === '30') return 30
     if (v === '60') return 60
+    if (v === '1440') return HEATMAP_WINDOW_24H_MIN
     return 15
   } catch {
     return 15
   }
 }
 
-const bucketCountForWindow = (windowMin: TimelineWindowMin): number => {
+const bucketCountForWindow = (windowMin: HeatmapWindowMin): number => {
   if (windowMin === 15) return DEPTH_WINDOW_15_MIN_BUCKETS
   if (windowMin === 30) return DEPTH_WINDOW_30_MIN_BUCKETS
+  if (windowMin === HEATMAP_WINDOW_24H_MIN) return DEPTH_WINDOW_24H_BUCKETS
   return DEPTH_WINDOW_60_MIN_BUCKETS
 }
 
 const HEATMAP_CHART_FALLBACK_H = 400
 const HEATMAP_CHART_MIN_H = 120
 const HEATMAP_PROFILE_RAIL_W = 32
+
+const emptyAxisStabilize = (): HeatmapAxisStabilizeState => ({
+  tighterSince: null,
+  pendingMin: null,
+  pendingMax: null,
+  widerSince: null,
+  pendingWiderMin: null,
+  pendingWiderMax: null,
+})
+
+/** Skip Y-axis easing after window change so scale snaps to new candles/polylines. */
+const HEATMAP_AXIS_WINDOW_WARMUP_MS = 2_500
 
 /** Canvas height follows the chart row slot; do not inflate above the row (panel uses overflow hidden). */
 const heatmapSlotHeightPx = (row: HTMLElement | null, fallbackMin: number): number => {
@@ -261,7 +285,7 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
   const [frozenTimelineEnd, setFrozenTimelineEnd] = useState<number | null>(null)
   const [taAnnounce, setTaAnnounce] = useState<string | null>(null)
   const openInterest = useOpenInterest()
-  const [windowMin, setWindowMin] = useState<TimelineWindowMin>(readWindowMin())
+  const [windowMin, setWindowMin] = useState<HeatmapWindowMin>(readWindowMin())
   const [chartSize, setChartSize] = useState({ w: 900, h: 400 })
   const [axisMaxUsd, setAxisMaxUsd] = useState(1)
   const [candles, setCandles] = useState<Candle[]>([])
@@ -277,6 +301,7 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     rows: 40,
   }))
   const priceAxisPaintRef = useRef(priceAxis)
+  const axisWarmupUntilMsRef = useRef(0)
   const axisStabilizeRef = useRef<HeatmapAxisStabilizeState>({
     tighterSince: null,
     pendingMin: null,
@@ -289,16 +314,25 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
   const bucketCount = bucketCountForWindow(windowMin)
   const candleBarMs = heatmapCandleBarMs(windowMin)
 
-  useEffect(() => {
-    axisStabilizeRef.current = {
-      tighterSince: null,
-      pendingMin: null,
-      pendingMax: null,
-      widerSince: null,
-      pendingWiderMin: null,
-      pendingWiderMax: null,
-    }
+  const markHeatmapWindowWarmup = () => {
+    axisWarmupUntilMsRef.current = Date.now() + HEATMAP_AXIS_WINDOW_WARMUP_MS
+    scaleStateRef.current = { tick: 0, max: 1 }
+    axisStabilizeRef.current = emptyAxisStabilize()
+    setAxisMaxUsd(1)
+  }
+
+  const applyHeatmapWindowChange = (next: HeatmapWindowMin) => {
+    markHeatmapWindowWarmup()
+    setOffRangePools({ above: null, below: null })
+    setCandles(readHeatmapSpotCandleCache(next) ?? [])
+    setVenueMidHistory(readVenueMidHistoryCache(next))
+    setWindowMin(next)
+  }
+
+  useLayoutEffect(() => {
+    markHeatmapWindowWarmup()
   }, [windowMin, bucketCount])
+
   const displayPlan = useMemo(() => timelineDisplayPlan(bucketCount), [bucketCount])
   const timelineNowRef = useRef(0)
   const liveTimelineNow = snapTimelineNow(micro.sampledAt)
@@ -308,20 +342,25 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
   const liveMid = micro.venues.binancePerp.mid
   const liveSpotMid = micro.venues.binanceSpot.mid
 
+  const heatmapChartCandles = useMemo(
+    () => heatmapSpotCandlesForChart(windowMin, candles),
+    [windowMin, candles],
+  )
+
   const candlesForPaint = useMemo(
     () =>
       heatmapSpotCandlesWithLiveMid(
-        candles,
+        heatmapChartCandles,
         candleBarMs,
         timelineNow,
         liveSpotMid > 0 ? liveSpotMid : undefined,
       ),
-    [candles, candleBarMs, timelineNow, liveSpotMid],
+    [heatmapChartCandles, candleBarMs, timelineNow, liveSpotMid],
   )
 
   const heatmapViewport = useMemo(() => heatmapViewportForChartHeight(chartSize.h), [chartSize.h])
 
-  const ta = useTaCarousel({ enabled: taEnabled, candles })
+  const ta = useTaCarousel({ enabled: taEnabled, candles: heatmapChartCandles })
 
   const samplesByVenue = useMemo(() => {
     const out = {} as Record<(typeof DEPTH_VENUE_ORDER)[number], (typeof micro.venues)[keyof typeof micro.venues]['depthSamples']>
@@ -336,7 +375,7 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
   const taWallLine = useMemo(() => {
     if (!taEnabled || ta.instances.length === 0) return null
     const inst = ta.instances[0]!
-    const anchor = candles[inst.anchorIndex]
+    const anchor = heatmapChartCandles[inst.anchorIndex]
     if (!anchor) return null
     const mergedColumns = buildMergedSessionHeatmap(
       samplesByVenue.out,
@@ -365,7 +404,7 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
       windowRange.end,
     )
     const axis = computeHeatmapSessionPriceAxis(
-      candles,
+      heatmapChartCandles,
       timeRangeTa,
       candleBarMs,
       windowMin,
@@ -389,7 +428,7 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
   }, [
     taEnabled,
     ta.instances,
-    candles,
+    heatmapChartCandles,
     samplesByVenue,
     bucketCount,
     timelineNow,
@@ -414,7 +453,7 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     const timeRange = { start: windowRange.start, end: windowRange.end }
     return taStripPlacementForInstances(
       ta.instances,
-      candles,
+      heatmapChartCandles,
       chartSize.w,
       chartSize.h,
       priceAxis,
@@ -424,7 +463,7 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
   }, [
     taEnabled,
     ta.instances,
-    candles,
+    heatmapChartCandles,
     chartSize.w,
     chartSize.h,
     priceAxis,
@@ -436,31 +475,28 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
 
   useEffect(() => {
     try {
-      sessionStorage.setItem(STORAGE_WINDOW, String(windowMin))
+      sessionStorage.setItem(STORAGE_HEATMAP_WINDOW, String(windowMin))
     } catch {
       /* ignore */
     }
   }, [windowMin])
 
   useEffect(() => {
-    scaleStateRef.current = { tick: 0, max: 1 }
-  }, [bucketCount])
-
-  useEffect(() => {
     let cancelled = false
-    setCandles(readHeatmapSpotCandleCache(windowMin) ?? [])
-    const loadCandles = () => {
+    const loadCandles = (forceRefresh: boolean) => {
       void loadHeatmapSpotCandlesWithCacheSWR(
         windowMin,
         (rows) => {
           if (!cancelled && rows.length > 0) setCandles(rows)
         },
+        Date.now(),
+        { forceRefresh },
       ).then((rows) => {
         if (!cancelled && rows.length > 0) setCandles(rows)
       })
     }
-    loadCandles()
-    const candleId = window.setInterval(loadCandles, HEATMAP_CANDLE_POLL_MS)
+    loadCandles(true)
+    const candleId = window.setInterval(() => loadCandles(false), HEATMAP_CANDLE_POLL_MS)
     return () => {
       cancelled = true
       window.clearInterval(candleId)
@@ -468,12 +504,8 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
   }, [windowMin])
 
   useEffect(() => {
-    setVenueMidHistory(readVenueMidHistoryCache(windowMin))
-  }, [windowMin])
-
-  useEffect(() => {
     let cancelled = false
-    const loadVenueMids = () => {
+    const loadVenueMids = (forceRefresh: boolean) => {
       const endMs = Date.now()
       const axisEnd = timelineNowRef.current > 0 ? timelineNowRef.current : endMs
       const windowRange = heatmapWindowTimeRange(bucketCount, axisEnd, displayPlan.groupSize)
@@ -489,6 +521,7 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
         },
         bounds,
         endMs,
+        { forceRefresh },
       )
         .then((rows) => {
           if (!cancelled) setVenueMidHistory(rows)
@@ -497,8 +530,8 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
           if (import.meta.env.DEV) console.warn('[DepthSessionHeatmap] venue mid history load failed', err)
         })
     }
-    loadVenueMids()
-    const midId = window.setInterval(loadVenueMids, HEATMAP_VENUE_MID_POLL_MS)
+    loadVenueMids(true)
+    const midId = window.setInterval(() => loadVenueMids(false), HEATMAP_VENUE_MID_POLL_MS)
     return () => {
       cancelled = true
       window.clearInterval(midId)
@@ -615,7 +648,7 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     const layoutCols = displayPlan.displayCols
 
     const rawAxis = computeHeatmapSessionPriceAxis(
-      candles,
+      heatmapChartCandles,
       timeRange,
       candleBarMs,
       windowMin,
@@ -624,12 +657,15 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
       { minHalfBps: heatmapViewport.minHalfBps },
       windowRange.end,
     )
-    const stabilized = stabilizeHeatmapPriceAxis(
-      priceAxisPaintRef.current,
-      rawAxis,
-      timelineNow,
-      axisStabilizeRef.current,
-    )
+    const axisWarmup = Date.now() < axisWarmupUntilMsRef.current
+    const stabilized = axisWarmup
+      ? { axis: rawAxis, state: emptyAxisStabilize() }
+      : stabilizeHeatmapPriceAxis(
+          priceAxisPaintRef.current,
+          rawAxis,
+          timelineNow,
+          axisStabilizeRef.current,
+        )
     axisStabilizeRef.current = stabilized.state
     const axis = stabilized.axis
     priceAxisPaintRef.current = axis
@@ -814,23 +850,30 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
           <button
             type="button"
             className={windowMin === 15 ? 'depth-toggle depth-toggle-active' : 'depth-toggle'}
-            onClick={() => setWindowMin(15)}
+            onClick={() => applyHeatmapWindowChange(15)}
           >
             15m
           </button>
           <button
             type="button"
             className={windowMin === 30 ? 'depth-toggle depth-toggle-active' : 'depth-toggle'}
-            onClick={() => setWindowMin(30)}
+            onClick={() => applyHeatmapWindowChange(30)}
           >
             30m
           </button>
           <button
             type="button"
             className={windowMin === 60 ? 'depth-toggle depth-toggle-active' : 'depth-toggle'}
-            onClick={() => setWindowMin(60)}
+            onClick={() => applyHeatmapWindowChange(60)}
           >
             60m
+          </button>
+          <button
+            type="button"
+            className={windowMin === HEATMAP_WINDOW_24H_MIN ? 'depth-toggle depth-toggle-active' : 'depth-toggle'}
+            onClick={() => applyHeatmapWindowChange(HEATMAP_WINDOW_24H_MIN)}
+          >
+            24h
           </button>
         </div>
       </div>

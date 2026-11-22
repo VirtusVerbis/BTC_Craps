@@ -142,18 +142,21 @@ export const loadHeatmapVenueMidHistoryWithCache = async (
   return merged
 }
 
+export type HeatmapVenueMidLoadOpts = { forceRefresh?: boolean }
+
 /** Stale-while-revalidate: may return cached history immediately via `onCached`. */
 export const loadHeatmapVenueMidHistoryWithCacheSWR = async (
   windowMin: HeatmapTimelineWindowMin,
   onCached: (history: VenueMidHistory) => void,
   bounds?: HeatmapVenueMidFetchBounds,
   now = Date.now(),
+  opts?: HeatmapVenueMidLoadOpts,
 ): Promise<VenueMidHistory> => {
   const barMs = heatmapCandleBarMs(windowMin)
   const cached = readVenueMidHistoryCache(windowMin, barMs)
   if (cached) onCached(cached)
 
-  if (isVenueMidHistoryCacheFresh(windowMin, now, barMs) && cached) {
+  if (!opts?.forceRefresh && isVenueMidHistoryCacheFresh(windowMin, now, barMs) && cached) {
     return cached
   }
 

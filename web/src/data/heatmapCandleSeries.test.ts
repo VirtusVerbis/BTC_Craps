@@ -13,6 +13,7 @@ describe('heatmapCandleBarMs', () => {
     expect(heatmapCandleBarMs(60)).toBe(60_000)
     expect(heatmapCandleBarMs(30)).toBe(30_000)
     expect(heatmapCandleBarMs(15)).toBe(15_000)
+    expect(heatmapCandleBarMs(1440)).toBe(1_440_000)
   })
 })
 

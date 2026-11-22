@@ -6,6 +6,7 @@ import {
   fetchHeatmapTimelineCandles,
   heatmapCandleBarMs,
   heatmapSpotWindowStartMs,
+  heatmapWindowUses1mKlines,
   mergeHeatmapSpot1sCandles,
   mergeHeatmapSpotCandles,
   type HeatmapTimelineWindowMin,
@@ -62,7 +63,7 @@ const writeStored = (
 const storedUsable = (stored: StoredSpotCache | null, barMs: number, windowMin: HeatmapTimelineWindowMin): boolean => {
   if (!stored || stored.barMs !== barMs) return false
   if (stored.candles.length < 2) return false
-  if (windowMin !== 60 && (!stored.raw1s || stored.raw1s.length < 10)) return false
+  if (!heatmapWindowUses1mKlines(windowMin) && (!stored.raw1s || stored.raw1s.length < 10)) return false
   return true
 }
 
@@ -140,11 +141,14 @@ const refreshHourSpot = async (
   return mergeHeatmapSpotCandles(windowMin, priorCandles, fresh, now)
 }
 
+export type HeatmapSpotCandleLoadOpts = { forceRefresh?: boolean }
+
 /** Stale-while-revalidate: paints cached candles immediately, then tail or full refresh. */
 export const loadHeatmapSpotCandlesWithCacheSWR = async (
   windowMin: HeatmapTimelineWindowMin,
   onCached: (candles: Candle[]) => void,
   now = Date.now(),
+  opts?: HeatmapSpotCandleLoadOpts,
 ): Promise<Candle[]> => {
   const barMs = heatmapCandleBarMs(windowMin)
   const stored = readStored(windowMin)
@@ -154,13 +158,13 @@ export const loadHeatmapSpotCandlesWithCacheSWR = async (
   const fullFresh = isHeatmapSpotCandleCacheFresh(windowMin, now, barMs)
   const tailDue = isHeatmapSpotTailRefreshDue(windowMin, now, barMs)
 
-  if (fullFresh && !tailDue && cached) {
+  if (!opts?.forceRefresh && fullFresh && !tailDue && cached) {
     return cached
   }
 
-  const forceFullWindow = !fullFresh
+  const forceFullWindow = !fullFresh || opts?.forceRefresh === true
 
-  if (windowMin === 60) {
+  if (heatmapWindowUses1mKlines(windowMin)) {
     const merged = await refreshHourSpot(windowMin, stored, now)
     if (merged.length >= 2) writeStored(windowMin, barMs, merged, now)
     return merged.length >= 2 ? merged : cached ?? merged

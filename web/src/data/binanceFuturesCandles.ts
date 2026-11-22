@@ -44,3 +44,23 @@ export const fetchBinanceFuturesBtcKlines = async (
 
 export const fetchBinanceFuturesBtc1mKlines = (limit = 200, startTime?: number): Promise<Candle[]> =>
   fetchBinanceFuturesBtcKlines('1m', limit, startTime)
+
+export const fetchBinanceFuturesBtc1mThrough = async (startTime: number, endTime: number): Promise<Candle[]> => {
+  const out: Candle[] = []
+  let cursor = Math.floor(startTime)
+  const end = Math.floor(endTime)
+  const maxPages = 4
+  for (let guard = 0; guard < maxPages && cursor < end; guard++) {
+    const batch = await fetchBinanceFuturesBtc1mKlines(1000, cursor)
+    if (batch.length === 0) break
+    for (const c of batch) {
+      if (c.openTime > end) break
+      if (c.openTime >= startTime) out.push(c)
+    }
+    const last = batch[batch.length - 1]!.openTime
+    if (last <= cursor) break
+    cursor = last + 60_000
+    if (batch.length < 1000) break
+  }
+  return out
+}

@@ -213,8 +213,10 @@ export const resolveVenueMidPolylines = (
     const sampleSegs = streamed ? (fromSamples[venue] ?? []) : []
     const snap = micro.venues[venue]
     const liveMid = snap?.status === 'connected' && snap.mid > 0 ? snap.mid : 0
-    const historyPoints =
+    const pad = Math.max(60_000, barMs)
+    const historyPoints = (
       history != null ? midPointsFromCandleHistory(history[venue] ?? [], barMs) : []
+    ).filter((p) => p.t >= rangeStart - pad && p.t <= rangeEnd + pad)
     out[venue] = stitchHistoryMidPolylinesToSamples(historyPoints, sampleSegs, liveMid, rangeEnd)
     if (out[venue].length === 0 && sampleSegs.length > 0) {
       out[venue] = sampleSegs.filter((s) => s.length >= 2)

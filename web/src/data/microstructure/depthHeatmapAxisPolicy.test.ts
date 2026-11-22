@@ -28,6 +28,7 @@ describe('volatilityThresholdBpsForWindow', () => {
   it('scales from 30m baseline', () => {
     expect(volatilityThresholdBpsForWindow(30)).toBe(15)
     expect(volatilityThresholdBpsForWindow(15)).toBe(7.5)
+    expect(volatilityThresholdBpsForWindow(1440)).toBe(60)
   })
 })
 
