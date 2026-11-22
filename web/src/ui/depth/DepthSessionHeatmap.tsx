@@ -112,6 +112,19 @@ import {
 } from './depthHeatmapDailyMaLines'
 import { HeatmapDailyMaCrossStrip } from './HeatmapDailyMaCrossStrip'
 import { HeatmapDailyMaRailLabels, heatmapDailyMaRailAria } from './HeatmapDailyMaRailLabels'
+import {
+  flushHeatmapDepthPersistedColumns,
+  loadHeatmapDepthPersistedColumns,
+} from '../../data/heatmapDepthPersistDb'
+import {
+  HEATMAP_DEPTH_PERSIST_FLUSH_MS,
+  type HeatmapDepthPersistedColumn,
+} from '../../data/heatmapDepthPersistTypes'
+import {
+  heatmapDepthPersistedColumnLive,
+  mergePersistedDepthIntoLiveColumns,
+  upsertPersistedDepthColumns,
+} from '../../data/heatmapDepthPersistMerge'
 
 /** Poll spot REST on tail cadence; full window backfill throttled in cache layer. */
 const HEATMAP_CANDLE_POLL_MS = HEATMAP_SPOT_CANDLE_TAIL_POLL_MS
@@ -323,6 +336,10 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     pendingWiderMin: null,
     pendingWiderMax: null,
   })
+  const depthPersistForPaintRef = useRef<HeatmapDepthPersistedColumn[]>([])
+  const depthPersistFlushBatchRef = useRef<HeatmapDepthPersistedColumn[]>([])
+  const depthPersistFlushTimerRef = useRef<number | null>(null)
+  const [depthPersistHydrated, setDepthPersistHydrated] = useState(0)
 
   const bucketCount = bucketCountForWindow(windowMin)
   const candleBarMs = heatmapCandleBarMs(windowMin)
@@ -390,6 +407,57 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     }
     return { out, statuses }
   }, [micro.venues])
+
+  const flushDepthPersistNow = () => {
+    if (depthPersistFlushTimerRef.current != null) {
+      window.clearTimeout(depthPersistFlushTimerRef.current)
+      depthPersistFlushTimerRef.current = null
+    }
+    const batch = depthPersistFlushBatchRef.current
+    if (batch.length === 0) return
+    depthPersistFlushBatchRef.current = []
+    void flushHeatmapDepthPersistedColumns(batch).then(() => {
+      void loadHeatmapDepthPersistedColumns().then((cols) => {
+        depthPersistForPaintRef.current = cols
+      })
+    })
+  }
+
+  const queueDepthPersistFromColumns = (liveFullBand: readonly HeatmapGridColumn[]) => {
+    const incoming: HeatmapDepthPersistedColumn[] = []
+    for (const col of liveFullBand) {
+      const row = heatmapDepthPersistedColumnLive(col)
+      if (row) incoming.push(row)
+    }
+    if (incoming.length === 0) return
+    depthPersistForPaintRef.current = upsertPersistedDepthColumns(depthPersistForPaintRef.current, incoming)
+    depthPersistFlushBatchRef.current = upsertPersistedDepthColumns(
+      depthPersistFlushBatchRef.current,
+      incoming,
+    )
+    if (depthPersistFlushTimerRef.current != null) return
+    depthPersistFlushTimerRef.current = window.setTimeout(() => {
+      depthPersistFlushTimerRef.current = null
+      flushDepthPersistNow()
+    }, HEATMAP_DEPTH_PERSIST_FLUSH_MS)
+  }
+
+  useEffect(() => {
+    void loadHeatmapDepthPersistedColumns().then((cols) => {
+      depthPersistForPaintRef.current = cols
+      setDepthPersistHydrated((n) => n + 1)
+    })
+    const onHide = () => {
+      if (document.visibilityState === 'hidden') flushDepthPersistNow()
+    }
+    window.addEventListener('pagehide', flushDepthPersistNow)
+    document.addEventListener('visibilitychange', onHide)
+    return () => {
+      flushDepthPersistNow()
+      window.removeEventListener('pagehide', flushDepthPersistNow)
+      document.removeEventListener('visibilitychange', onHide)
+    }
+  }, [])
 
   const taWallLine = useMemo(() => {
     if (!patternOverlayOn || activePattern.instances.length === 0) return null
@@ -673,7 +741,9 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
       displayPlan.groupSize,
     )
     const withLive = overlayLiveBooksOnLatestHeatmapColumn(mergedColumns, micro, DEPTH_VENUE_ORDER, heatmapViewport.bandBps)
-    const columns = applyHeatmapViewportToColumns(withLive, heatmapViewport.bandBps)
+    queueDepthPersistFromColumns(withLive)
+    const liveColumns = applyHeatmapViewportToColumns(withLive, heatmapViewport.bandBps)
+    const columns = mergePersistedDepthIntoLiveColumns(liveColumns, depthPersistForPaintRef.current)
 
     const windowRange = heatmapWindowTimeRange(bucketCount, timelineNow, displayPlan.groupSize)
     const timeRange = { start: windowRange.start, end: windowRange.end }
@@ -730,8 +800,8 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
         : columns.length > 0
           ? columns[columns.length - 1]!.refMid
           : 0
-    const byPrice = aggregateMaxUsdByPrice(columns)
-    const latestCol = latestHeatmapColumn(columns)
+    const byPrice = aggregateMaxUsdByPrice(liveColumns)
+    const latestCol = latestHeatmapColumn(liveColumns)
     const offRange = nearestOffRangeLargePools(latestCol, axis, refMid, undefined, heatmapViewport.bandBps)
     drawHeatmap(
       ctx,
@@ -765,7 +835,7 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
         profileCanvas.height = h
         profileCanvas.style.width = `${pw}px`
         profileCanvas.style.height = '100%'
-        drawHeatmapDepthProfile(pctx, pw, h, columns, axis, maxVal, refMid, byPrice, heatmapViewport.bandBps)
+        drawHeatmapDepthProfile(pctx, pw, h, liveColumns, axis, maxVal, refMid, byPrice, heatmapViewport.bandBps)
       }
     }
   }, [
@@ -790,6 +860,7 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     dailySmaSeries,
     dailyMaForWindow,
     showDailySma,
+    depthPersistHydrated,
   ])
 
   const axisMaxLabel = formatWallUsd(axisMaxUsd)
