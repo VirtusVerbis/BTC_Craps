@@ -121,7 +121,7 @@ import {
   type HeatmapDepthPersistedColumn,
 } from '../../data/heatmapDepthPersistTypes'
 import {
-  heatmapDepthPersistedColumnLive,
+  heatmapDepthPersistedCarriedFromGrid,
   mergePersistedDepthIntoLiveColumns,
   upsertPersistedDepthColumns,
 } from '../../data/heatmapDepthPersistMerge'
@@ -423,12 +423,11 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     })
   }
 
-  const queueDepthPersistFromColumns = (liveFullBand: readonly HeatmapGridColumn[]) => {
-    const incoming: HeatmapDepthPersistedColumn[] = []
-    for (const col of liveFullBand) {
-      const row = heatmapDepthPersistedColumnLive(col)
-      if (row) incoming.push(row)
-    }
+  const queueDepthPersistFromColumns = (
+    liveColumns: readonly HeatmapGridColumn[],
+    axis: HeatmapPriceAxis,
+  ) => {
+    const incoming = heatmapDepthPersistedCarriedFromGrid(liveColumns, axis)
     if (incoming.length === 0) return
     depthPersistForPaintRef.current = upsertPersistedDepthColumns(depthPersistForPaintRef.current, incoming)
     depthPersistFlushBatchRef.current = upsertPersistedDepthColumns(
@@ -741,7 +740,6 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
       displayPlan.groupSize,
     )
     const withLive = overlayLiveBooksOnLatestHeatmapColumn(mergedColumns, micro, DEPTH_VENUE_ORDER, heatmapViewport.bandBps)
-    queueDepthPersistFromColumns(withLive)
     const liveColumns = applyHeatmapViewportToColumns(withLive, heatmapViewport.bandBps)
     const columns = mergePersistedDepthIntoLiveColumns(liveColumns, depthPersistForPaintRef.current)
 
@@ -781,6 +779,8 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     const axis = stabilized.axis
     priceAxisPaintRef.current = axis
     setPriceAxis(axis)
+
+    queueDepthPersistFromColumns(liveColumns, axis)
 
     const windowMax = heatmapGridMax(columns)
     const scaled = advanceTimelineScale(timelineNow, windowMax, scaleStateRef.current)

@@ -24,6 +24,8 @@ export interface HeatmapGridColumn {
   /** Binance perp mid at this column (price line reference). */
   refMid: number
   gap: boolean
+  /** IndexedDB restore: paint buckets per column without time carry. */
+  restoredCarry?: boolean
 }
 
 export const pickSampleInCoarseColumn = (

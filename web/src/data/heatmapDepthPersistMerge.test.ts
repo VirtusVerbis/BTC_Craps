@@ -32,8 +32,10 @@ describe('mergePersistedDepthIntoLiveColumns', () => {
     ]
     const out = mergePersistedDepthIntoLiveColumns(live, persisted)
     expect(out[0]!.gap).toBe(false)
+    expect(out[0]!.restoredCarry).toBe(true)
     expect(out[0]!.buckets[0]!.usd).toBe(800_000)
     expect(out[1]!.gap).toBe(false)
+    expect(out[1]!.restoredCarry).toBe(true)
   })
 })
 

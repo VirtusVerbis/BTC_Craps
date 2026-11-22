@@ -1,24 +1,42 @@
+import { carriedPaintBucketsForColumnIndex } from './microstructure/depthHeatmapCarriedPaint'
+import type { PriceBucket } from './microstructure/depthHeatmapPriceBins'
+import type { HeatmapPriceAxis } from './microstructure/depthHeatmapPriceAxis'
 import type { HeatmapGridColumn } from './microstructure/depthSessionHeatmapGrid'
 import { HEATMAP_DEPTH_PERSIST_MAX_MS } from './heatmapDepthPersistTypes'
 import type { HeatmapDepthPersistedColumn } from './heatmapDepthPersistTypes'
-import type { PriceBucket } from './microstructure/depthHeatmapPriceBins'
 
 const bucketsFromPersisted = (b: HeatmapDepthPersistedColumn): PriceBucket[] =>
   b.b.map(([p, usd]) => ({ p, usd }))
 
-export const heatmapDepthPersistedColumnLive = (col: HeatmapGridColumn): HeatmapDepthPersistedColumn | null => {
-  if (col.gap || col.buckets.length === 0) return null
-  const b: [number, number][] = []
-  for (const row of col.buckets) {
-    if (row.usd > 0) b.push([row.p, row.usd])
-  }
-  if (b.length === 0) return null
+/** Snapshot carried paint values for one column (matches live drag renderer). */
+export const heatmapDepthPersistedColumnCarried = (
+  colIndex: number,
+  columns: readonly HeatmapGridColumn[],
+  axis: HeatmapPriceAxis,
+): HeatmapDepthPersistedColumn | null => {
+  const col = columns[colIndex]
+  if (!col || col.gap) return null
+  const rows = carriedPaintBucketsForColumnIndex(colIndex, columns, axis)
+  if (rows.length === 0) return null
+  const b: [number, number][] = rows.map((r) => [r.p, r.usd])
   return {
     t0: col.intervalStart,
     t1: col.intervalEnd,
     m: col.refMid > 0 ? col.refMid : undefined,
     b,
   }
+}
+
+export const heatmapDepthPersistedCarriedFromGrid = (
+  columns: readonly HeatmapGridColumn[],
+  axis: HeatmapPriceAxis,
+): HeatmapDepthPersistedColumn[] => {
+  const out: HeatmapDepthPersistedColumn[] = []
+  for (let i = 0; i < columns.length; i++) {
+    const row = heatmapDepthPersistedColumnCarried(i, columns, axis)
+    if (row) out.push(row)
+  }
+  return out
 }
 
 export const trimPersistedColumnsWallClock = (
@@ -81,6 +99,7 @@ export const mergePersistedDepthIntoLiveColumns = (
       buckets,
       refMid: hit.m && hit.m > 0 ? hit.m : col.refMid,
       gap: false,
+      restoredCarry: true,
     }
   })
 }
