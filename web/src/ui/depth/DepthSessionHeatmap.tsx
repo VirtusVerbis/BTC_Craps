@@ -82,6 +82,28 @@ import {
 } from '../../data/microstructure/depthHeatmapAxisPolicy'
 import { drawHeatmapSpotKlinePolyline } from './depthHeatmapSpotKlineLine'
 import { HeatmapSpotAvgAxisLabel } from './HeatmapSpotAvgAxisLabel'
+import {
+  buildDailyMaPolylines,
+  buildDailySmaSeries,
+  dailySmaRailPlacements,
+  dailySmaVisibleOnAxis,
+  findDailySmaCrosses,
+  HEATMAP_DAILY_SMA_200,
+  latestDailyMaCrossInRange,
+  shouldBootstrapDailySmaFetch,
+  type DailyMaPolylines,
+} from '../../data/heatmapDailySma'
+import {
+  HEATMAP_DAILY_SMA_CACHE_TTL_MS,
+  loadHeatmapDailySmaWithCacheSWR,
+  readHeatmapDailySmaCache,
+} from '../../data/heatmapDailySmaCache'
+import {
+  drawHeatmapDailyMaCrossMarker,
+  drawHeatmapDailyMaPolylines,
+} from './depthHeatmapDailyMaLines'
+import { HeatmapDailyMaCrossStrip } from './HeatmapDailyMaCrossStrip'
+import { HeatmapDailyMaRailLabels, heatmapDailyMaRailAria } from './HeatmapDailyMaRailLabels'
 
 /** Poll spot REST on tail cadence; full window backfill throttled in cache layer. */
 const HEATMAP_CANDLE_POLL_MS = HEATMAP_SPOT_CANDLE_TAIL_POLL_MS
@@ -166,6 +188,7 @@ const drawHeatmap = (
   venueMidPolylines: ReturnType<typeof resolveVenueMidPolylines>,
   liveSpotMid: number,
   rangeEnd: number,
+  dailyMa?: { polylines: DailyMaPolylines; cross: ReturnType<typeof latestDailyMaCrossInRange> },
   ta?: TaDrawOpts,
 ) => {
   const rowH = h / axis.rows
@@ -210,6 +233,10 @@ const drawHeatmap = (
   drawHeatmapSpotKlinePolyline(ctx, spotKline, w, h, axis, timeRange)
 
   drawHeatmapVenueMidPolylines(ctx, venueMidPolylines, w, h, axis, timeRange)
+  if (dailyMa) {
+    drawHeatmapDailyMaPolylines(ctx, dailyMa.polylines, w, h, axis, timeRange)
+    drawHeatmapDailyMaCrossMarker(ctx, dailyMa.cross, w, h, timeRange)
+  }
   if (ta && ta.instances.length > 0) {
     const highlights = highlightedOpenTimes(ta.instances, candles)
     drawHeatmapCandlesWithTaHighlights(ctx, candles, w, h, axis, timeRange, candleIntervalMs, highlights)
@@ -238,6 +265,7 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
   const [chartSize, setChartSize] = useState({ w: 900, h: 400 })
   const [axisMaxUsd, setAxisMaxUsd] = useState(1)
   const [candles, setCandles] = useState<Candle[]>([])
+  const [dailyCandles, setDailyCandles] = useState<Candle[]>(() => readHeatmapDailySmaCache() ?? [])
   const [venueMidHistory, setVenueMidHistory] = useState<VenueMidHistory | null>(() =>
     readVenueMidHistoryCache(readWindowMin()),
   )
@@ -477,6 +505,56 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     }
   }, [windowMin, bucketCount, displayPlan.groupSize])
 
+  const dailySmaSeries = useMemo(() => buildDailySmaSeries(dailyCandles), [dailyCandles])
+
+  const dailyMaForWindow = useMemo(() => {
+    const windowRange = heatmapWindowTimeRange(bucketCount, timelineNow, displayPlan.groupSize)
+    const timeRange = { start: windowRange.start, end: windowRange.end }
+    const polylines = buildDailyMaPolylines(dailySmaSeries, timeRange)
+    const crosses = findDailySmaCrosses(dailySmaSeries)
+    const cross = latestDailyMaCrossInRange(crosses, timeRange)
+    return { polylines, cross, timeRange }
+  }, [dailySmaSeries, bucketCount, timelineNow, displayPlan.groupSize])
+
+  const showDailySma = useMemo(
+    () =>
+      dailySmaSeries.length > 0 &&
+      dailySmaVisibleOnAxis(dailyMaForWindow.polylines, priceAxis, dailyMaForWindow.timeRange),
+    [dailySmaSeries, dailyMaForWindow.polylines, dailyMaForWindow.timeRange, priceAxis],
+  )
+
+  const dailySmaRails = useMemo(
+    () =>
+      dailySmaSeries.length > 0
+        ? dailySmaRailPlacements(dailyMaForWindow.polylines, priceAxis, dailyMaForWindow.timeRange)
+        : [],
+    [dailySmaSeries.length, dailyMaForWindow.polylines, dailyMaForWindow.timeRange, priceAxis],
+  )
+
+  const showDailySmaRails = dailySmaRails.length > 0 && !showDailySma
+  const showDailySmaUi = showDailySma || showDailySmaRails
+
+  const needDailySmaFetch = useMemo(() => {
+    if (showDailySmaUi) return true
+    return shouldBootstrapDailySmaFetch(priceAxis, dailySmaSeries.length >= HEATMAP_DAILY_SMA_200)
+  }, [showDailySmaUi, dailySmaSeries.length, priceAxis])
+
+  useEffect(() => {
+    if (!needDailySmaFetch) return
+    let cancelled = false
+    const loadDaily = () => {
+      void loadHeatmapDailySmaWithCacheSWR().then((rows) => {
+        if (!cancelled && rows.length > 0) setDailyCandles(rows)
+      })
+    }
+    loadDaily()
+    const id = showDailySma ? window.setInterval(loadDaily, HEATMAP_DAILY_SMA_CACHE_TTL_MS) : undefined
+    return () => {
+      cancelled = true
+      if (id != null) window.clearInterval(id)
+    }
+  }, [needDailySmaFetch, showDailySma])
+
   useEffect(() => {
     const row = chartRowRef.current
     const scroll = scrollRef.current
@@ -593,6 +671,9 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
       venueMidPolylines,
       liveSpotMid,
       windowRange.end,
+      showDailySma
+        ? { polylines: dailyMaForWindow.polylines, cross: dailyMaForWindow.cross }
+        : undefined,
       taEnabled && ta.instances.length > 0 ? { instances: ta.instances } : undefined,
     )
     setAxisMaxUsd(maxVal)
@@ -629,9 +710,13 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     fillAvailableHeight,
     taEnabled,
     ta.instances,
+    dailySmaSeries,
+    dailyMaForWindow,
+    showDailySma,
   ])
 
   const axisMaxLabel = formatWallUsd(axisMaxUsd)
+  const axisMinLabel = formatWallUsd(0)
   const midRangePrice = heatmapAxisMidRangePrice(priceAxis)
   const axisTop = formatAxisPrice(priceAxis.priceMax)
   const axisMid = formatAxisPrice(midRangePrice)
@@ -694,10 +779,11 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
   if (offRangePools.below && qualifiesOffRangePool(offRangePools.below.usd) && chipMid > 0) {
     offRangeAriaParts.push(offRangeChipAria('below', offRangePools.below, chipMid))
   }
+  const dmaAriaParts = showDailySmaRails ? heatmapDailyMaRailAria(dailySmaRails, chipMid) : []
+  const heatmapAriaBase = `Depth heatmap by BTC price; color scale to ${axisMaxLabel} resting USD`
+  const heatmapAriaExtra = [...dmaAriaParts, ...offRangeAriaParts].filter(Boolean)
   const heatmapAria =
-    offRangeAriaParts.length > 0
-      ? `Depth heatmap by BTC price; color scale to ${axisMaxLabel} resting USD. ${offRangeAriaParts.join('. ')}`
-      : `Depth heatmap by BTC price; color scale to ${axisMaxLabel} resting USD`
+    heatmapAriaExtra.length > 0 ? `${heatmapAriaBase}. ${heatmapAriaExtra.join('. ')}` : heatmapAriaBase
 
   return (
     <section
@@ -706,7 +792,7 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
       <div className="depth-timeline-toolbar">
         <DepthInfoIcon glossaryKey="depthSessionHeatmap" label="Depth heatmap (price × time)" />
         <div className="depth-heatmap-legend" aria-hidden>
-          <span className="depth-heatmap-legend-label">Resting size (USD)</span>
+          <span className="depth-heatmap-legend-min">{axisMinLabel}</span>
           <span className="depth-heatmap-legend-ramp" />
           <span className="depth-heatmap-legend-max">{axisMaxLabel}</span>
         </div>
@@ -772,6 +858,10 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
               }
             }}
           >
+            {showDailySmaUi ? (
+              <HeatmapDailyMaRailLabels rails={dailySmaRails} showInBand={showDailySma} chartMid={chipMid} />
+            ) : null}
+            {showDailySma ? <HeatmapDailyMaCrossStrip cross={dailyMaForWindow.cross} /> : null}
             <TaHeatmapStrip
               visible={taEnabled}
               placement={taStripPlacement}

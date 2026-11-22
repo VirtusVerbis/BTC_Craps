@@ -25,6 +25,7 @@ export type DepthGlossaryKey =
   | 'wallLiveSection'
   | 'wallTapeSection'
   | 'depthSessionHeatmap'
+  | 'depthDailySma'
   | 'wallDepthChart'
   | 'wallChartMode'
   | 'wallChartXScale'
@@ -82,20 +83,58 @@ export const depthGlossary: Record<DepthGlossaryKey, GlossaryEntry> = {
     body: 'Wifi icon on each venue: green live, amber reconnecting, gray disconnected (same as the main overlay). Mids update with depth sampling; stale feeds may show Mid — or zero taker flow.',
   },
   timelineHeatmap: {
-    title: 'Depth timeline',
-    body: 'Bid vs ask notional near price over the last hour (~2.5s samples). Bright bands show where size piled up.',
+    title: 'Depth timeline (single venue)',
+    body:
+      'Bid vs ask notional near mid over recent samples (~2.5s). Bright bands show where size piled up.',
+    items: [
+      {
+        label: 'Colors',
+        detail: 'Green bids above center, red asks below; taller = more USD near mid at that moment.',
+      },
+      {
+        label: 'Merged chart',
+        detail: 'All venues together: main Depth timeline above the consolidated book.',
+      },
+    ],
   },
   mergedTimeline: {
     title: 'Merged depth timeline',
-    body: 'All venues on one clock: bids above the midline, asks below. Each column is a time slice; bar height is USD notional resting within 50 bps of that venue’s mid (sum of price × size on that side). The left axis shows the session scale max—a full band height in overlap. In stack, venue bands add so a column can exceed one band height. Y only ratchets up during the session so history does not shrink when a new spike appears.',
+    body:
+      'All venues on one clock: bids above the midline, asks below. Each column is a time slice; bar height is USD notional within 50 bps of that venue’s mid (price × size on that side). Samples on a ~2.5s grid.',
+    items: [
+      {
+        label: 'Session scale (Y)',
+        detail:
+          'Left axis = session max. A full bar height in overlap matches that max. Y only ratchets up during the session so past spikes don’t shrink when a newer peak appears.',
+      },
+      {
+        label: 'Stack vs overlap',
+        detail:
+          'In stack, venue bands add in a column, so total height can exceed one band height.',
+      },
+      {
+        label: 'Overlap mode',
+        detail:
+          'Each venue’s bar from the midline in the same column (opaque colors). Largest painted first, smallest last, so thinner venues stay visible on top.',
+      },
+      {
+        label: 'Stack mode',
+        detail:
+          'One column from the midline: opaque segments add up, sorted by size, largest farthest from mid (top bids, bottom asks). Slice heights scale to that column’s leader, then fit in the canvas half.',
+      },
+      {
+        label: '15m / 30m / 60m',
+        detail: 'Last 15, 30, or 60 minutes of depth samples retained in memory on that grid.',
+      },
+    ],
   },
   timelineLayerMode: {
     title: 'Overlap vs stack',
-    body: 'Overlap draws each venue’s bar from the midline in the same column (opaque colors); largest is painted first and smallest last so thinner venues stay visible on top. Stack builds one column from the midline with opaque segments that add up—sorted by size with the largest farthest from mid (top bids, bottom asks); each column scales slice heights to that column’s leader, then fits the stack in the canvas half.',
+    body: 'See Depth timeline — Stack vs overlap, Overlap mode, and Stack mode.',
   },
   timelineWindow: {
     title: 'Timeline window',
-    body: 'Shows the last 15, 30, or 60 minutes of depth samples retained in memory (~2.5s grid).',
+    body: 'See Depth timeline — 15m / 30m / 60m.',
   },
   wallDepthChart: {
     title: 'Live book depth',
@@ -147,7 +186,50 @@ export const depthGlossary: Record<DepthGlossaryKey, GlossaryEntry> = {
   depthSessionHeatmap: {
     title: 'Depth heatmap (price × time)',
     body:
-      'Session-only Coinglass-style view: time across the bottom, BTC USD price on the side ($6 ticks by default). Resting liquidity within ~180 bps of each venue mid is binned at absolute prices and merged across venues; Binance spot OHLC candles are drawn on top with a yellow BN-S close line underneath. Venue-colored labels on the price rail track each exchange’s latest kline close (same venues as the mid lines, plus Binance spot; spot tip uses live spot mid between candle refreshes). A animated ~$ typical-price label tracks (H+L+C)/3 on the latest spot bar. Y range uses finalized in-window spot OHLC (open bars ignored) so micro blips do not rescale the rail; it still widens on closed-bar spikes and in-window venue mids when spot range is irregular, with a brief hold before tightening again. Top/bottom chips and edge tint mark the nearest merged pool ≥ $1M outside the visible Y (latest book, distance in bps from Binance perp mid). The profile rail shows session-max resting USD at each price. Brighter color = more resting USD; faint dashed line = Binance perp live mid. Color scale max ratchets up during the session.',
+      'BTC resting liquidity over the last 15m, 30m, or 60m: time left to right, USD price on the right. Color is merged resting size near each venue’s mid (~±180 bps), scaled $0 to session max on the toolbar ramp. Binance spot candles on top; yellow line = BN-S close; dashed white = Binance perp live mid.',
+    items: [
+      {
+        label: 'Heatmap color',
+        detail: 'Brighter = more resting USD at that price and time (venues merged).',
+      },
+      {
+        label: 'Profile rail',
+        detail: 'Right strip: session maximum resting USD at each price in view.',
+      },
+      {
+        label: 'Venue mids',
+        detail: 'Colored lines = each exchange mid through the window; price-rail tags show latest closes.',
+      },
+      {
+        label: 'BN-S typical',
+        detail: 'Animated ~$ on the latest spot bar = (high + low + close) / 3.',
+      },
+      {
+        label: '50D / 200D SMA',
+        detail:
+          'Binance spot daily simple moving averages (50 and 200 closes). Dashed orange and pink on-chart when inside the price band; left rail labels with bps when off-screen.',
+      },
+      {
+        label: 'Golden / death cross',
+        detail: '50D crosses above or below 200D on daily closes; badge at top when that UTC day is in the time window.',
+      },
+      {
+        label: 'Off-chart walls',
+        detail: 'Top-right / bottom-right chips: nearest merged pool ≥ $1M outside the Y band (bps from perp mid).',
+      },
+      {
+        label: 'Price scale (Y)',
+        detail: 'Fits in-window spot and depth; open bars don’t jitter the scale; brief widen on real spikes.',
+      },
+      {
+        label: 'TA',
+        detail: 'Optional pattern overlay on candles; pause freezes the time cursor.',
+      },
+    ],
+  },
+  depthDailySma: {
+    title: 'Daily 50 / 200 SMA',
+    body: 'See Depth heatmap — 50D / 200D SMA and Golden / death cross.',
   },
   wallTapeSection: {
     title: 'Wall tape',

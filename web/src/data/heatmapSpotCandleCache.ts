@@ -103,7 +103,6 @@ const refreshSubHourSpot = async (
   now: number,
   forceFullWindow: boolean,
 ): Promise<{ candles: Candle[]; raw1s: Candle[] }> => {
-  const barMs = heatmapCandleBarMs(windowMin)
   const windowStart = heatmapSpotWindowStartMs(windowMin, now)
   const prior1s = prior?.raw1s ?? []
 

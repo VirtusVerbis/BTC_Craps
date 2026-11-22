@@ -8,7 +8,7 @@ export interface Candle {
   close: number
 }
 
-export type BinanceKlineInterval = '1s' | '1m'
+export type BinanceKlineInterval = '1s' | '1m' | '1d'
 
 /** Binance kline REST — in dev, Vite proxies `/binance-api` to `https://api.binance.com`. */
 export const fetchBinanceBtcKlines = async (

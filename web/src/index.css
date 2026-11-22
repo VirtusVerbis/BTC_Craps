@@ -3168,6 +3168,131 @@ html.shooter-gesture-lock body {
   font-weight: 700;
 }
 
+.depth-heatmap-dma-legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+  font-size: var(--depth-font-sm);
+}
+
+.depth-heatmap-dma-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 4px;
+  border: 1px solid;
+  font-weight: 700;
+  white-space: nowrap;
+  background: rgba(10, 14, 23, 0.72);
+}
+
+.depth-heatmap-dma-chip-dash {
+  width: 1.25rem;
+  height: 0;
+  border-top: 2px solid currentColor;
+}
+
+.depth-heatmap-dma-chip-dash--50 {
+  border-top-style: dashed;
+  border-top-width: 2.5px;
+}
+
+.depth-heatmap-dma-chip-dash--200 {
+  border-top-style: dashed;
+}
+
+.depth-heatmap-dma-regime {
+  color: rgba(246, 240, 218, 0.65);
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+
+.depth-heatmap-dma-rail-col {
+  position: absolute;
+  left: 0.35rem;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.28rem;
+  max-width: min(48%, calc(100% - 7rem));
+  pointer-events: none;
+}
+
+.depth-heatmap-dma-rail-col--top {
+  top: 0.35rem;
+}
+
+.depth-heatmap-dma-rail-col--bottom {
+  bottom: 0.35rem;
+}
+
+.depth-heatmap-dma-rail-chip {
+  flex-wrap: wrap;
+  row-gap: 0.1rem;
+  max-width: 100%;
+}
+
+.depth-heatmap-dma-rail-name {
+  white-space: nowrap;
+}
+
+.depth-heatmap-dma-rail-detail {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8125rem;
+  opacity: 0.92;
+  white-space: nowrap;
+}
+
+.depth-session-heatmap:has(.depth-dma-cross-strip--top-center) .depth-heatmap-dma-rail-col--top {
+  padding-right: 0;
+}
+
+.depth-dma-cross-strip {
+  position: absolute;
+  z-index: 4;
+  max-width: min(14rem, 42vw);
+  padding: 0.45rem 0.65rem;
+  border-radius: 6px;
+  border: 1px solid rgba(246, 240, 218, 0.28);
+  background: rgba(10, 14, 23, 0.92);
+  pointer-events: none;
+}
+
+.depth-dma-cross-strip--top-left {
+  top: 0.55rem;
+  left: 0.55rem;
+}
+
+.depth-dma-cross-strip--top-center {
+  top: 0.55rem;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.depth-dma-cross-strip--golden .depth-dma-cross-strip-title {
+  color: rgb(255, 193, 7);
+}
+
+.depth-dma-cross-strip--death .depth-dma-cross-strip-title {
+  color: rgb(244, 67, 54);
+}
+
+.depth-dma-cross-strip-title {
+  margin: 0;
+  font-weight: 800;
+  font-size: 0.9375rem;
+  line-height: 1.2;
+}
+
+.depth-dma-cross-strip-date {
+  margin: 0.2rem 0 0;
+  font-size: 0.8125rem;
+  color: rgba(246, 240, 218, 0.78);
+}
+
 .depth-heatmap-legend {
   display: flex;
   align-items: center;
@@ -3197,6 +3322,7 @@ html.shooter-gesture-lock body {
   border: 1px solid rgba(246, 240, 218, 0.2);
 }
 
+.depth-heatmap-legend-min,
 .depth-heatmap-legend-max {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -3381,7 +3507,7 @@ html.shooter-gesture-lock body {
 }
 
 .depth-panel .depth-info-body {
-  font-size: var(--depth-font-sm);
+  font-size: calc(var(--depth-font-sm) * 0.8);
 }
 
 .depth-panel .depth-info-icon {
@@ -3424,7 +3550,7 @@ html.shooter-gesture-lock body {
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.4);
   font-weight: 400;
-  font-size: 0.88rem;
+  font-size: calc(0.88rem * 0.8);
 }
 
 .depth-info-popover {
@@ -3434,7 +3560,7 @@ html.shooter-gesture-lock body {
   max-width: min(22rem, calc(100vw - 16px));
   border: 1px solid rgba(246, 240, 218, 0.22);
   background: rgba(14, 12, 22, 0.96);
-  font-size: var(--depth-font-sm);
+  font-size: calc(var(--depth-font-sm) * 0.8);
   line-height: 1.45;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
   pointer-events: auto;
