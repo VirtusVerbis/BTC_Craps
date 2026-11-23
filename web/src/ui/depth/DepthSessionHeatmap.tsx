@@ -66,6 +66,7 @@ import { TaHeatmapStrip } from './TaHeatmapStrip'
 import { taStripPlacementForInstances } from './taStripPlacement'
 import { TaHeatmapTransport } from './TaHeatmapTransport'
 import type { PatternInstance } from '../../data/ta/taTypes'
+import { TA_PATTERN_PULSE_PERIOD_MS } from '../../data/ta/taConstants'
 import { drawDraggedHeatmapDepth } from './depthHeatmapDragPaint'
 import { drawHeatmapVenueMidPolylines } from './depthHeatmapVenueMidLines'
 import { offRangeChipStyle } from './depthHeatmapOffRangeChip'
@@ -216,6 +217,8 @@ const offRangeChipAria = (direction: 'above' | 'below', edge: OffRangeEdge, mid:
 
 type TaDrawOpts = {
   instances: readonly PatternInstance[]
+  patternPulsePhase: number
+  patternPulseAnimate: boolean
 }
 
 const biasLabel = (bias: PatternInstance['bias']): string => {
@@ -291,7 +294,18 @@ const drawHeatmap = (
   if (ta && ta.instances.length > 0) {
     const highlights = highlightedOpenTimes(ta.instances, candles)
     drawHeatmapCandlesWithTaHighlights(ctx, candles, w, h, axis, timeRange, candleIntervalMs, highlights)
-    drawHeatmapTaAnnotations(ctx, ta.instances, candles, w, h, axis, timeRange, candleIntervalMs)
+    drawHeatmapTaAnnotations(
+      ctx,
+      ta.instances,
+      candles,
+      w,
+      h,
+      axis,
+      timeRange,
+      candleIntervalMs,
+      ta.patternPulsePhase,
+      ta.patternPulseAnimate,
+    )
   } else {
     drawHeatmapCandleOverlay(ctx, candles, w, h, axis, timeRange, candleIntervalMs)
   }
@@ -402,6 +416,40 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     candles: heatmapChartCandles,
   })
   const activePattern = taEnabled ? ta : struct
+
+  const patternPulseEpochRef = useRef(performance.now())
+  const [patternPulsePhase, setPatternPulsePhase] = useState(0)
+  const [patternPulseAnimate, setPatternPulseAnimate] = useState(true)
+  const patternPulseActive = patternOverlayOn && activePattern.instances.length > 0
+
+  useEffect(() => {
+    patternPulseEpochRef.current = performance.now()
+    setPatternPulsePhase(0)
+  }, [activePattern.patternId])
+
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const apply = () => setPatternPulseAnimate(!mq.matches)
+    apply()
+    mq.addEventListener('change', apply)
+    return () => mq.removeEventListener('change', apply)
+  }, [])
+
+  useEffect(() => {
+    if (!patternPulseActive || !patternPulseAnimate) {
+      setPatternPulsePhase(0)
+      return undefined
+    }
+    let raf = 0
+    const tick = () => {
+      const elapsed = performance.now() - patternPulseEpochRef.current
+      const phase = (elapsed % TA_PATTERN_PULSE_PERIOD_MS) / TA_PATTERN_PULSE_PERIOD_MS
+      setPatternPulsePhase(phase)
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [patternPulseActive, patternPulseAnimate, activePattern.patternId])
 
   const samplesByVenue = useMemo(() => {
     const out = {} as Record<(typeof DEPTH_VENUE_ORDER)[number], (typeof micro.venues)[keyof typeof micro.venues]['depthSamples']>
@@ -818,7 +866,13 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
       showDailySma
         ? { polylines: dailyMaForWindow.polylines, cross: dailyMaForWindow.cross }
         : undefined,
-      patternOverlayOn && activePattern.instances.length > 0 ? { instances: activePattern.instances } : undefined,
+      patternOverlayOn && activePattern.instances.length > 0
+        ? {
+            instances: activePattern.instances,
+            patternPulsePhase,
+            patternPulseAnimate,
+          }
+        : undefined,
     )
     setAxisMaxUsd(maxVal)
     setOffRangePools(offRange)
@@ -854,6 +908,8 @@ export const DepthSessionHeatmap = ({ micro, fillAvailableHeight = false }: Dept
     fillAvailableHeight,
     patternOverlayOn,
     activePattern.instances,
+    patternPulsePhase,
+    patternPulseAnimate,
     dailySmaSeries,
     dailyMaForWindow,
     showDailySma,

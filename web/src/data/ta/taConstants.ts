@@ -4,6 +4,12 @@ export const TA_CATALOG_STEP_MS = 1_000
 /** Dwell on pattern when one or more instances match. */
 export const TA_PATTERN_DWELL_MS = 10_000
 
+/** One full in/out pulse on pattern circles and candle envelopes (ms). */
+export const TA_PATTERN_PULSE_PERIOD_MS = 1_500
+
+export const TA_PATTERN_PULSE_ALPHA_MIN = 0.42
+export const TA_PATTERN_PULSE_ALPHA_MAX = 1
+
 /** Bars before pattern anchor for trend classification (15/30/60 agnostic). */
 export const TREND_LOOKBACK_BARS = 12
 

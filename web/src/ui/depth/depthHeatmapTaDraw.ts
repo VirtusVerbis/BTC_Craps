@@ -5,6 +5,8 @@ import {
   TA_BEAR_ARROW,
   TA_BULL_ARROW,
   TA_HIGHLIGHT_COLOR,
+  TA_PATTERN_PULSE_ALPHA_MAX,
+  TA_PATTERN_PULSE_ALPHA_MIN,
 } from '../../data/ta/taConstants'
 import type { HeatmapPriceAxis } from '../../data/microstructure/depthHeatmapPriceAxis'
 import {
@@ -27,6 +29,18 @@ const ARROW_DELTA = 54
 
 const ENVELOPE_PAD_X = 10
 const ENVELOPE_PAD_Y = 8
+
+/** 0.5 at cycle start, peak 1 at 0.25 phase, trough 0 at 0.75 phase. */
+export const taPatternPulseWeight = (phase01: number): number =>
+  (Math.sin(phase01 * Math.PI * 2) + 1) / 2
+
+const taPatternPulseAlpha = (phase01: number, animate: boolean): number => {
+  if (!animate) return TA_PATTERN_PULSE_ALPHA_MAX
+  const t = taPatternPulseWeight(phase01)
+  return TA_PATTERN_PULSE_ALPHA_MIN + (TA_PATTERN_PULSE_ALPHA_MAX - TA_PATTERN_PULSE_ALPHA_MIN) * t
+}
+
+const ENVELOPE_BASE_ALPHA = 0.92
 
 export const highlightedOpenTimes = (instances: readonly PatternInstance[], candles: readonly Candle[]): Set<number> => {
   const out = new Set<number>()
@@ -102,22 +116,31 @@ const drawArrow = (
   x1: number,
   y1: number,
   color: string,
+  phase01: number,
+  pulseAnimate: boolean,
 ) => {
+  const t = pulseAnimate ? taPatternPulseWeight(phase01) : 1
+  const savedAlpha = ctx.globalAlpha
+  if (pulseAnimate) {
+    ctx.globalAlpha = savedAlpha * taPatternPulseAlpha(phase01, true)
+  }
   ctx.strokeStyle = color
   ctx.fillStyle = color
-  ctx.lineWidth = ARROW_LINE
+  ctx.lineWidth = pulseAnimate ? ARROW_LINE * (0.75 + 0.5 * t) : ARROW_LINE
   ctx.lineCap = 'round'
   ctx.beginPath()
   ctx.moveTo(x0, y0)
   ctx.lineTo(x1, y1)
   ctx.stroke()
   const angle = Math.atan2(y1 - y0, x1 - x0)
+  const head = pulseAnimate ? ARROW_HEAD * (0.88 + 0.2 * t) : ARROW_HEAD
   ctx.beginPath()
   ctx.moveTo(x1, y1)
-  ctx.lineTo(x1 - ARROW_HEAD * Math.cos(angle - 0.4), y1 - ARROW_HEAD * Math.sin(angle - 0.4))
-  ctx.lineTo(x1 - ARROW_HEAD * Math.cos(angle + 0.4), y1 - ARROW_HEAD * Math.sin(angle + 0.4))
+  ctx.lineTo(x1 - head * Math.cos(angle - 0.4), y1 - head * Math.sin(angle - 0.4))
+  ctx.lineTo(x1 - head * Math.cos(angle + 0.4), y1 - head * Math.sin(angle + 0.4))
   ctx.closePath()
   ctx.fill()
+  ctx.globalAlpha = savedAlpha
 }
 
 const drawCandleEnvelope = (
@@ -126,12 +149,16 @@ const drawCandleEnvelope = (
   highY: number,
   lowY: number,
   candleW: number,
+  phase01: number,
+  pulseAnimate: boolean,
 ) => {
   const halfH = Math.max((lowY - highY) / 2 + ENVELOPE_PAD_Y, ENVELOPE_PAD_Y)
   const rx = Math.max(candleW / 2 + ENVELOPE_PAD_X, ENVELOPE_PAD_X)
   const cy = (highY + lowY) / 2
-  ctx.strokeStyle = TA_ANNOTATION_COLOR
-  ctx.lineWidth = 2.25
+  const alpha = taPatternPulseAlpha(phase01, pulseAnimate)
+  const t = pulseAnimate ? taPatternPulseWeight(phase01) : 1
+  ctx.strokeStyle = `rgba(246, 240, 218, ${ENVELOPE_BASE_ALPHA * alpha})`
+  ctx.lineWidth = pulseAnimate ? 1.85 + 0.85 * t : 2.25
   ctx.setLineDash([])
   ctx.beginPath()
   ctx.ellipse(cx, cy, rx, halfH, 0, 0, Math.PI * 2)
@@ -147,6 +174,8 @@ export const drawHeatmapTaAnnotations = (
   axis: HeatmapPriceAxis,
   timeRange: HeatmapTimeRange,
   candleIntervalMs: number,
+  patternPulsePhase = 0,
+  patternPulseAnimate = false,
 ): void => {
   if (instances.length === 0) return
   const intervalMs = Math.max(1000, candleIntervalMs)
@@ -167,7 +196,7 @@ export const drawHeatmapTaAnnotations = (
       const highY = heatmapPriceToY(fc.high, h, axis)
       const lowY = heatmapPriceToY(fc.low, h, axis)
       if (lowY > h + 8 || highY < -8) continue
-      drawCandleEnvelope(ctx, fx, highY, lowY, candleW)
+      drawCandleEnvelope(ctx, fx, highY, lowY, candleW, patternPulsePhase, patternPulseAnimate)
     }
 
     if (drawnAnchors.has(inst.anchorIndex) && instances.length > 8) continue
@@ -182,11 +211,14 @@ export const drawHeatmapTaAnnotations = (
       if (!fc) continue
       const fx = heatmapTimeToX(fc.openTime + intervalMs / 2, w, timeRange)
       const fy = heatmapPriceToY(f.price, h, axis)
+      const t = patternPulseAnimate ? taPatternPulseWeight(patternPulsePhase) : 1
+      ctx.globalAlpha = taPatternPulseAlpha(patternPulsePhase, patternPulseAnimate)
       ctx.strokeStyle = TA_HIGHLIGHT_COLOR
-      ctx.lineWidth = 2
+      ctx.lineWidth = patternPulseAnimate ? 1.5 + 1.25 * t : 2
       ctx.beginPath()
-      ctx.arc(fx, fy, 11, 0, Math.PI * 2)
+      ctx.arc(fx, fy, patternPulseAnimate ? 10 + t : 11, 0, Math.PI * 2)
       ctx.stroke()
+      ctx.globalAlpha = 1
     }
 
     let color = TA_ANNOTATION_COLOR
@@ -208,7 +240,7 @@ export const drawHeatmapTaAnnotations = (
       y1 = anchorY + ARROW_DELTA
     }
     if (inst.arrow !== 'none') {
-      drawArrow(ctx, x, anchorY, x1, y1, color)
+      drawArrow(ctx, x, anchorY, x1, y1, color, patternPulsePhase, patternPulseAnimate)
     }
   }
   ctx.restore()
