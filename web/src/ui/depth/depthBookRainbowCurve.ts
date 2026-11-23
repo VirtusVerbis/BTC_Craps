@@ -10,7 +10,6 @@ type Point = { x: number; y: number }
 
 const curveToScreenPoints = (
   points: readonly CumulativeDepthPoint[],
-  midX: number,
   baseY: number,
   chartH: number,
   maxCum: number,
@@ -93,6 +92,6 @@ export const drawAggregateRainbowCurve = (
 ): void => {
   if (points.length < 2) return
   const pointX = (bps: number) => xFromBps(midX, halfW, bps, xScale, fixedMaxBps, sideExtents)
-  const vertices = curveToScreenPoints(points, midX, baseY, chartH, maxCum, pointX)
+  const vertices = curveToScreenPoints(points, baseY, chartH, maxCum, pointX)
   drawRainbowDashedPolyline(ctx, vertices, timeMs)
 }
