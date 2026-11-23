@@ -76,3 +76,61 @@ export const maxCumulativeBtc = (curves: { bids: CumulativeDepthPoint[]; asks: C
   }
   return max
 }
+
+export const maxCumulativeBtcSide = (
+  curves: readonly { bids: CumulativeDepthPoint[]; asks: CumulativeDepthPoint[] }[],
+  side: 'bid' | 'ask',
+): number => {
+  let max = 0.01
+  const points = side === 'bid' ? 'bids' : 'asks'
+  for (const c of curves) {
+    for (const p of c[points]) {
+      max = Math.max(max, p.cumulativeBtc)
+    }
+  }
+  return max
+}
+
+/** Step cumulative on a venue bid/ask curve at a shared bps knot (overlap aggregate). */
+export const cumulativeBtcAtSharedBps = (
+  points: readonly CumulativeDepthPoint[],
+  targetBps: number,
+  side: 'bid' | 'ask',
+): number => {
+  if (points.length === 0) return 0
+  if (side === 'bid') {
+    let at = 0
+    for (const p of points) {
+      if (p.bps >= targetBps) at = p.cumulativeBtc
+    }
+    return at
+  }
+  let at = 0
+  for (const p of points) {
+    if (p.bps <= targetBps) at = p.cumulativeBtc
+  }
+  return at
+}
+
+/** Sum venue cumulative curves at each union bps knot (each venue still uses its own mid). */
+export const sumVenueCurvesAtSharedBps = (
+  curves: readonly { bids: CumulativeDepthPoint[]; asks: CumulativeDepthPoint[] }[],
+): { bids: CumulativeDepthPoint[]; asks: CumulativeDepthPoint[] } => {
+  const bidBps = new Set<number>([0])
+  const askBps = new Set<number>([0])
+  for (const c of curves) {
+    for (const p of c.bids) bidBps.add(p.bps)
+    for (const p of c.asks) askBps.add(p.bps)
+  }
+  const bidSorted = [...bidBps].sort((a, b) => b - a)
+  const askSorted = [...askBps].sort((a, b) => a - b)
+  const bids: CumulativeDepthPoint[] = bidSorted.map((bps) => ({
+    bps,
+    cumulativeBtc: curves.reduce((sum, c) => sum + cumulativeBtcAtSharedBps(c.bids, bps, 'bid'), 0),
+  }))
+  const asks: CumulativeDepthPoint[] = askSorted.map((bps) => ({
+    bps,
+    cumulativeBtc: curves.reduce((sum, c) => sum + cumulativeBtcAtSharedBps(c.asks, bps, 'ask'), 0),
+  }))
+  return { bids, asks }
+}

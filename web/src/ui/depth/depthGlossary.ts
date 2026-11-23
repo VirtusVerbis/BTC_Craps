@@ -142,7 +142,8 @@ export const depthGlossary: Record<DepthGlossaryKey, GlossaryEntry> = {
     items: [
       {
         label: 'Curves',
-        detail: 'Bid (left) and ask (right) from mid; height is cumulative BTC; colors match the venue legend.',
+        detail:
+          'Bid (left) and ask (right) from mid; height is cumulative BTC; colors match the venue legend. Venue height scales to the deepest single venue on that side; dashed rainbow is the sum across venues at shared bps, scaled to that combined total (stroke only).',
       },
       {
         label: 'Wall dashes',

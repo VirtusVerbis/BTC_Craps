@@ -5,8 +5,11 @@ import {
   DEPTH_BOOK_CHART_MAX_BPS,
   DEPTH_BOOK_CHART_STRETCH_MAX_BPS,
   maxCumulativeBtc,
+  maxCumulativeBtcSide,
+  sumVenueCurvesAtSharedBps,
   type CurveSideExtents,
 } from '../../data/microstructure/depthBookCurve'
+import { drawAggregateRainbowCurve } from './depthBookRainbowCurve'
 import type { MicrostructureState, VenueId, WallRecord } from '../../data/microstructure/types'
 import { DepthInfoIcon } from './DepthInfoIcon'
 import { formatVenueMid, venueMidChartLabelColor } from './depthVenueMidFormat'
@@ -351,7 +354,8 @@ const drawWallMarkers = (
   h: number,
   xScale: BookChartXScale,
   sideExtents: CurveSideExtents,
-  maxCum: number,
+  maxCumBid: number,
+  maxCumAsk: number,
   chartInnerH: number,
   curvesByVenue: Readonly<Partial<Record<VenueId, VenueCurve>>>,
   venueExtents?: Readonly<Partial<Record<VenueId, CurveSideExtents>>>,
@@ -372,9 +376,10 @@ const drawWallMarkers = (
     const curve = curvesByVenue[wall.venue]
     const points = curve ? (wall.side === 'bid' ? curve.bids : curve.asks) : []
     const venueMaxCum = venueSideMaxCumulative(points)
+    const sideMaxCum = wall.side === 'bid' ? maxCumBid : maxCumAsk
     const topY =
       venueMaxCum > 0
-        ? baseY - (venueMaxCum / maxCum) * chartInnerH
+        ? baseY - (venueMaxCum / sideMaxCum) * chartInnerH
         : baseY - WALL_MARKER_MIN_PX
     ctx.strokeStyle = wall.side === 'bid' ? 'rgba(76, 175, 80, 0.9)' : 'rgba(244, 67, 54, 0.9)'
     ctx.setLineDash([3, 3])
@@ -478,7 +483,40 @@ export const DepthBookChart = ({ micro, topWalls, fillAvailableHeight = false }:
     [micro.venues, bookChartMaxBps],
   )
 
-  const maxCum = useMemo(() => maxCumulativeBtc(venueCurves.map((v) => v.curve)), [venueCurves])
+  const aggregateCurve = useMemo(
+    () => sumVenueCurvesAtSharedBps(venueCurves.map((v) => v.curve)),
+    [venueCurves],
+  )
+  const aggregateSideExtents = useMemo(() => curveSideExtents(aggregateCurve), [aggregateCurve])
+
+  const maxCumVenueBid = useMemo(
+    () => maxCumulativeBtcSide(venueCurves.map((v) => v.curve), 'bid'),
+    [venueCurves],
+  )
+  const maxCumVenueAsk = useMemo(
+    () => maxCumulativeBtcSide(venueCurves.map((v) => v.curve), 'ask'),
+    [venueCurves],
+  )
+  const maxCumRainbowBid = useMemo(
+    () => maxCumulativeBtcSide([aggregateCurve], 'bid'),
+    [aggregateCurve],
+  )
+  const maxCumRainbowAsk = useMemo(
+    () => maxCumulativeBtcSide([aggregateCurve], 'ask'),
+    [aggregateCurve],
+  )
+
+  const [rainbowNow, setRainbowNow] = useState(0)
+  useEffect(() => {
+    if (mode !== 'overlap') return
+    let frame = 0
+    const tick = (t: number) => {
+      setRainbowNow(t)
+      frame = requestAnimationFrame(tick)
+    }
+    frame = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(frame)
+  }, [mode])
 
   const venueExtentsById = useMemo((): Partial<Record<VenueId, CurveSideExtents>> => {
     const out: Partial<Record<VenueId, CurveSideExtents>> = {}
@@ -600,6 +638,7 @@ export const DepthBookChart = ({ micro, topWalls, fillAvailableHeight = false }:
           xScale,
           extents,
           venueMaxCum,
+          venueMaxCum,
           rowH - 18,
           { [venue]: curve },
         )
@@ -638,6 +677,8 @@ export const DepthBookChart = ({ micro, topWalls, fillAvailableHeight = false }:
         baseY - CURVE_LABEL_DESCENT_PX - (xScale === 'fixed' ? 10 : 0),
       )
 
+      const aggregateExtents = xScale === 'stretch' ? aggregateSideExtents : fixedExtents
+
       for (const { venue, curve, sideExtents } of venueCurves) {
         const bidFill = depthVenueColorBid[venue].replace(/[\d.]+\)$/, '0.22)')
         const askFill = depthVenueColorAsk[venue].replace(/[\d.]+\)$/, '0.22)')
@@ -652,7 +693,7 @@ export const DepthBookChart = ({ micro, topWalls, fillAvailableHeight = false }:
           xScale,
           DEPTH_BOOK_CHART_MAX_BPS,
           extents,
-          maxCum,
+          maxCumVenueBid,
           bidFill,
           'bid',
           venue,
@@ -669,7 +710,7 @@ export const DepthBookChart = ({ micro, topWalls, fillAvailableHeight = false }:
           xScale,
           DEPTH_BOOK_CHART_MAX_BPS,
           extents,
-          maxCum,
+          maxCumVenueAsk,
           askFill,
           'ask',
           venue,
@@ -677,6 +718,35 @@ export const DepthBookChart = ({ micro, topWalls, fillAvailableHeight = false }:
           overlapLabelFloorY,
         )
       }
+
+      drawAggregateRainbowCurve(
+        ctx,
+        aggregateCurve.bids,
+        midX,
+        baseY,
+        chartHInner,
+        halfW,
+        xScale,
+        DEPTH_BOOK_CHART_MAX_BPS,
+        aggregateExtents,
+        maxCumRainbowBid,
+        rainbowNow,
+        xFromBps,
+      )
+      drawAggregateRainbowCurve(
+        ctx,
+        aggregateCurve.asks,
+        midX,
+        baseY,
+        chartHInner,
+        halfW,
+        xScale,
+        DEPTH_BOOK_CHART_MAX_BPS,
+        aggregateExtents,
+        maxCumRainbowAsk,
+        rainbowNow,
+        xFromBps,
+      )
 
       resolveLabelCollisions(bidLabels, labelMinY, labelMaxY)
       resolveLabelCollisions(askLabels, labelMinY, labelMaxY)
@@ -696,7 +766,8 @@ export const DepthBookChart = ({ micro, topWalls, fillAvailableHeight = false }:
         chartH,
         xScale,
         fixedExtents,
-        maxCum,
+        maxCumVenueBid,
+        maxCumVenueAsk,
         chartHInner,
         curvesByVenue,
         xScale === 'stretch' ? venueExtentsById : undefined,
@@ -707,7 +778,23 @@ export const DepthBookChart = ({ micro, topWalls, fillAvailableHeight = false }:
         drawFixedAxisLabels(ctx, padX, chartW, DEPTH_BOOK_CHART_MAX_BPS, y + chartH - 2)
       }
     }
-  }, [micro, mode, xScale, topWalls, viewSize, fillAvailableHeight, maxCum, venueCurves, venueExtentsById])
+  }, [
+    micro,
+    mode,
+    xScale,
+    topWalls,
+    viewSize,
+    fillAvailableHeight,
+    maxCumVenueBid,
+    maxCumVenueAsk,
+    maxCumRainbowBid,
+    maxCumRainbowAsk,
+    venueCurves,
+    venueExtentsById,
+    aggregateCurve,
+    aggregateSideExtents,
+    rainbowNow,
+  ])
 
   return (
     <div
